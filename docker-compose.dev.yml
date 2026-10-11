@@ -3,9 +3,9 @@
 # Server, worker, and client run on the host (not containerized).
 #
 # Postgres image is built from the production Dockerfile at
-# ${INFRA_PG_DIR} (default ../../../infrastructure/postgres-service, la
-# profundidad de jupiter) so dev inherits any extension. Proyectos en otra
-# profundidad lo pisan en docker/dev/.env — p.ej. agilerp usa ../../infra...
+# ${INFRA_PG_DIR} (por defecto la ruta desde este server hasta
+# infrastructure/postgres-service, calculada al generar; docker/dev/.env la
+# puede pisar) so dev inherits any extension
 # upgrade (pgmq, pgvector, pgaudit) without duplication.
 # Init scripts are mounted from the same source for the same reason.
 #
@@ -17,7 +17,7 @@
 services:
   postgres:
     build:
-      context: ${INFRA_PG_DIR:-../../../infrastructure/postgres-service}
+      context: ${INFRA_PG_DIR:-../../infrastructure/postgres-service}
       dockerfile: Dockerfile
     image: agilbank-postgres-dev:latest
     container_name: ${COMPOSE_PROJECT_NAME:-agilbank}-postgres-dev
@@ -31,7 +31,7 @@ services:
       # NOTE: this image (ghcr.io/pgmq/pg18-pgmq) uses PGDATA=/var/lib/postgresql/18/docker
       # We mount the parent dir so the volume captures whatever subpath the image picks.
       - postgres_data:/var/lib/postgresql
-      - ${INFRA_PG_DIR:-../../../infrastructure/postgres-service}/init:/docker-entrypoint-initdb.d:ro
+      - ${INFRA_PG_DIR:-../../infrastructure/postgres-service}/init:/docker-entrypoint-initdb.d:ro
     command: >
       postgres
         -c shared_preload_libraries=pg_stat_statements,pgaudit
