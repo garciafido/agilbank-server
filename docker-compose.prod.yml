@@ -1,0 +1,124 @@
+services:
+  server:
+    image: localhost:5000/agilbank-server:latest
+    # Si una migración falla el server sale con error en vez de arrancar con el
+    # esquema atrasado: el reinicio es el reintento.
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Con STORAGE_PROVIDER=filesystem, server y worker tienen que ver los mismos
+    # archivos: el server guarda lo que se sube y el worker lo procesa. La ruta
+    # se fija acá y no en el .env porque tiene que coincidir con el montaje. Con
+    # otro proveedor el volumen queda sin uso.
+    environment:
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - ./certs:/app/certs:ro
+      - uploads:/app/uploads
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      replicas: ${SERVER_REPLICAS:-1}
+    networks:
+      - default
+      - traefik-public
+      - postgres-network
+      - monitoring
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      # /metrics queda FUERA del router público. Es un endpoint de scrapeo
+      # interno: Prometheus llega por la red de Docker, directo al puerto del
+      # contenedor, así que excluirlo acá no lo afecta.
+      #
+      # Estaba publicado en internet sin autenticación: 107 KB con los ids de
+      # todos los clientes, qué operaciones corre cada uno y con qué frecuencia
+      # — 390 series con label de empresa. Y de yapa, los operation_name
+      # exponían la superficie completa de la API, que es justo lo que
+      # introspection:false intenta ocultar.
+      - traefik.http.routers.agilbank-api.rule=Host(`api.${DOMAIN}`) && !PathPrefix(`/metrics`)
+      - traefik.http.routers.agilbank-api.entrypoints=websecure
+      - traefik.http.routers.agilbank-api.tls.certresolver=letsencrypt
+      - traefik.http.services.agilbank-api.loadbalancer.server.port=4000
+      # Auto-registro en Prometheus (docker_sd del monitoring-stack): sin estos
+      # labels el /metrics del server no se scrapea y el dashboard queda vacío.
+      - prometheus.scrape=true
+      - prometheus.port=4000
+      - prometheus.job=agilbank-server
+      - prometheus.project=agilbank
+
+  worker:
+    image: localhost:5000/agilbank-worker:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      server:
+        condition: service_healthy
+    healthcheck:
+      # El puerto en el que escucha el worker: WORKER_HEALTH_PORT del .env, 4001
+      # por defecto. Con $$ no lo expande compose al leer este archivo: lo expande
+      # el shell del contenedor, con el mismo entorno que ve el worker.
+      test: ["CMD-SHELL", "curl -sf http://localhost:$${WORKER_HEALTH_PORT:-4001}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      replicas: ${WORKER_REPLICAS:-1}
+    networks:
+      - default
+      - postgres-network
+
+  client:
+    image: localhost:5000/agilbank-client:latest
+    restart: unless-stopped
+    deploy:
+      replicas: ${CLIENT_REPLICAS:-1}
+    networks:
+      - default
+      - traefik-public
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      - traefik.http.routers.agilbank-app.rule=Host(`app.${DOMAIN}`)
+      - traefik.http.routers.agilbank-app.entrypoints=websecure
+      - traefik.http.routers.agilbank-app.tls.certresolver=letsencrypt
+      - traefik.http.services.agilbank-app.loadbalancer.server.port=80
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - redis_data:/data
+
+networks:
+  traefik-public:
+    external: true
+  postgres-network:
+    external: true
+  monitoring:
+    external: true
+
+volumes:
+  redis_data:
+  uploads:

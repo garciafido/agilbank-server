@@ -1,0 +1,166 @@
+syntax = "proto3";
+
+package satellite;
+
+// ============================================================================
+// SATELLITE SERVICE
+// Main service for satellite-server communication
+// ============================================================================
+
+service SatelliteService {
+  // Bidirectional streaming for real-time task dispatch and results
+  rpc TaskStream(stream SatelliteMessage) returns (stream ServerMessage);
+
+  // Unary calls for simple operations
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc GetConfig(ConfigRequest) returns (ConfigResponse);
+  rpc AcknowledgeTask(AcknowledgeTaskRequest) returns (AcknowledgeTaskResponse);
+}
+
+// ============================================================================
+// SATELLITE -> SERVER MESSAGES
+// ============================================================================
+
+message SatelliteMessage {
+  string satellite_id = 1;
+  oneof payload {
+    HeartbeatData heartbeat = 2;
+    TaskResult task_result = 3;
+    TaskProgress task_progress = 4;
+    ProxyStats proxy_stats = 5;
+  }
+}
+
+message HeartbeatRequest {
+  string satellite_id = 1;
+  HeartbeatData data = 2;
+}
+
+message HeartbeatData {
+  SystemMetrics metrics = 1;
+  int32 active_tasks = 2;
+  ProxyStats proxy_stats = 3;
+  string public_ip = 4;
+  int64 uptime_seconds = 5;
+  string version = 6;
+}
+
+message SystemMetrics {
+  double cpu_usage = 1;      // 0-100
+  double memory_usage = 2;   // 0-100
+  double disk_usage = 3;     // 0-100
+  int64 available_memory_mb = 4;
+  int64 available_disk_mb = 5;
+}
+
+message ProxyStats {
+  int32 active_connections = 1;
+  int64 bytes_sent = 2;
+  int64 bytes_received = 3;
+  int32 total_requests = 4;
+  int32 failed_requests = 5;
+}
+
+message TaskResult {
+  string task_id = 1;
+  TaskStatus status = 2;
+  bytes output = 3;           // JSON serialized output
+  string error_message = 4;
+  string error_type = 5;
+  int32 duration_ms = 6;
+  bytes artifacts = 7;        // JSON array of artifact references
+}
+
+message TaskProgress {
+  string task_id = 1;
+  int32 progress_percent = 2; // 0-100
+  string current_step = 3;
+  string message = 4;
+}
+
+message ConfigRequest {
+  string satellite_id = 1;
+}
+
+message AcknowledgeTaskRequest {
+  string satellite_id = 1;
+  string task_id = 2;
+  bool accepted = 3;
+  string rejection_reason = 4;
+}
+
+// ============================================================================
+// SERVER -> SATELLITE MESSAGES
+// ============================================================================
+
+message ServerMessage {
+  oneof payload {
+    TaskAssignment task_assign = 1;
+    TaskCancel task_cancel = 2;
+    ConfigUpdate config_update = 3;
+    Ping ping = 4;
+  }
+}
+
+message HeartbeatResponse {
+  bool acknowledged = 1;
+  int64 server_time = 2;           // Unix timestamp ms
+  int32 heartbeat_interval_ms = 3; // Recommended next heartbeat interval
+  repeated PendingTask pending_tasks = 4;
+}
+
+message PendingTask {
+  string task_id = 1;
+  string task_type = 2;
+  int32 priority = 3;
+}
+
+message ConfigResponse {
+  bytes capabilities_config = 1;    // JSON
+  int32 max_concurrent_tasks = 2;
+  int32 heartbeat_interval_ms = 3;
+  int32 task_timeout_ms = 4;
+  bytes proxy_config = 5;           // JSON
+}
+
+message AcknowledgeTaskResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message TaskAssignment {
+  string task_id = 1;
+  string task_type = 2;             // "proxy_request", "bot_execution", "worker_task"
+  bytes input = 3;                  // JSON serialized input
+  int32 timeout_ms = 4;
+  int32 priority = 5;
+  string correlation_id = 6;
+  map<string, string> metadata = 7;
+}
+
+message TaskCancel {
+  string task_id = 1;
+  string reason = 2;
+}
+
+message ConfigUpdate {
+  bytes capabilities_config = 1;    // JSON
+  int32 max_concurrent_tasks = 2;
+  bool reconnect_required = 3;
+}
+
+message Ping {
+  int64 timestamp = 1;
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum TaskStatus {
+  TASK_STATUS_UNSPECIFIED = 0;
+  TASK_STATUS_COMPLETED = 1;
+  TASK_STATUS_FAILED = 2;
+  TASK_STATUS_CANCELLED = 3;
+  TASK_STATUS_TIMEOUT = 4;
+}

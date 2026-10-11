@@ -1,0 +1,76 @@
+type IdempotencyRecord {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  client: String!
+  key: String!
+  bodyHash: String!
+  status: IdempotencyStatus!
+  result: Json
+  failureReason: String
+  completedAt: DateTime
+}
+
+extend type Mutation {
+  idempotencyRecordDelete(id: String!): IdempotencyRecord!
+}
+
+extend type Query {
+  idempotencyRecordOne(id: String!): IdempotencyRecord!
+  idempotencyRecordListWithOffset(
+    where: IdempotencyRecord_Filter
+    orderBy: [IdempotencyRecord_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [IdempotencyRecord]!
+  idempotencyRecordListWithCursor(
+    where: IdempotencyRecord_Filter
+    orderBy: IdempotencyRecord_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [IdempotencyRecord]!
+}
+
+input IdempotencyRecord_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  client: FilterString
+  key: FilterString
+  bodyHash: FilterString
+  status: FilterString
+  result: FilterJson
+  failureReason: FilterString
+  completedAt: FilterDateTime
+  AND: [IdempotencyRecord_Filter!]
+  OR: [IdempotencyRecord_Filter!]
+  NOT: [IdempotencyRecord_Filter!]
+}
+
+input IdempotencyRecord_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  client: SortOrder
+  key: SortOrder
+  bodyHash: SortOrder
+  status: SortOrder
+  result: SortOrder
+  failureReason: SortOrder
+  completedAt: SortOrder
+}
+
+input IdempotencyRecord_OrderByCursor {
+  id: SortOrder
+}

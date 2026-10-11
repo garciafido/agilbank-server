@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./client"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  subdomain String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users      User[]
+  products   Product[]
+  orders     Order[]
+  orderItems OrderItem[]
+
+  @@map("tenants")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  tenantId String
+  orders   Order[]
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Product {
+  id        String   @id @default(uuid())
+  name      String
+  price     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  orderItems OrderItem[]
+
+  @@index([tenantId])
+  @@map("products")
+}
+
+model Order {
+  id        String   @id @default(uuid())
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  items OrderItem[]
+
+  @@index([tenantId])
+  @@index([userId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id       String @id @default(uuid())
+  quantity Int
+  price    Float  @default(0) // Cambiamos a requerido con valor por defecto
+
+  order   Order  @relation(fields: [orderId], references: [id])
+  orderId String
+
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([tenantId])
+  @@map("order_items")
+}

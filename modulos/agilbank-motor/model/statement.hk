@@ -1,0 +1,151 @@
+#################
+# statement.hk — El extracto bancario y su lectura
+#
+# Un extracto que entró (por API o por pantalla) y el resultado de leerlo. Pieza COMPARTIDA entre
+# agilbank-server y AgilErp: no referencia nada del ERP, y puede generarse en un producto que no
+# tiene cuentas bancarias propias.
+# Spec: agilpost-motor/docs/superpowers/specs/2026-10-09-agilbank-lectura-design.md
+#################
+
+AbStatementStatus: enum
+  .labels(es=["Estado del Extracto", "Estados del Extracto", "M"])
+{
+  queued: value
+    .labels(es=["En cola", "M"])
+
+  processing: value
+    .labels(es=["Leyendo", "M"])
+
+  read: value
+    .labels(es=["Leído", "M"])
+
+  failed: value
+    .labels(es=["Falló", "M"])
+}
+
+AbStatement: entity
+  # La huella única POR EMPRESA hace que reenviar el mismo archivo devuelva la lectura anterior
+  # (RF-11) como garantía de la base: dos envíos simultáneos pasan los dos la consulta previa, y solo
+  # la restricción evita el duplicado.
+  .unique(contentHash)
+  .labels(es=["Extracto Bancario", "Extractos Bancarios", "M"])
+  .description(es=["Un extracto bancario tal como lo entregó el banco, y su lectura llevada al resumen bancario canónico."])
+  .displayId(originalName)
+  .listDisplay(originalName, status, verdict, periodFrom, periodTo)
+  .defaultOrderBy(createdAt_, Desc)
+  .skipCreate
+  .skipUpdate
+{
+  file: file
+    .labels(es=["Archivo", "El extracto como lo entregó el banco", "M"])
+
+  originalName: string
+    .labels(es=["Nombre", "Nombre original del archivo", "M"])
+
+  contentHash: maybe(string)
+    .fillingOnServer
+    .labels(es=["Huella del Archivo", "SHA-256 del contenido: identifica el extracto sin depender de su nombre", "F"])
+    .index
+
+  status: AbStatementStatus
+    .default(queued)
+    .fillingOnServer
+    .labels(es=["Estado", "Estado de la lectura", "M"])
+
+  verdict: maybe(string)
+    .fillingOnServer
+    .labels(es=["Veredicto", "verified, weak, abstained o unavailable", "M"])
+
+  bankCode: maybe(string)
+    .fillingOnServer
+    .labels(es=["Banco", "Código de entidad: los tres primeros dígitos del CBU", "M"])
+
+  cbu: maybe(string)
+    .fillingOnServer
+    .labels(es=["CBU", "La cuenta del extracto", "M"])
+
+  periodFrom: maybe(date)
+    .fillingOnServer
+    .labels(es=["Desde", "Fecha del primer renglón", "F"])
+
+  periodTo: maybe(date)
+    .fillingOnServer
+    .labels(es=["Hasta", "Fecha del último renglón", "F"])
+
+  openingBalance: maybe(decimal)
+    .fillingOnServer
+    .labels(es=["Saldo Inicial", "El saldo inicial leído", "M"])
+
+  closingBalance: maybe(decimal)
+    .fillingOnServer
+    .labels(es=["Saldo Final", "El saldo final leído", "M"])
+
+  lineCount: maybe(integer)
+    .fillingOnServer
+    .labels(es=["Renglones", "Cantidad de renglones leídos", "M"])
+
+  # La cuenta como la mandó ProntoNet: con ella se controlan los saldos y la cuenta del archivo.
+  declaredAccount: maybe(json)
+    .fillingOnServer
+    .labels(es=["Cuenta Declarada", "Lo que el sistema de origen sabía de la cuenta", "F"])
+    .editor(json)
+
+  # La lectura entera: encabezado, renglones, avisos y controles. Postgres saca de la fila cualquier
+  # jsonb de más de 2 KB (TOAST): no pesa en las consultas que no la piden.
+  reading: maybe(json)
+    .fillingOnServer
+    .labels(es=["Lectura", "El resumen bancario canónico con sus controles", "F"])
+    .editor(json)
+
+  error: maybe(string)
+    .fillingOnServer
+    .labels(es=["Error", "Motivo del fallo", "M"])
+
+  processedAt: maybe(dateTime)
+    .fillingOnServer
+    .labels(es=["Leído el", "Fin de la lectura", "M"])
+}
+
+AbCorrectionReview: enum
+  .labels(es=["Revisión", "Revisiones", "F"])
+{
+  pending: value
+    .labels(es=["Pendiente", "F"])
+
+  confirmed: value
+    .labels(es=["Confirmada", "F"])
+
+  rejected: value
+    .labels(es=["Rechazada", "F"])
+}
+
+AbConceptCorrection: entity
+  # Vale enseguida para la empresa que la cargó y para nadie más (RNF-06). Lo confirmado en la
+  # revisión pasa a la tabla común del motor, que es código versionado y no esta entidad.
+  .labels(es=["Corrección de Concepto", "Correcciones de Concepto", "F"])
+  .description(es=["Lo que un usuario de la empresa marcó para un concepto del banco: su tipo canónico, o una alícuota."])
+  .displayId(bankText)
+  .listDisplay(bankCode, bankText, canonicalType, review)
+{
+  bankCode: maybe(string)
+    .labels(es=["Banco", "Código de entidad, o vacío si vale para cualquier banco", "M"])
+
+  operationCode: maybe(string)
+    .labels(es=["Código del Banco", "El código de operación que trae el extracto, si lo trae", "M"])
+
+  bankText: string
+    .labels(es=["Concepto", "El texto del banco, tal cual", "M"])
+
+  canonicalType: string
+    .labels(es=["Tipo Canónico", "El código del tipo en el catálogo de AgilBank", "M"])
+
+  rate: maybe(decimal)
+    .labels(es=["Alícuota", "Una alícuota que el usuario cargó para este concepto", "F"])
+
+  review: AbCorrectionReview
+    .default(pending)
+    .labels(es=["Revisión", "Si ya pasó a la tabla común", "F"])
+
+  reviewedAt: maybe(dateTime)
+    .labels(es=["Revisada el", "Cuándo se revisó", "F"])
+}

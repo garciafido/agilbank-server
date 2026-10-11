@@ -1,0 +1,23 @@
+{
+    "apps": [
+        {
+            "name": "Agilbank",
+            "script": "./dist/server.js",
+            "merge_logs": true,
+            "max_restarts": 20,
+            "instances": 4,
+            "max_memory_restart": "200M",
+            "env": {
+                "PORT": 4000,
+                "NODE_ENV": "production"
+                "UPLOAD_TEMP_DIR": "/home/pepe/xxxx/uploaded/tmp",
+                "STATIC_FILES": "/home/pepe/xxxx/uploaded/files",
+                "SMTP_USER": "pepe@gmail.com",
+                "SMTP_FROM": "pepe@gmail.com",
+                "SMTP_PASSWORD": "xxx xxx xxx xxxx",
+                "SMTP_HOST": "smtp.gmail.com",
+                "SMTP_PORT": 465,
+            }
+        }
+    ]
+}

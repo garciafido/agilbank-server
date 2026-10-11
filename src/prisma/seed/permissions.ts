@@ -1,0 +1,367 @@
+import { PrismaClient, Prisma } from "../generated-client/client";
+import { upsertOne } from "./utils";
+
+const data: Prisma.PermissionCreateInput[] = [
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "abStatement_retrieve",
+    name: "Extractos Bancarios: Visualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "abStatement_update",
+    name: "Extractos Bancarios: Actualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "abStatement_create",
+    name: "Extractos Bancarios: Crear",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "abStatement_delete",
+    name: "Extractos Bancarios: Borrar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "abConceptCorrection_retrieve",
+    name: "Correcciones de Concepto: Visualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "abConceptCorrection_update",
+    name: "Correcciones de Concepto: Actualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "abConceptCorrection_create",
+    name: "Correcciones de Concepto: Crear",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "abConceptCorrection_delete",
+    name: "Correcciones de Concepto: Borrar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "user_retrieve",
+    name: "Usuarios: Visualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "user_update",
+    name: "Usuarios: Actualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "user_create",
+    name: "Usuarios: Crear",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "user_delete",
+    name: "Usuarios: Borrar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "role_retrieve",
+    name: "Roles: Visualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "role_update",
+    name: "Roles: Actualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "role_create",
+    name: "Roles: Crear",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "role_delete",
+    name: "Roles: Borrar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "permission_retrieve",
+    name: "Permisos: Visualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "permission_update",
+    name: "Permisos: Actualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "permission_create",
+    name: "Permisos: Crear",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "permission_delete",
+    name: "Permisos: Borrar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "tenant_retrieve",
+    name: "Empresas: Visualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "tenant_update",
+    name: "Empresas: Actualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "tenant_create",
+    name: "Empresas: Crear",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "tenant_delete",
+    name: "Empresas: Borrar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "workerEvent_retrieve",
+    name: "Eventos de Worker: Visualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "workerEvent_update",
+    name: "Eventos de Worker: Actualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "workerEvent_create",
+    name: "Eventos de Worker: Crear",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "workerEvent_delete",
+    name: "Eventos de Worker: Borrar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "integrationClient_retrieve",
+    name: "Sistemas Clientes: Visualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "integrationClient_update",
+    name: "Sistemas Clientes: Actualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "integrationClient_create",
+    name: "Sistemas Clientes: Crear",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "integrationClient_delete",
+    name: "Sistemas Clientes: Borrar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "idempotencyRecord_retrieve",
+    name: "Operaciones por API: Visualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "idempotencyRecord_update",
+    name: "Operaciones por API: Actualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "idempotencyRecord_create",
+    name: "Operaciones por API: Crear",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "idempotencyRecord_delete",
+    name: "Operaciones por API: Borrar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "userNotification_retrieve",
+    name: "Notificaciones: Visualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "userNotification_update",
+    name: "Notificaciones: Actualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "userNotification_create",
+    name: "Notificaciones: Crear",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "userNotification_delete",
+    name: "Notificaciones: Borrar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "userNotificationPreference_retrieve",
+    name: "Preferencias de Notificación: Visualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "userNotificationPreference_update",
+    name: "Preferencias de Notificación: Actualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "userNotificationPreference_create",
+    name: "Preferencias de Notificación: Crear",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "userNotificationPreference_delete",
+    name: "Preferencias de Notificación: Borrar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "emailVerification_retrieve",
+    name: "Verificaciones de Email: Visualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "emailVerification_update",
+    name: "Verificaciones de Email: Actualizar",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "emailVerification_create",
+    name: "Verificaciones de Email: Crear",
+  },
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "emailVerification_delete",
+    name: "Verificaciones de Email: Borrar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "simulation_run",
+    name: "Ejecutar Simulaciones",
+  },
+];
+
+export async function seedPermissions(prisma: PrismaClient) {
+  for (const x of data) {
+    await upsertOne(prisma, "permission", x);
+    console.log(`Upserted Permission id: ${x.id}`);
+  }
+}

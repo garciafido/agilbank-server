@@ -1,0 +1,113 @@
+type IntegrationClient {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  name: String!
+  tokenHash: String!
+  scopes: String!
+  status: IntegrationClientStatus!
+  serviceUser: User!
+  expiresAt: DateTime
+}
+
+extend type Mutation {
+  integrationClientCreate(
+    name: String!
+    tokenHash: String!
+    scopes: String!
+    status: IntegrationClientStatus!
+    serviceUserId: String!
+    expiresAt: DateTime
+    idempotencyKey_: String
+  ): IntegrationClient!
+  integrationClientUpdate(
+    id: String!
+    version_: String!
+    name: String
+    tokenHash: String
+    scopes: String
+    status: IntegrationClientStatus
+    serviceUserId: String
+    expiresAt: DateTime
+    idempotencyKey_: String
+  ): IntegrationClient!
+  integrationClientDelete(id: String!): IntegrationClient!
+}
+
+extend type Query {
+  integrationClientOne(id: String!): IntegrationClient!
+  integrationClientListWithOffset(
+    where: IntegrationClient_Filter
+    orderBy: [IntegrationClient_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [IntegrationClient]!
+  integrationClientListWithCursor(
+    where: IntegrationClient_Filter
+    orderBy: IntegrationClient_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [IntegrationClient]!
+}
+
+input IntegrationClient_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  name: FilterString
+  tokenHash: FilterString
+  scopes: FilterString
+  status: FilterString
+  serviceUser: User_Filter
+  expiresAt: FilterDateTime
+  AND: [IntegrationClient_Filter!]
+  OR: [IntegrationClient_Filter!]
+  NOT: [IntegrationClient_Filter!]
+}
+
+input IntegrationClient_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  name: SortOrder
+  tokenHash: SortOrder
+  scopes: SortOrder
+  status: SortOrder
+  serviceUser: User_OrderBy
+  expiresAt: SortOrder
+}
+
+input IntegrationClient_OrderByCursor {
+  id: SortOrder
+}
+
+input IntegrationClient_CreateInput {
+  name: String!
+  tokenHash: String!
+  scopes: String!
+  status: IntegrationClientStatus!
+  serviceUserId: String!
+  expiresAt: DateTime
+}
+
+input IntegrationClient_UpdateInput {
+  id: String!
+  version_: String!
+  name: String
+  tokenHash: String
+  scopes: String
+  status: IntegrationClientStatus
+  serviceUserId: String
+  expiresAt: DateTime
+}

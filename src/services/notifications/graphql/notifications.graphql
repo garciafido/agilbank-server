@@ -1,0 +1,97 @@
+# ============================================
+# Notifications GraphQL Schema
+# ============================================
+
+type Query {
+  """
+  Get current user's notifications with optional filters
+  """
+  myNotifications(
+    """Only show unread notifications"""
+    unreadOnly: Boolean
+    """Filter by notification type"""
+    type: NotificationTypeFilter
+    """Maximum number of notifications to return"""
+    limit: Int
+    """Number of notifications to skip (for pagination)"""
+    offset: Int
+  ): NotificationConnection!
+
+  """
+  Get count of unread notifications for current user
+  """
+  unreadNotificationCount: Int!
+}
+
+type Mutation {
+  """
+  Mark a single notification as read
+  """
+  markNotificationRead(id: ID!): UserNotificationResult!
+
+  """
+  Mark all notifications as read
+  Returns the number of notifications marked as read
+  """
+  markAllNotificationsRead: Int!
+
+  """
+  Archive a notification (soft delete)
+  """
+  archiveNotification(id: ID!): UserNotificationResult!
+}
+
+# ============================================
+# Types
+# ============================================
+
+enum NotificationTypeFilter {
+  mention
+  assignment
+  comment
+  alert
+  system
+  token_limit_reached
+}
+
+enum NotificationPriority {
+  high
+  medium
+  low
+}
+
+type NotificationConnection {
+  """List of notifications"""
+  notifications: [UserNotificationItem!]!
+  """Total count of notifications matching the filter"""
+  totalCount: Int!
+  """Whether there are more notifications available"""
+  hasMore: Boolean!
+}
+
+type UserNotificationItem {
+  id: ID!
+  type: String!
+  priority: String!
+  title: String!
+  body: String
+  actorUser: NotificationActorUser
+  objectType: String
+  objectId: String
+  actionUrl: String
+  readAt: String
+  archivedAt: String
+  createdAt: String!
+}
+
+type NotificationActorUser {
+  id: ID!
+  name: String
+  email: String
+}
+
+type UserNotificationResult {
+  success: Boolean!
+  notification: UserNotificationItem
+  error: String
+}

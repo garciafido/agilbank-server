@@ -1,0 +1,77 @@
+type Permission {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  name: String!
+}
+
+extend type Mutation {
+  permissionCreate(name: String!, idempotencyKey_: String): Permission!
+  permissionUpdate(
+    id: String!
+    version_: String!
+    name: String
+    idempotencyKey_: String
+  ): Permission!
+  permissionDelete(id: String!): Permission!
+}
+
+extend type Query {
+  permissionOne(id: String!): Permission!
+  permissionListWithOffset(
+    where: Permission_Filter
+    orderBy: [Permission_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [Permission]!
+  permissionListWithCursor(
+    where: Permission_Filter
+    orderBy: Permission_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [Permission]!
+}
+
+input Permission_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  name: FilterString
+  AND: [Permission_Filter!]
+  OR: [Permission_Filter!]
+  NOT: [Permission_Filter!]
+}
+
+input Permission_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  name: SortOrder
+}
+
+input Permission_OrderByCursor {
+  id: SortOrder
+
+  name: SortOrder
+}
+
+input Permission_CreateInput {
+  name: String!
+}
+
+input Permission_UpdateInput {
+  id: String!
+  version_: String!
+  name: String
+}

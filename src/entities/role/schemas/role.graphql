@@ -1,0 +1,100 @@
+type Role {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  name: String!
+  permissions: [Permission!]
+  isForAllTenants: Boolean!
+}
+
+extend type Mutation {
+  roleCreate(
+    name: String!
+    permissionsIds: [String!]
+    isForAllTenants: Boolean!
+    idempotencyKey_: String
+  ): Role!
+  roleUpdate(
+    id: String!
+    version_: String!
+    name: String
+    permissionsIds: InputMultipleRef
+    isForAllTenants: Boolean
+    idempotencyKey_: String
+  ): Role!
+  roleDelete(id: String!): Role!
+}
+
+extend type Query {
+  roleOne(id: String!): Role!
+  roleListWithOffset(
+    where: Role_Filter
+    orderBy: [Role_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [Role]!
+  roleListWithCursor(
+    where: Role_Filter
+    orderBy: Role_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [Role]!
+}
+
+input Role_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  name: FilterString
+  permissions: Role_permissions_Filter
+  isForAllTenants: FilterBoolean
+  AND: [Role_Filter!]
+  OR: [Role_Filter!]
+  NOT: [Role_Filter!]
+}
+
+input Role_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  name: SortOrder
+  permissions: OrderByMultiple
+  isForAllTenants: SortOrder
+}
+
+input Role_OrderByCursor {
+  id: SortOrder
+
+  name: SortOrder
+}
+
+input Role_CreateInput {
+  name: String!
+  permissionsIds: [String!]
+  isForAllTenants: Boolean!
+}
+
+input Role_UpdateInput {
+  id: String!
+  version_: String!
+  name: String
+  permissionsIds: InputMultipleRef
+  isForAllTenants: Boolean
+}
+
+input Role_permissions_Filter {
+  every: Permission_Filter
+  some: Permission_Filter
+  none: Permission_Filter
+}

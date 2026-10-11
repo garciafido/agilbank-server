@@ -1,0 +1,140 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+# dist is needed for hybrid deployment - built locally, copied to Docker
+build/
+.next/
+out/
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+cypress/videos/
+cypress/screenshots/
+jest-results/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.*.example
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+Dockerfile*
+docker-compose*.yml
+docker/
+
+# Documentation
+*.md
+docs/
+LICENSE
+
+# Misc
+.editorconfig
+.prettierrc*
+.eslintrc*
+.stylelintrc*
+.npmrc
+renovate.json
+.github/
+.husky/
+uploads/*
+!uploads/.gitkeep
+backups/
+# Uploads del local storage (FilesystemStorage) — datos de runtime, NUNCA en la
+# imagen. Están gitignored, pero `COPY . .` usa .dockerignore (no .gitignore) y los
+# traía igual (cientos de MB acumulados en dev), agotando el disco de Docker.
+# El provider recrea los subdirectorios on demand (mkdir recursive).
+src/common/public/
+
+# Development files
+*.spec.ts
+*.test.ts
+*.spec.js
+*.test.js
+__tests__/
+__mocks__/
+fixtures/
+scripts/test-*
+
+# Additional build optimizations
+*.log
+*.pid
+*.seed
+*.pid.lock
+tmp/
+temp/
+cache/
+.turbo/
+.parcel-cache/
+.cache/
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+.prettiercache
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Backup files
+*.bak
+*.backup
+*~
+*.orig
+*.rej
+
+# Archive files (CRITICAL - can be huge)
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Deployment artifacts (often contain large backups)
+deployment/
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+
+# Additional test artifacts
+test-results/
+playwright-report/
+e2e/videos/
+e2e/screenshots/

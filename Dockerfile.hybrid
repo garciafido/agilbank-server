@@ -1,0 +1,44 @@
+FROM node:20-alpine
+
+# Install dependencies for Prisma and networking tools
+RUN apk add --no-cache openssl curl
+
+# Install Chromium and dependencies for Puppeteer
+RUN apk add --no-cache     chromium     nss     freetype     harfbuzz     ca-certificates     ttf-freefont
+
+# Configure Puppeteer to use system Chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+# Los módulos externos, antes de instalar: sus dependencias `file:` los necesitan en disco.
+COPY modulos ./modulos
+
+# Configure npm for better reliability
+RUN npm config set fetch-timeout 60000 &&     npm config set fetch-retries 3 &&     npm config set progress true
+
+# Install production dependencies
+RUN echo "📦 Installing production dependencies..." &&     npm ci --production ||     (echo "❌ npm ci failed, retrying with cache clean..." &&      npm cache clean --force &&      npm ci --production)
+
+# Copy compiled code
+COPY dist ./dist
+COPY prisma ./prisma
+
+# Generate Prisma client with error handling
+RUN echo "🔧 Generating Prisma client..." &&     npx prisma generate ||     (echo "❌ Prisma generate failed" && exit 1)
+
+# Create uploads and backup directories
+RUN mkdir -p uploads backups/emails backups/seed
+
+# Health check file
+RUN echo '{"status":"ok"}' > /app/health.json
+
+# Expose port
+EXPOSE 4000
+
+# Run the application
+CMD ["node", "dist/server.js"]

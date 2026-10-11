@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "lib": ["esnext"],
+    "rootDirs": ["./packages"],
+    "outDir": "./dist",
+    "allowJs": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "strictPropertyInitialization": false,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "strictNullChecks": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types"
+    ],
+    "types": [
+      "jest",
+      "node"
+    ],
+    "baseUrl": "."
+  },
+  "exclude": ["/build", "/coverage", "/programs", "/applications", "mocha.init.js", "nyc.config.js", "prisma.config.ts"],
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "prisma/**/*",
+    "prisma-test/**/*"
+  ]
+}

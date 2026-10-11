@@ -1,0 +1,139 @@
+# Multi-stage build for worker with Playwright
+# Using slim (Debian) instead of alpine for glibc compatibility with onnxruntime-node
+
+# Dependencies stage - cache package installations
+FROM node:20-slim AS deps
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ libvips-dev && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY package*.json ./
+# Los módulos externos, antes de instalar: sus dependencias `file:` los necesitan en disco.
+COPY modulos ./modulos
+# Skip Playwright browser download in Docker (uses system Chromium)
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+# npm resiliente a cortes de red transitorios (ECONNRESET) durante npm ci:
+# reintenta en vez de abortar. El cache mount /root/.npm acelera el reintento.
+ENV NPM_CONFIG_FETCH_RETRIES=5 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=600000
+# Install production dependencies with cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev
+
+# Dev dependencies stage
+FROM node:20-slim AS dev-deps
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ libvips-dev && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY package*.json ./
+# Los módulos externos, antes de instalar: sus dependencias `file:` los necesitan en disco.
+COPY modulos ./modulos
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+# npm resiliente a cortes de red transitorios (ECONNRESET) durante npm ci:
+# reintenta en vez de abortar. El cache mount /root/.npm acelera el reintento.
+ENV NPM_CONFIG_FETCH_RETRIES=5 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=600000
+# Install ALL dependencies with cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+
+# Prisma generation stage
+FROM dev-deps AS prisma
+WORKDIR /app
+COPY prisma.config.ts ./
+COPY prisma ./prisma
+RUN npx prisma generate
+# Bundle generated client TS → single CJS file (needed by .prisma/client proxy at runtime)
+RUN npx esbuild src/prisma/generated-client/client.ts --bundle --format=cjs --platform=node \
+    --external:@prisma/client/runtime/client \
+    --banner:js='var _importMetaUrl=require("url").pathToFileURL(__filename).href;' \
+    --define:import.meta.url=_importMetaUrl \
+    --outfile=src/prisma/generated-client/client.js
+
+# Build stage - worker specific
+FROM prisma AS builder
+WORKDIR /app
+COPY . .
+# Build with esbuild (fast, no type checking - types checked in CI)
+RUN npm run build:fast
+
+# Production stage - worker with Playwright
+FROM node:20-slim AS production
+
+# OCI Image labels (build-time arguments)
+ARG GIT_COMMIT=""
+ARG GIT_BRANCH=""
+ARG BUILD_TIME=""
+ARG IMAGE_TAG=""
+
+LABEL org.opencontainers.image.title="agilbank-worker" \
+      org.opencontainers.image.description="Agilbank Worker - Background Jobs with Playwright" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.created="${BUILD_TIME}" \
+      org.opencontainers.image.version="${IMAGE_TAG}" \
+      org.opencontainers.image.ref.name="${GIT_BRANCH}"
+
+# Install base dependencies including tini, curl, wget
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    tini \
+    curl \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Fuentes para el rendering (los browsers las necesitan para PDFs/screenshots)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fonts-liberation \
+    fonts-noto-color-emoji \
+    && rm -rf /var/lib/apt/lists/*
+
+# Browsers bundled y versionados con cada driver — NUNCA el chromium de apt:
+# bookworm-security lo bumpea sin aviso y rompe el launch (chromium 150 vs
+# playwright 1.58 / puppeteer 22 dejó bots y PDFs muertos en prod, 2026-07-06).
+# Sin PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ni PUPPETEER_EXECUTABLE_PATH: cada
+# driver resuelve su propio browser desde estos paths.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV PUPPETEER_CACHE_DIR=/pptr-browsers
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Copy production dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Instalar los browsers que cada driver espera (matchean la versión lockeada del
+# paquete). --with-deps instala las libs de sistema, compartidas por ambos.
+RUN npx playwright install --with-deps chromium && \
+    npx puppeteer browsers install chrome && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy prisma config and schema (needed for prisma migrate deploy at runtime)
+COPY --from=builder /app/prisma.config.ts ./
+COPY --from=builder /app/prisma ./prisma
+
+# Copy generated prisma client (required for runtime)
+COPY --from=builder /app/src/prisma/generated-client ./src/prisma/generated-client
+
+# Create .prisma/client proxy (Prisma 7 with custom output doesn't generate this)
+RUN mkdir -p node_modules/.prisma/client && \
+    echo 'module.exports = require("/app/src/prisma/generated-client/client");' > node_modules/.prisma/client/default.js
+
+# Copy built application
+COPY --from=builder /app/dist ./dist
+
+# Remove server files to save space (~30MB)
+RUN rm -rf dist/server.js dist/graphql || true
+
+# Health check for worker
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "process.exit(0)" || exit 1
+
+# Use tini for proper signal handling (installed at /usr/bin/tini in Debian)
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+# Start worker
+CMD ["npm", "run", "worker:start"]

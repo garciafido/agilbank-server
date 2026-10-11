@@ -1,0 +1,91 @@
+type UserNotification {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  type: NotificationType!
+  priority: NotificationPriority
+  title: String!
+  body: String
+  actorUser: User
+  objectType: String
+  objectId: String
+  actionUrl: String
+  readAt: DateTime
+  notificationCreatedAt: DateTime
+  archivedAt: DateTime
+  metadata: Json
+}
+
+extend type Mutation {
+  userNotificationDelete(id: String!): UserNotification!
+}
+
+extend type Query {
+  userNotificationOne(id: String!): UserNotification!
+  userNotificationListWithOffset(
+    where: UserNotification_Filter
+    orderBy: [UserNotification_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [UserNotification]!
+  userNotificationListWithCursor(
+    where: UserNotification_Filter
+    orderBy: UserNotification_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [UserNotification]!
+}
+
+input UserNotification_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  type: FilterString
+  priority: FilterString
+  title: FilterString
+  body: FilterString
+  actorUser: User_Filter
+  objectType: FilterString
+  objectId: FilterString
+  actionUrl: FilterString
+  readAt: FilterDateTime
+  notificationCreatedAt: FilterDateTime
+  archivedAt: FilterDateTime
+  metadata: FilterJson
+  AND: [UserNotification_Filter!]
+  OR: [UserNotification_Filter!]
+  NOT: [UserNotification_Filter!]
+}
+
+input UserNotification_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  type: SortOrder
+  priority: SortOrder
+  title: SortOrder
+  body: SortOrder
+  actorUser: User_OrderBy
+  objectType: SortOrder
+  objectId: SortOrder
+  actionUrl: SortOrder
+  readAt: SortOrder
+  notificationCreatedAt: SortOrder
+  archivedAt: SortOrder
+  metadata: SortOrder
+}
+
+input UserNotification_OrderByCursor {
+  id: SortOrder
+}

@@ -1,0 +1,1283 @@
+{
+  "entities": [
+    {
+      "name": "AbStatement",
+      "labels": {
+        "es": {
+          "s": "Extracto Bancario",
+          "p": "Extractos Bancarios",
+          "d": "Un extracto bancario tal como lo entregó el banco, y su lectura llevada al resumen bancario canónico."
+        }
+      },
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "ID"
+            },
+            "en": {
+              "s": "ID"
+            },
+            "pt": {
+              "s": "ID"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "file",
+          "type": "File",
+          "labels": {
+            "es": {
+              "s": "Archivo",
+              "p": "El extracto como lo entregó el banco"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "originalName",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Nombre",
+              "p": "Nombre original del archivo"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "contentHash",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Huella del Archivo",
+              "p": "SHA-256 del contenido: identifica el extracto sin depender de su nombre"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "status",
+          "type": "__Enum",
+          "labels": {
+            "es": {
+              "s": "Estado",
+              "p": "Estado de la lectura"
+            }
+          },
+          "groupable": false,
+          "enumValues": [
+            {
+              "value": "queued",
+              "label": "En cola"
+            },
+            {
+              "value": "processing",
+              "label": "Leyendo"
+            },
+            {
+              "value": "read",
+              "label": "Leído"
+            },
+            {
+              "value": "failed",
+              "label": "Falló"
+            }
+          ]
+        },
+        {
+          "name": "verdict",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Veredicto",
+              "p": "verified, weak, abstained o unavailable"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "bankCode",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Banco",
+              "p": "Código de entidad: los tres primeros dígitos del CBU"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "cbu",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "CBU",
+              "p": "La cuenta del extracto"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "periodFrom",
+          "type": "Date",
+          "labels": {
+            "es": {
+              "s": "Desde",
+              "p": "Fecha del primer renglón"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "periodTo",
+          "type": "Date",
+          "labels": {
+            "es": {
+              "s": "Hasta",
+              "p": "Fecha del último renglón"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "openingBalance",
+          "type": "Decimal",
+          "labels": {
+            "es": {
+              "s": "Saldo Inicial",
+              "p": "El saldo inicial leído"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "closingBalance",
+          "type": "Decimal",
+          "labels": {
+            "es": {
+              "s": "Saldo Final",
+              "p": "El saldo final leído"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "lineCount",
+          "type": "Int",
+          "labels": {
+            "es": {
+              "s": "Renglones",
+              "p": "Cantidad de renglones leídos"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "declaredAccount",
+          "type": "Json",
+          "labels": {
+            "es": {
+              "s": "Cuenta Declarada",
+              "p": "Lo que el sistema de origen sabía de la cuenta"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "reading",
+          "type": "Json",
+          "labels": {
+            "es": {
+              "s": "Lectura",
+              "p": "El resumen bancario canónico con sus controles"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "error",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Error",
+              "p": "Motivo del fallo"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "processedAt",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Leído el",
+              "p": "Fin de la lectura"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "createdAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de creación"
+            },
+            "en": {
+              "s": "Created at"
+            },
+            "pt": {
+              "s": "Data de criação"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "updatedAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de actualización"
+            },
+            "en": {
+              "s": "Updated at"
+            },
+            "pt": {
+              "s": "Data de atualização"
+            }
+          },
+          "groupable": false
+        }
+      ],
+      "displayFields": [
+        "originalName",
+        "status",
+        "verdict"
+      ]
+    },
+    {
+      "name": "AbConceptCorrection",
+      "labels": {
+        "es": {
+          "s": "Corrección de Concepto",
+          "p": "Correcciones de Concepto",
+          "d": "Lo que un usuario de la empresa marcó para un concepto del banco: su tipo canónico, o una alícuota."
+        }
+      },
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "ID"
+            },
+            "en": {
+              "s": "ID"
+            },
+            "pt": {
+              "s": "ID"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "bankCode",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Banco",
+              "p": "Código de entidad, o vacío si vale para cualquier banco"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "operationCode",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Código del Banco",
+              "p": "El código de operación que trae el extracto, si lo trae"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "bankText",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Concepto",
+              "p": "El texto del banco, tal cual"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "canonicalType",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Tipo Canónico",
+              "p": "El código del tipo en el catálogo de AgilBank"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "rate",
+          "type": "Decimal",
+          "labels": {
+            "es": {
+              "s": "Alícuota",
+              "p": "Una alícuota que el usuario cargó para este concepto"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "review",
+          "type": "__Enum",
+          "labels": {
+            "es": {
+              "s": "Revisión",
+              "p": "Si ya pasó a la tabla común"
+            }
+          },
+          "groupable": false,
+          "enumValues": [
+            {
+              "value": "pending",
+              "label": "Pendiente"
+            },
+            {
+              "value": "confirmed",
+              "label": "Confirmada"
+            },
+            {
+              "value": "rejected",
+              "label": "Rechazada"
+            }
+          ]
+        },
+        {
+          "name": "reviewedAt",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Revisada el",
+              "p": "Cuándo se revisó"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "createdAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de creación"
+            },
+            "en": {
+              "s": "Created at"
+            },
+            "pt": {
+              "s": "Data de criação"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "updatedAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de actualización"
+            },
+            "en": {
+              "s": "Updated at"
+            },
+            "pt": {
+              "s": "Data de atualização"
+            }
+          },
+          "groupable": false
+        }
+      ],
+      "displayFields": [
+        "bankCode",
+        "bankText",
+        "canonicalType"
+      ]
+    },
+    {
+      "name": "User",
+      "labels": {
+        "en": {
+          "s": "User",
+          "p": "Users"
+        },
+        "es": {
+          "s": "Usuario",
+          "p": "Usuarios"
+        },
+        "pt": {
+          "s": "Usuário",
+          "p": "Usuários"
+        }
+      },
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "ID"
+            },
+            "en": {
+              "s": "ID"
+            },
+            "pt": {
+              "s": "ID"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "targetTenant",
+          "type": "ref",
+          "labels": {
+            "en": {
+              "s": "Company",
+              "p": "Company the user belongs to",
+              "d": "Only on create, and only for the roles that .tenantSelectableBy names: it says where the user is born. It has no column — the value goes to the user's tenancy, which afterwards is read in Organization."
+            },
+            "es": {
+              "s": "Empresa",
+              "p": "Empresa a la que pertenece el usuario",
+              "d": "Solo en el alta, y solo para los roles que nombra .tenantSelectableBy: dice en qué empresa nace el usuario. No tiene columna — el valor va a la empresa del usuario, que después se lee en Organización."
+            },
+            "pt": {
+              "s": "Empresa",
+              "p": "Empresa à qual o usuário pertence",
+              "d": "Somente na criação, e somente para os papéis que .tenantSelectableBy nomeia: diz em qual empresa o usuário nasce. Não tem coluna — o valor vai para a empresa do usuário, que depois se lê em Organização."
+            }
+          },
+          "groupable": true,
+          "targetEntity": "Tenant",
+          "multi": false
+        },
+        {
+          "name": "tenantDisplayName",
+          "type": "String",
+          "labels": {
+            "en": {
+              "s": "Organization"
+            },
+            "es": {
+              "s": "Organización"
+            },
+            "pt": {
+              "s": "Organização"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "email",
+          "type": "String",
+          "labels": {
+            "en": {
+              "s": "Email"
+            },
+            "es": {
+              "s": "Email"
+            },
+            "pt": {
+              "s": "Email"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "labels": {
+            "en": {
+              "s": "Name"
+            },
+            "es": {
+              "s": "Nombre"
+            },
+            "pt": {
+              "s": "Nome"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "active",
+          "type": "Boolean",
+          "labels": {
+            "en": {
+              "s": "Is active?"
+            },
+            "es": {
+              "s": "Está activo?"
+            },
+            "pt": {
+              "s": "Está ativo?"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "language",
+          "type": "__Enum",
+          "labels": {
+            "en": {
+              "s": "Language",
+              "p": "User interface language"
+            },
+            "es": {
+              "s": "Idioma",
+              "p": "Idioma de la interfaz del usuario"
+            },
+            "pt": {
+              "s": "Idioma",
+              "p": "Idioma da interface do usuário"
+            }
+          },
+          "groupable": false,
+          "enumValues": [
+            {
+              "value": "es",
+              "label": "Español"
+            },
+            {
+              "value": "en",
+              "label": "Inglés"
+            },
+            {
+              "value": "pt",
+              "label": "Portugués"
+            }
+          ]
+        },
+        {
+          "name": "avatar",
+          "type": "File",
+          "labels": {
+            "en": {
+              "s": "Avatar"
+            },
+            "es": {
+              "s": "Avatar"
+            },
+            "pt": {
+              "s": "Avatar"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "cellphone",
+          "type": "String",
+          "labels": {
+            "en": {
+              "s": "Cellphone"
+            },
+            "es": {
+              "s": "Celular"
+            },
+            "pt": {
+              "s": "Celular"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "twoFaseAuth",
+          "type": "Boolean",
+          "labels": {
+            "en": {
+              "s": "Requires 2FA"
+            },
+            "es": {
+              "s": "Requiere 2FA"
+            },
+            "pt": {
+              "s": "Requer 2FA"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "profile",
+          "type": "Json",
+          "labels": {
+            "en": {
+              "s": "Profile"
+            },
+            "es": {
+              "s": "Perfil"
+            },
+            "pt": {
+              "s": "Perfil"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "roles",
+          "type": "ref",
+          "labels": {
+            "en": {
+              "s": "Roles"
+            },
+            "es": {
+              "s": "Roles"
+            },
+            "pt": {
+              "s": "Funções"
+            }
+          },
+          "groupable": true,
+          "countable": true,
+          "targetEntity": "Role",
+          "multi": true
+        },
+        {
+          "name": "createdAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de creación"
+            },
+            "en": {
+              "s": "Created at"
+            },
+            "pt": {
+              "s": "Data de criação"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "updatedAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de actualización"
+            },
+            "en": {
+              "s": "Updated at"
+            },
+            "pt": {
+              "s": "Data de atualização"
+            }
+          },
+          "groupable": false
+        }
+      ],
+      "displayFields": [
+        "email",
+        "name",
+        "active"
+      ],
+      "deniedFields": [
+        "twoFaSecret",
+        "twoFaBackupCodes",
+        "twoFaVerifiedAt",
+        "passwordResetToken",
+        "passwordResetExpiresAt"
+      ]
+    },
+    {
+      "name": "Role",
+      "labels": {
+        "en": {
+          "s": "Role",
+          "p": "Roles"
+        },
+        "es": {
+          "s": "Rol",
+          "p": "Roles"
+        },
+        "pt": {
+          "s": "Papel",
+          "p": "Funções"
+        }
+      },
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "ID"
+            },
+            "en": {
+              "s": "ID"
+            },
+            "pt": {
+              "s": "ID"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "labels": {
+            "en": {
+              "s": "Name"
+            },
+            "es": {
+              "s": "Nombre"
+            },
+            "pt": {
+              "s": "Nome"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "permissions",
+          "type": "ref",
+          "labels": {
+            "en": {
+              "s": "Permissions"
+            },
+            "es": {
+              "s": "Permisos"
+            },
+            "pt": {
+              "s": "Permissões"
+            }
+          },
+          "groupable": true,
+          "countable": true,
+          "targetEntity": "Permission",
+          "multi": true
+        },
+        {
+          "name": "isForAllTenants",
+          "type": "Boolean",
+          "labels": {
+            "en": {
+              "s": "Tenant usable",
+              "p": "Tenant usable"
+            },
+            "es": {
+              "s": "Disponible para inquilinos",
+              "p": "Disponible para inquilinos"
+            },
+            "pt": {
+              "s": "Disponível para inquilinos",
+              "p": "Disponível para inquilinos"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "createdAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de creación"
+            },
+            "en": {
+              "s": "Created at"
+            },
+            "pt": {
+              "s": "Data de criação"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "updatedAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de actualización"
+            },
+            "en": {
+              "s": "Updated at"
+            },
+            "pt": {
+              "s": "Data de atualização"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "User_roles",
+          "type": "subentity",
+          "labels": {
+            "es": {
+              "s": "Roles",
+              "d": "Registros de Usuario que referencian a este registro"
+            },
+            "en": {
+              "s": "Roles",
+              "d": "User records that reference this record"
+            },
+            "pt": {
+              "s": "Funções",
+              "d": "Registros de Usuário que referenciam este registro"
+            }
+          },
+          "groupable": false,
+          "countable": true,
+          "targetEntity": "User",
+          "multi": true
+        }
+      ],
+      "displayFields": [
+        "name"
+      ],
+      "inverseRelations": [
+        {
+          "sourceEntity": "User",
+          "sourceField": "roles",
+          "prismaField": "User_roles",
+          "multi": true
+        }
+      ]
+    },
+    {
+      "name": "Permission",
+      "labels": {
+        "en": {
+          "s": "Permission",
+          "p": "Permissions"
+        },
+        "es": {
+          "s": "Permiso",
+          "p": "Permisos"
+        },
+        "pt": {
+          "s": "Permisão",
+          "p": "Permissões"
+        }
+      },
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "ID"
+            },
+            "en": {
+              "s": "ID"
+            },
+            "pt": {
+              "s": "ID"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "labels": {
+            "en": {
+              "s": "Name"
+            },
+            "es": {
+              "s": "Nombre"
+            },
+            "pt": {
+              "s": "Nome"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "createdAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de creación"
+            },
+            "en": {
+              "s": "Created at"
+            },
+            "pt": {
+              "s": "Data de criação"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "updatedAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de actualización"
+            },
+            "en": {
+              "s": "Updated at"
+            },
+            "pt": {
+              "s": "Data de atualização"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "Role_permissions",
+          "type": "subentity",
+          "labels": {
+            "es": {
+              "s": "Permisos",
+              "d": "Registros de Rol que referencian a este registro"
+            },
+            "en": {
+              "s": "Permissions",
+              "d": "Role records that reference this record"
+            },
+            "pt": {
+              "s": "Permissões",
+              "d": "Registros de Papel que referenciam este registro"
+            }
+          },
+          "groupable": false,
+          "countable": true,
+          "targetEntity": "Role",
+          "multi": true
+        }
+      ],
+      "displayFields": [
+        "name"
+      ],
+      "inverseRelations": [
+        {
+          "sourceEntity": "Role",
+          "sourceField": "permissions",
+          "prismaField": "Role_permissions",
+          "multi": true
+        }
+      ]
+    },
+    {
+      "name": "Tenant",
+      "labels": {
+        "es": {
+          "s": "Empresa",
+          "p": "Empresas",
+          "d": "Empresa cliente de AgilErp. Agrupa usuarios y contabilidad en un espacio aislado."
+        }
+      },
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "ID"
+            },
+            "en": {
+              "s": "ID"
+            },
+            "pt": {
+              "s": "ID"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Nombre",
+              "p": "Razón social o nombre de fantasía"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "taxId",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "CUIT",
+              "p": "CUIT de la empresa"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "status",
+          "type": "__Enum",
+          "labels": {
+            "es": {
+              "s": "Estado",
+              "p": "Estado operativo de la empresa"
+            }
+          },
+          "groupable": false,
+          "enumValues": [
+            {
+              "value": "active",
+              "label": "Activa"
+            },
+            {
+              "value": "suspended",
+              "label": "Suspendida"
+            }
+          ]
+        },
+        {
+          "name": "ivaCondition",
+          "type": "__Enum",
+          "labels": {
+            "es": {
+              "s": "Condición de IVA",
+              "p": "Condición de la empresa frente al IVA"
+            }
+          },
+          "groupable": false,
+          "enumValues": [
+            {
+              "value": "registeredResponsible",
+              "label": "Responsable Inscripto"
+            },
+            {
+              "value": "monotax",
+              "label": "Monotributista"
+            },
+            {
+              "value": "exempt",
+              "label": "Exento"
+            }
+          ]
+        },
+        {
+          "name": "grossReceiptsJurisdiction",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Jurisdicción de IIBB",
+              "p": "Jurisdicción principal de Ingresos Brutos",
+              "d": "Código de la jurisdicción: CABA, BA, CBA. Vacío si no está inscripta."
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "withholdingAgent",
+          "type": "Boolean",
+          "labels": {
+            "es": {
+              "s": "Agente de Retención",
+              "p": "La empresa actúa como agente de retención o percepción"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "imputationMinConfidence",
+          "type": "Int",
+          "labels": {
+            "es": {
+              "s": "Umbral de imputación automática",
+              "p": "Probabilidad mínima para precargar la cuenta sugerida",
+              "d": "Vacío usa el valor de la instalación. 100 nunca precarga: muestra siempre las opciones con su índice."
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "logo",
+          "type": "File",
+          "labels": {
+            "es": {
+              "s": "Logo",
+              "p": "Logo de la empresa"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "createdAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de creación"
+            },
+            "en": {
+              "s": "Created at"
+            },
+            "pt": {
+              "s": "Data de criação"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "updatedAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de actualización"
+            },
+            "en": {
+              "s": "Updated at"
+            },
+            "pt": {
+              "s": "Data de atualização"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "User_targetTenant",
+          "type": "subentity",
+          "labels": {
+            "es": {
+              "s": "Empresa",
+              "p": "Empresa a la que pertenece el usuario",
+              "d": "Registros de Usuario que referencian a este registro"
+            },
+            "en": {
+              "s": "Company",
+              "p": "Company the user belongs to",
+              "d": "User records that reference this record"
+            },
+            "pt": {
+              "s": "Empresa",
+              "p": "Empresa à qual o usuário pertence",
+              "d": "Registros de Usuário que referenciam este registro"
+            }
+          },
+          "groupable": false,
+          "countable": true,
+          "targetEntity": "User",
+          "multi": true
+        }
+      ],
+      "displayFields": [
+        "name",
+        "taxId",
+        "status"
+      ],
+      "inverseRelations": [
+        {
+          "sourceEntity": "User",
+          "sourceField": "targetTenant",
+          "prismaField": "User_targetTenant",
+          "multi": true
+        }
+      ]
+    }
+  ],
+  "queryPatterns": {
+    "setRelations": [
+      {
+        "parent": "Role",
+        "setField": "User_roles",
+        "junction": "User",
+        "groupByField": "targetTenant",
+        "targetEntity": "Tenant"
+      },
+      {
+        "parent": "Permission",
+        "setField": "Role_permissions",
+        "junction": "Role",
+        "groupByField": "permissions",
+        "targetEntity": "Permission"
+      },
+      {
+        "parent": "Tenant",
+        "setField": "User_targetTenant",
+        "junction": "User",
+        "groupByField": "targetTenant",
+        "targetEntity": "Tenant"
+      }
+    ],
+    "refRelations": [
+      {
+        "entity": "User",
+        "refField": "targetTenant",
+        "targetEntity": "Tenant",
+        "orderByExample": "targetTenant.id"
+      },
+      {
+        "entity": "User",
+        "refField": "roles",
+        "targetEntity": "Role",
+        "orderByExample": "roles.id"
+      },
+      {
+        "entity": "Role",
+        "refField": "permissions",
+        "targetEntity": "Permission",
+        "orderByExample": "permissions.id"
+      }
+    ],
+    "countableRelations": [
+      {
+        "entity": "User",
+        "entityLabel": "usuario",
+        "setField": "roles",
+        "targetLabel": "rol"
+      },
+      {
+        "entity": "Role",
+        "entityLabel": "rol",
+        "setField": "permissions",
+        "targetLabel": "permiso"
+      },
+      {
+        "entity": "Role",
+        "entityLabel": "rol",
+        "setField": "User_roles",
+        "targetLabel": "usuario"
+      },
+      {
+        "entity": "Permission",
+        "entityLabel": "permiso",
+        "setField": "Role_permissions",
+        "targetLabel": "rol"
+      },
+      {
+        "entity": "Tenant",
+        "entityLabel": "empresa",
+        "setField": "User_targetTenant",
+        "targetLabel": "usuario"
+      }
+    ],
+    "groupByCountFilters": [
+      {
+        "entity": "User",
+        "entityLabel": "usuario",
+        "entityLabelPlural": "usuarios",
+        "groupByField": "targetTenant",
+        "groupByLabel": "empresa",
+        "countField": "roles",
+        "countLabel": "rol",
+        "countLabelPlural": "roles"
+      },
+      {
+        "entity": "Role",
+        "entityLabel": "rol",
+        "entityLabelPlural": "roles",
+        "groupByField": "permissions",
+        "groupByLabel": "permiso",
+        "countField": "permissions",
+        "countLabel": "permiso",
+        "countLabelPlural": "permisos"
+      }
+    ]
+  }
+}

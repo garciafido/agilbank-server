@@ -1,0 +1,120 @@
+type AbConceptCorrection {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  bankCode: String
+  operationCode: String
+  bankText: String!
+  canonicalType: String!
+  rate: Decimal
+  review: AbCorrectionReview!
+  reviewedAt: DateTime
+}
+
+extend type Mutation {
+  abConceptCorrectionCreate(
+    bankCode: String
+    operationCode: String
+    bankText: String!
+    canonicalType: String!
+    rate: Decimal
+    review: AbCorrectionReview!
+    reviewedAt: DateTime
+    idempotencyKey_: String
+  ): AbConceptCorrection!
+  abConceptCorrectionUpdate(
+    id: String!
+    version_: String!
+    bankCode: String
+    operationCode: String
+    bankText: String
+    canonicalType: String
+    rate: Decimal
+    review: AbCorrectionReview
+    reviewedAt: DateTime
+    idempotencyKey_: String
+  ): AbConceptCorrection!
+  abConceptCorrectionDelete(id: String!): AbConceptCorrection!
+}
+
+extend type Query {
+  abConceptCorrectionOne(id: String!): AbConceptCorrection!
+  abConceptCorrectionListWithOffset(
+    where: AbConceptCorrection_Filter
+    orderBy: [AbConceptCorrection_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [AbConceptCorrection]!
+  abConceptCorrectionListWithCursor(
+    where: AbConceptCorrection_Filter
+    orderBy: AbConceptCorrection_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [AbConceptCorrection]!
+}
+
+input AbConceptCorrection_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  bankCode: FilterString
+  operationCode: FilterString
+  bankText: FilterString
+  canonicalType: FilterString
+  rate: FilterDecimal
+  review: FilterString
+  reviewedAt: FilterDateTime
+  AND: [AbConceptCorrection_Filter!]
+  OR: [AbConceptCorrection_Filter!]
+  NOT: [AbConceptCorrection_Filter!]
+}
+
+input AbConceptCorrection_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  bankCode: SortOrder
+  operationCode: SortOrder
+  bankText: SortOrder
+  canonicalType: SortOrder
+  rate: SortOrder
+  review: SortOrder
+  reviewedAt: SortOrder
+}
+
+input AbConceptCorrection_OrderByCursor {
+  id: SortOrder
+}
+
+input AbConceptCorrection_CreateInput {
+  bankCode: String
+  operationCode: String
+  bankText: String!
+  canonicalType: String!
+  rate: Decimal
+  review: AbCorrectionReview!
+  reviewedAt: DateTime
+}
+
+input AbConceptCorrection_UpdateInput {
+  id: String!
+  version_: String!
+  bankCode: String
+  operationCode: String
+  bankText: String
+  canonicalType: String
+  rate: Decimal
+  review: AbCorrectionReview
+  reviewedAt: DateTime
+}

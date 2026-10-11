@@ -1,0 +1,130 @@
+type Tenant {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  name: String!
+  taxId: String
+  status: TenantStatus!
+  ivaCondition: TenantIvaCondition!
+  grossReceiptsJurisdiction: String
+  withholdingAgent: Boolean!
+  imputationMinConfidence: Int
+  logo: String
+  logo_data: FileData
+}
+
+extend type Mutation {
+  tenantCreate(
+    name: String!
+    taxId: String
+    status: TenantStatus!
+    ivaCondition: TenantIvaCondition!
+    grossReceiptsJurisdiction: String
+    withholdingAgent: Boolean!
+    imputationMinConfidence: Int
+    logo: UploadedFile
+    idempotencyKey_: String
+  ): Tenant!
+  tenantUpdate(
+    id: String!
+    version_: String!
+    name: String
+    taxId: String
+    status: TenantStatus
+    ivaCondition: TenantIvaCondition
+    grossReceiptsJurisdiction: String
+    withholdingAgent: Boolean
+    imputationMinConfidence: Int
+    logo: UploadedFile
+    idempotencyKey_: String
+  ): Tenant!
+  tenantDelete(id: String!): Tenant!
+}
+
+extend type Query {
+  tenantOne(id: String!): Tenant!
+  tenantListWithOffset(
+    where: Tenant_Filter
+    orderBy: [Tenant_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [Tenant]!
+  tenantListWithCursor(
+    where: Tenant_Filter
+    orderBy: Tenant_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [Tenant]!
+}
+
+input Tenant_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  name: FilterString
+  taxId: FilterString
+  status: FilterString
+  ivaCondition: FilterString
+  grossReceiptsJurisdiction: FilterString
+  withholdingAgent: FilterBoolean
+  imputationMinConfidence: FilterInt
+  logo: FilterString
+  AND: [Tenant_Filter!]
+  OR: [Tenant_Filter!]
+  NOT: [Tenant_Filter!]
+}
+
+input Tenant_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  name: SortOrder
+  taxId: SortOrder
+  status: SortOrder
+  ivaCondition: SortOrder
+  grossReceiptsJurisdiction: SortOrder
+  withholdingAgent: SortOrder
+  imputationMinConfidence: SortOrder
+  logo: SortOrder
+}
+
+input Tenant_OrderByCursor {
+  id: SortOrder
+
+  name: SortOrder
+}
+
+input Tenant_CreateInput {
+  name: String!
+  taxId: String
+  status: TenantStatus!
+  ivaCondition: TenantIvaCondition!
+  grossReceiptsJurisdiction: String
+  withholdingAgent: Boolean!
+  imputationMinConfidence: Int
+  logo: UploadedFile
+}
+
+input Tenant_UpdateInput {
+  id: String!
+  version_: String!
+  name: String
+  taxId: String
+  status: TenantStatus
+  ivaCondition: TenantIvaCondition
+  grossReceiptsJurisdiction: String
+  withholdingAgent: Boolean
+  imputationMinConfidence: Int
+  logo: UploadedFile
+}

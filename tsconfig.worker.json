@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "sourceMap": true
+  },
+  "include": [
+    "src/workers/**/*",
+    "src/utils/**/*",
+    "src/types/**/*",
+    "src/prisma/**/*",
+    "src/common/**/*",
+    "src/core/**/*",
+    "src/service-context.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "prisma.config.ts"
+  ]
+}

@@ -1,0 +1,378 @@
+# @auth directive - Role-based access control for projections
+# Applied at endpoint level to restrict access based on user roles
+# Note: This is ROUTING/INTERFACE security, not data security (that's SecurePrismaOps)
+directive @auth(roles: [String!]!) on FIELD_DEFINITION | OBJECT
+
+scalar Date
+
+scalar DateTime
+
+scalar Decimal
+
+scalar Upload
+
+input UploadedFile {
+  ticket: String!
+  filename: String!
+  mimetype: String!
+  encoding: String
+  size: Int!
+}
+
+type UploadedFileData {
+  ticket: String!
+  filename: String!
+  mimetype: String!
+  encoding: String
+  size: Int!
+}
+
+extend type Mutation {
+  singleUpload(file: Upload!): UploadedFileData!
+  deleteUploadedFile(ticket: String!): String!
+  saveProfile(key: [String!]!, value: Json!): Boolean!
+  updateMyAvatar(avatar: UploadedFile): User!
+  setMyLanguage(language: Language!): User!
+  broadcastMaintenance(active: Boolean!, message: String, until: String): Int!
+  botRunCancel(botRunId: String!, force: Boolean): String!
+}
+
+# Qué impide borrar un registro (common/resolvers/deletionBlockers.ts). Datos,
+# no texto: el cliente arma el mensaje en cada idioma.
+type DeletionBlockerItem {
+  id: ID!
+  # El nombre visible: un texto, o uno por idioma ({ "es": ..., "en": ..., "pt": ... }).
+  nameText: String
+  nameI18n: Json
+}
+
+type DeletionBlockerVisible {
+  count: Int!
+  items: [DeletionBlockerItem!]!
+}
+
+type DeletionBlockerReason {
+  kind: String!
+  rootEntity: String!
+  relations: [String!]!
+  visible: DeletionBlockerVisible
+  hiddenInTenant: Int
+  otherTenants: Int
+}
+
+type DeletionBlockers {
+  entity: String!
+  id: ID!
+  blocked: Boolean!
+  reasons: [DeletionBlockerReason!]!
+}
+
+extend type Query {
+  deletionBlockers(entity: String!, id: ID!): DeletionBlockers!
+}
+
+scalar Json
+
+enum AbStatementStatus {
+  queued
+  processing
+  read
+  failed
+}
+
+enum AbCorrectionReview {
+  pending
+  confirmed
+  rejected
+}
+
+enum Language {
+  es
+  en
+  pt
+}
+
+enum TenantIvaCondition {
+  registeredResponsible
+  monotax
+  exempt
+}
+
+enum TenantStatus {
+  active
+  suspended
+}
+
+enum IntegrationClientStatus {
+  active
+  revoked
+}
+
+enum IdempotencyStatus {
+  in_progress
+  done
+  failed
+}
+
+enum NotificationType {
+  mention
+  assignment
+  comment
+  alert
+  system
+}
+
+enum NotificationPriority {
+  high
+  medium
+  low
+}
+
+enum EmailFrequency {
+  immediate
+  daily_digest
+  weekly_digest
+}
+
+enum EmailVerificationStatus {
+  pending
+  verified
+  expired
+  revoked
+}
+
+type Query {
+  _empty: String
+}
+
+type Mutation {
+  _empty: String
+}
+
+enum FilterMode {
+  insensitive
+}
+
+input FilterString {
+  equals: String
+  not: String
+  in: [String!]
+  notIn: [String!]
+  contains: String
+  lt: String
+  lte: String
+  gt: String
+  gte: String
+  mode: FilterMode
+  startsWith: String
+  endsWith: String
+  range: String
+  isNull: Boolean
+  isEmpty: Boolean
+  regex: String
+  search: String
+}
+
+input FilterDate {
+  equals: String
+  not: String
+  in: [String!]
+  notIn: [String!]
+  lt: String
+  lte: String
+  gt: String
+  gte: String
+  range: String
+  isNull: Boolean
+  isEmpty: Boolean
+  regex: String
+}
+
+input FilterDateTime {
+  equals: String
+  not: String
+  in: [String!]
+  notIn: [String!]
+  lt: String
+  lte: String
+  gt: String
+  gte: String
+  range: String
+  isNull: Boolean
+  isEmpty: Boolean
+  regex: String
+}
+
+input FilterBoolean {
+  equals: Boolean
+  not: Boolean
+  isNull: Boolean
+  isEmpty: Boolean
+}
+
+input FilterInt {
+  equals: Int
+  not: Int
+  in: [Int!]
+  notIn: [Int!]
+  lt: Int
+  lte: Int
+  gt: Int
+  gte: Int
+  isNull: Boolean
+  isEmpty: Boolean
+}
+
+input FilterFloat {
+  equals: Float
+  not: Float
+  in: [Float!]
+  notIn: [Float!]
+  lt: Float
+  lte: Float
+  gt: Float
+  gte: Float
+  isNull: Boolean
+  isEmpty: Boolean
+}
+
+input FilterDecimal {
+  equals: Decimal
+  not: Decimal
+  in: [Decimal!]
+  notIn: [Decimal!]
+  lt: Decimal
+  lte: Decimal
+  gt: Decimal
+  gte: Decimal
+  isNull: Boolean
+  isEmpty: Boolean
+}
+
+input FilterJson {
+  equals: Json
+  not: Json
+  byPath: Json
+}
+
+input FilterStringList {
+  equals: String
+  search: String
+  has: String
+  hasEvery: [String!]
+  hasSome: [String!]
+  hasNone: [String!]
+  isEmpty: Boolean
+}
+
+input InputMultipleRef {
+  set: [String!]
+  add: [String!]
+  remove: [String!]
+}
+
+enum SortOrder {
+  asc
+  desc
+}
+
+enum ThumbnailSize {
+  width256
+  width512
+  width1280
+}
+
+input OrderByMultiple {
+  _count: SortOrder
+}
+
+type AuthenticateResponse {
+  accessToken: String!
+  refreshToken: String!
+  accessExpiresIn: Int!
+  refreshExpiresIn: Int!
+}
+
+type LoginResponse {
+  accessToken: String
+  refreshToken: String
+  accessExpiresIn: Int
+  refreshExpiresIn: Int
+  twoFaRequired: Boolean!
+  twoFaAction: String
+  tempToken: String
+}
+
+type TwoFaSetupResponse {
+  qrCodeDataUrl: String!
+  secret: String!
+  backupCodes: [String!]!
+}
+
+type SessionInfo {
+  id: String!
+  browserName: String
+  browserVersion: String
+  osName: String
+  deviceType: String
+  ipAddress: String
+  lastUsedAt: DateTime
+  createdAt: DateTime!
+  expiresAt: DateTime!
+}
+
+type TrustedDeviceInfo {
+  id: String!
+  browserName: String
+  browserVersion: String
+  osName: String
+  deviceType: String
+  ipAddress: String
+  lastUsedAt: DateTime
+  createdAt: DateTime!
+  expiresAt: DateTime!
+}
+
+type WorkerEventRetryResult {
+  newWorkerEventId: ID!
+}
+
+type WorkerEventRetryInfo {
+  canRetry: Boolean!
+  reason: String
+  modes: [String!]!
+  editableFields: [String!]!
+  currentValues: Json
+}
+
+type SimulationControlResult {
+  ok: Boolean!
+}
+
+type SimulationStartResult {
+  sessionId: ID!
+}
+
+type SimulationResetResult {
+  ok: Boolean!
+}
+
+type Thumbnail {
+  url: String!
+  size: ThumbnailSize!
+}
+
+type FileData {
+  name: String!
+  mimetype: String!
+  url: String!
+  size: Int
+  description: String
+  thumbnails: [Thumbnail]
+}
+
+input FileData_UpdateInput {
+  create: [UploadedFile!]
+  update: [UploadedFile!]
+  remove: [String!]
+}

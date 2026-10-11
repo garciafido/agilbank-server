@@ -1,0 +1,7 @@
+[
+  { "code": "007", "name": "Banco de Galicia y Buenos Aires", "cuit": null, "aliases": ["galicia"] },
+  { "code": "014", "name": "Banco de la Provincia de Buenos Aires", "cuit": "33999242109", "aliases": ["provincia de buenos aires", "pcia bs as", "pcia de bs as", "provincia bs as", "bapro"] },
+  { "code": "017", "name": "BBVA Argentina", "cuit": null, "aliases": ["bbva", "frances"] },
+  { "code": "097", "name": "Banco Provincia del Neuquén", "cuit": null, "aliases": ["bpn", "neuquen"] },
+  { "code": "191", "name": "Banco Credicoop Cooperativo Limitado", "cuit": "30571421352", "aliases": ["credicoop"] }
+]

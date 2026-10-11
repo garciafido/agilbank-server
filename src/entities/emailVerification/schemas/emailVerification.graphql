@@ -1,0 +1,113 @@
+type EmailVerification {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  email: String!
+  status: EmailVerificationStatus!
+  expiresAt: DateTime!
+  sentAt: DateTime
+  verifiedAt: DateTime
+  sentCount: Int!
+  lastSentAt: DateTime
+  requestedBy: User!
+  sourceEntity: String
+  sourceRecordId: String
+  validationChanges: Json
+  validationSubmittedAt: DateTime
+}
+
+extend type Mutation {
+  emailVerificationCreate(
+    email: String!
+    idempotencyKey_: String
+  ): EmailVerification!
+  emailVerificationUpdate(
+    id: String!
+    version_: String!
+    email: String
+    idempotencyKey_: String
+  ): EmailVerification!
+  emailVerificationDelete(id: String!): EmailVerification!
+}
+
+extend type Query {
+  emailVerificationOne(id: String!): EmailVerification!
+  emailVerificationListWithOffset(
+    where: EmailVerification_Filter
+    orderBy: [EmailVerification_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [EmailVerification]!
+  emailVerificationListWithCursor(
+    where: EmailVerification_Filter
+    orderBy: EmailVerification_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [EmailVerification]!
+}
+
+input EmailVerification_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  email: FilterString
+  status: FilterString
+  expiresAt: FilterDateTime
+  sentAt: FilterDateTime
+  verifiedAt: FilterDateTime
+  sentCount: FilterInt
+  lastSentAt: FilterDateTime
+  requestedBy: User_Filter
+  sourceEntity: FilterString
+  sourceRecordId: FilterString
+  validationChanges: FilterJson
+  validationSubmittedAt: FilterDateTime
+  AND: [EmailVerification_Filter!]
+  OR: [EmailVerification_Filter!]
+  NOT: [EmailVerification_Filter!]
+}
+
+input EmailVerification_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  email: SortOrder
+  status: SortOrder
+  expiresAt: SortOrder
+  sentAt: SortOrder
+  verifiedAt: SortOrder
+  sentCount: SortOrder
+  lastSentAt: SortOrder
+  requestedBy: User_OrderBy
+  sourceEntity: SortOrder
+  sourceRecordId: SortOrder
+  validationChanges: SortOrder
+  validationSubmittedAt: SortOrder
+}
+
+input EmailVerification_OrderByCursor {
+  id: SortOrder
+
+  email: SortOrder
+}
+
+input EmailVerification_CreateInput {
+  email: String!
+}
+
+input EmailVerification_UpdateInput {
+  id: String!
+  version_: String!
+  email: String
+}

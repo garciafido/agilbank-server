@@ -1,0 +1,31 @@
+{
+  "name": "agilbank",
+  "type": "app",
+  "remotePath": "/opt/agilbank",
+  "composeFile": "docker-compose.prod.yml",
+  "healthCheck": "health-check.sh",
+  "description": "agilbank application stack (server + worker + client)",
+  "zeroDowntime": true,
+  "rolloutServices": ["server", "worker", "client"],
+  "serviceGroups": { "server + worker": ["server", "worker"] },
+  "imageRetention": { "repos": ["agilbank-server", "agilbank-worker", "agilbank-client"] },
+  "preDeploy": ["./scripts/build-and-push.sh ${TARGET}"],
+  "setup": ["./scripts/setup-db.sh", "./scripts/setup-certs.sh", "docker network inspect monitoring >/dev/null 2>&1 || docker network create monitoring"],
+  "endpoints": [
+    { "url": "https://api.${DOMAIN}", "expect": 200 },
+    { "url": "https://app.${DOMAIN}", "expect": 200 }
+  ],
+  "maintenance": {
+    "hosts": ["api.${DOMAIN}", "app.${DOMAIN}"],
+    "migrateCheck": { "service": "server", "command": "npx prisma migrate status" }
+  },
+  "seed": {
+    "container": "server",
+    "command": "npm run db:seed",
+    "env": ["RUN_SEEDS=true", "NODE_ENV=production"],
+    "listCommand": "SEED_LIST_JSON=true node prisma/seed.js 2>/dev/null"
+  },
+  "postDeploy": [
+    "[ -f /opt/monitoring-stack/scripts/register-monitoring.sh ] && /opt/monitoring-stack/scripts/register-monitoring.sh agilbank /opt/agilbank/monitoring || echo '[SKIP] monitoring not available'"
+  ]
+}

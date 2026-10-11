@@ -1,0 +1,29 @@
+FROM node:20-alpine
+
+# Install dependencies for development
+RUN apk add --no-cache python3 make g++ git postgresql-client
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+# Los módulos externos, antes de instalar: sus dependencias `file:` los necesitan en disco.
+COPY modulos ./modulos
+
+# Install dependencies
+RUN npm install
+
+# Copy prisma schema
+COPY prisma ./prisma
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy application code
+COPY . .
+
+# Expose port
+EXPOSE 4000
+
+# Development command will be overridden by docker-compose
+CMD ["npm", "run", "dev"]

@@ -1,0 +1,57 @@
+groups:
+  - name: application
+    interval: 30s
+    rules:
+      - alert: ContainerDown
+        expr: absent(container_last_seen{name=~".*-server.*"}) or absent(container_last_seen{name=~".*-worker.*"})
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} is down"
+          description: "Container {{ $labels.name }} has been absent for more than 2 minutes"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "More than 10% of requests returning 5xx errors in the last 5 minutes"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency detected"
+          description: "95th percentile response time exceeded 2 seconds"
+
+      - alert: HealthCheckFailing
+        expr: probe_success == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Health check failing for {{ $labels.instance }}"
+          description: "Health check endpoint has been failing for more than 3 minutes at {{ $labels.instance }}"
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: db_connection_pool_available{} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection pool exhausted"
+          description: "No available database connections in the pool"
+
+      - alert: MemoryUsageHigh
+        expr: process_resident_memory_bytes / 1024 / 1024 > 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Process memory usage exceeded 1GB for more than 5 minutes"

@@ -1,0 +1,136 @@
+# Multi-stage build optimized for server (NO worker, NO Chromium)
+# Using slim (Debian) instead of alpine for glibc compatibility with onnxruntime-node
+
+# Dependencies stage - cache package installations
+FROM node:20-slim AS deps
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ libvips-dev && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY package*.json ./
+# Los módulos externos, antes de instalar: sus dependencias `file:` los necesitan en disco.
+COPY modulos ./modulos
+# Skip Playwright browser download in Docker (worker uses system Chromium)
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+# npm resiliente a cortes de red transitorios (ECONNRESET) durante npm ci:
+# reintenta en vez de abortar. El cache mount /root/.npm acelera el reintento.
+ENV NPM_CONFIG_FETCH_RETRIES=5 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=600000
+# Install production dependencies only with cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev
+
+# Dev dependencies stage - for building
+FROM node:20-slim AS dev-deps
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ libvips-dev && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY package*.json ./
+# Los módulos externos, antes de instalar: sus dependencias `file:` los necesitan en disco.
+COPY modulos ./modulos
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+# npm resiliente a cortes de red transitorios (ECONNRESET) durante npm ci:
+# reintenta en vez de abortar. El cache mount /root/.npm acelera el reintento.
+ENV NPM_CONFIG_FETCH_RETRIES=5 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=600000
+# Install ALL dependencies with cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+
+# Prisma generation stage - cache prisma client
+FROM dev-deps AS prisma
+WORKDIR /app
+COPY prisma.config.ts ./
+COPY prisma ./prisma
+RUN npx prisma generate
+# Bundle generated client TS → single CJS file (needed by .prisma/client proxy at runtime)
+RUN npx esbuild src/prisma/generated-client/client.ts --bundle --format=cjs --platform=node \
+    --external:@prisma/client/runtime/client \
+    --banner:js='var _importMetaUrl=require("url").pathToFileURL(__filename).href;' \
+    --define:import.meta.url=_importMetaUrl \
+    --outfile=src/prisma/generated-client/client.js
+
+# GraphQL generation stage - cache generated types
+FROM prisma AS graphql
+WORKDIR /app
+# Copy only what's needed for codegen
+COPY codegen.yml ./
+COPY src/common/schemas ./src/common/schemas
+COPY src/entities ./src/entities
+COPY src/pipelines ./src/pipelines
+RUN npx graphql-codegen || echo "GraphQL codegen completed with warnings"
+
+# Build stage - uses all previous caches
+FROM graphql AS builder
+WORKDIR /app
+# Copy rest of application
+COPY . .
+# Build with esbuild (fast, no type checking - types checked in CI)
+RUN npm run build:fast
+
+# Verify build output
+RUN test -d dist || (echo "Build failed: dist directory not created" && exit 1)
+
+# Production stage - SERVER ONLY (NO Chromium, NO worker)
+FROM node:20-slim AS production
+
+# OCI Image labels (build-time arguments)
+ARG GIT_COMMIT=""
+ARG GIT_BRANCH=""
+ARG BUILD_TIME=""
+ARG IMAGE_TAG=""
+
+LABEL org.opencontainers.image.title="agilbank-server" \
+      org.opencontainers.image.description="Agilbank Server - GraphQL API" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.created="${BUILD_TIME}" \
+      org.opencontainers.image.version="${IMAGE_TAG}" \
+      org.opencontainers.image.ref.name="${GIT_BRANCH}"
+
+RUN apt-get update && apt-get install -y --no-install-recommends python3 tini postgresql-client curl wget ca-certificates && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Copy production dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy prisma config and schema (needed for prisma migrate deploy at runtime)
+COPY --from=builder /app/prisma.config.ts ./
+COPY --from=builder /app/prisma ./prisma
+
+# Fix seed for production: use compiled JS instead of ts-node
+RUN echo 'require("/app/dist/prisma/seed/seed.js");' > ./prisma/seed.js
+RUN sed -i 's/"seed": "ts-node --transpile-only src\/prisma\/seed\/seed.ts"/"seed": "node prisma\/seed.js"/' package.json
+RUN sed -i "s/npx ts-node --transpile-only src\/prisma\/seed\/seed.ts/node prisma\/seed.js/" prisma.config.ts
+
+# Copy generated prisma client (required for runtime)
+COPY --from=builder /app/src/prisma/generated-client ./src/prisma/generated-client
+
+# Create .prisma/client proxy (Prisma 7 with custom output doesn't generate this)
+RUN mkdir -p node_modules/.prisma/client && \
+    echo 'module.exports = require("/app/src/prisma/generated-client/client");' > node_modules/.prisma/client/default.js
+
+# Copy built application (server only)
+COPY --from=builder /app/dist ./dist
+
+# Remove worker files to save space (~50MB)
+RUN rm -rf dist/workers || true
+
+# Create backup directories for email fallback
+RUN mkdir -p /app/backup/seed /app/backup/emails && \
+    chmod -R 777 /app/backup
+
+# Copy entrypoint (handles migrations + seeds before starting)
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
+# Use tini for proper signal handling (installed at /usr/bin/tini in Debian)
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+EXPOSE 4000
+
+CMD ["./docker-entrypoint.sh", "npm", "run", "start:dist"]

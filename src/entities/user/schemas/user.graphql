@@ -1,0 +1,186 @@
+type Company {
+  id: String!
+  name: String!
+  logo: String
+  logo_data: FileData
+  extra: Json
+}
+
+type User {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  tenant_id_: String
+  targetTenant: Tenant
+  tenantDisplayName: String
+  email: String!
+  name: String!
+  active: Boolean!
+  language: Language!
+  avatar: String
+  avatar_data: FileData
+  cellphone: String
+  twoFaseAuth: Boolean
+  profile: Json
+  roles: [Role!]
+  company: Company
+}
+
+extend type Mutation {
+  userCreate(
+    targetTenantId: String
+    email: String!
+    name: String!
+    active: Boolean!
+    language: Language!
+    avatar: UploadedFile
+    cellphone: String
+    twoFaseAuth: Boolean
+    rolesIds: [String!]
+    idempotencyKey_: String
+  ): User!
+  userUpdate(
+    id: String!
+    version_: String!
+    email: String
+    name: String
+    active: Boolean
+    language: Language
+    avatar: UploadedFile
+    cellphone: String
+    twoFaseAuth: Boolean
+    profile: Json
+    rolesIds: InputMultipleRef
+    idempotencyKey_: String
+  ): User!
+  userDelete(id: String!): User!
+  login(email: String!, password: String!): LoginResponse!
+  refreshToken(refreshToken: String!): AuthenticateResponse!
+  logout: Boolean!
+  revokeAllTokens: Boolean!
+  userChangePassword(oldPassword: String!, newPassword: String!): User!
+  userResetPassword(email: String!): User!
+  setupTwoFa(tempToken: String!): TwoFaSetupResponse!
+  confirmTwoFaSetup(
+    tempToken: String!
+    code: String!
+    rememberDevice: Boolean
+  ): AuthenticateResponse!
+  verifyTwoFa(
+    tempToken: String!
+    code: String!
+    rememberDevice: Boolean
+  ): AuthenticateResponse!
+  verifyTwoFaBackupCode(
+    tempToken: String!
+    code: String!
+    rememberDevice: Boolean
+  ): AuthenticateResponse!
+  revokeTrustedDevice(id: String!): Boolean!
+  revokeAllTrustedDevices: Boolean!
+}
+
+extend type Query {
+  userOne(id: String!): User!
+  userListWithOffset(
+    where: User_Filter
+    orderBy: [User_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [User]!
+  userListWithCursor(
+    where: User_Filter
+    orderBy: User_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [User]!
+  me: User!
+  mySessions: [SessionInfo!]!
+  myTrustedDevices: [TrustedDeviceInfo!]!
+}
+
+input User_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  targetTenant: Tenant_Filter
+  tenantDisplayName: FilterString
+  email: FilterString
+  name: FilterString
+  active: FilterBoolean
+  language: FilterString
+  avatar: FilterString
+  cellphone: FilterString
+  twoFaseAuth: FilterBoolean
+  profile: FilterJson
+  roles: User_roles_Filter
+  AND: [User_Filter!]
+  OR: [User_Filter!]
+  NOT: [User_Filter!]
+}
+
+input User_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  targetTenant: Tenant_OrderBy
+  tenantDisplayName: SortOrder
+  email: SortOrder
+  name: SortOrder
+  active: SortOrder
+  language: SortOrder
+  avatar: SortOrder
+  cellphone: SortOrder
+  twoFaseAuth: SortOrder
+  profile: SortOrder
+  roles: OrderByMultiple
+}
+
+input User_OrderByCursor {
+  id: SortOrder
+
+  email: SortOrder
+}
+
+input User_CreateInput {
+  targetTenantId: String
+  email: String!
+  name: String!
+  active: Boolean!
+  language: Language!
+  avatar: UploadedFile
+  cellphone: String
+  twoFaseAuth: Boolean
+  rolesIds: [String!]
+}
+
+input User_UpdateInput {
+  id: String!
+  version_: String!
+  email: String
+  name: String
+  active: Boolean
+  language: Language
+  avatar: UploadedFile
+  cellphone: String
+  twoFaseAuth: Boolean
+  profile: Json
+  rolesIds: InputMultipleRef
+}
+
+input User_roles_Filter {
+  every: Role_Filter
+  some: Role_Filter
+  none: Role_Filter
+}

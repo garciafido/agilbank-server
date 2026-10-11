@@ -1,0 +1,5 @@
+{
+  "debitsCreditsTax": [0.006, 0.012],
+  "vat": [0.21, 0.105, 0.27],
+  "vatPerception": [0.03, 0.015]
+}

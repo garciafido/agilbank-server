@@ -1,0 +1,109 @@
+type WorkerEvent {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  tenant_id_: String
+  queueName: String!
+  jobType: String!
+  status: String!
+  enqueuedAt: DateTime!
+  startedAt: DateTime
+  completedAt: DateTime
+  payload: Json!
+  result: Json
+  error: Json
+  retryCount: Int!
+  manualRetryCount: Int!
+  nextRetryAt: DateTime
+  duration: Int
+  correlationId: String
+  triggerUserId: User!
+}
+
+extend type Mutation {
+  workerEventDelete(id: String!): WorkerEvent!
+  workerEventRetry(
+    id: ID!
+    mode: String
+    overrides: Json
+  ): WorkerEventRetryResult!
+}
+
+extend type Query {
+  workerEventOne(id: String!, allTenants: Boolean): WorkerEvent!
+  workerEventListWithOffset(
+    where: WorkerEvent_Filter
+    orderBy: [WorkerEvent_OrderBy!]
+    offset: Int!
+    take: Int!
+    allTenants: Boolean
+  ): [WorkerEvent]!
+  workerEventListWithCursor(
+    where: WorkerEvent_Filter
+    orderBy: WorkerEvent_OrderByCursor!
+    cursorKey: String
+    take: Int!
+    allTenants: Boolean
+  ): [WorkerEvent]!
+  workerEventRetryInfo(id: ID!): WorkerEventRetryInfo!
+}
+
+input WorkerEvent_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  queueName: FilterString
+  jobType: FilterString
+  status: FilterString
+  enqueuedAt: FilterDateTime
+  startedAt: FilterDateTime
+  completedAt: FilterDateTime
+  payload: FilterJson
+  result: FilterJson
+  error: FilterJson
+  retryCount: FilterInt
+  manualRetryCount: FilterInt
+  nextRetryAt: FilterDateTime
+  duration: FilterInt
+  correlationId: FilterString
+  triggerUserId: User_Filter
+  AND: [WorkerEvent_Filter!]
+  OR: [WorkerEvent_Filter!]
+  NOT: [WorkerEvent_Filter!]
+}
+
+input WorkerEvent_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  queueName: SortOrder
+  jobType: SortOrder
+  status: SortOrder
+  enqueuedAt: SortOrder
+  startedAt: SortOrder
+  completedAt: SortOrder
+  payload: SortOrder
+  result: SortOrder
+  error: SortOrder
+  retryCount: SortOrder
+  manualRetryCount: SortOrder
+  nextRetryAt: SortOrder
+  duration: SortOrder
+  correlationId: SortOrder
+  triggerUserId: User_OrderBy
+}
+
+input WorkerEvent_OrderByCursor {
+  id: SortOrder
+}

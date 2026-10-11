@@ -1,0 +1,35 @@
+FROM node:20-alpine
+
+# Install dependencies for Prisma and networking tools
+RUN apk add --no-cache openssl curl
+
+# Install Chromium and dependencies for Puppeteer
+RUN apk add --no-cache     chromium     nss     freetype     harfbuzz     ca-certificates     ttf-freefont
+
+# Configure Puppeteer to use system Chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+WORKDIR /app
+
+# Copy everything (including node_modules if present)
+# This is a fallback when npm ci hangs
+COPY . .
+
+# Only generate Prisma client (assuming node_modules already exists)
+RUN if [ ! -d "node_modules" ]; then       echo "❌ node_modules not found. This Dockerfile requires pre-installed dependencies.";       exit 1;     fi
+
+# Generate Prisma client
+RUN echo "🔧 Generating Prisma client..." &&     npx prisma generate ||     (echo "❌ Prisma generate failed" && exit 1)
+
+# Create uploads directory
+RUN mkdir -p uploads
+
+# Health check file
+RUN echo '{"status":"ok"}' > /app/health.json
+
+# Expose port
+EXPOSE 4000
+
+# Run the application
+CMD ["node", "dist/server.js"]

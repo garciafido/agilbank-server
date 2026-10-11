@@ -1,0 +1,1252 @@
+{
+  "AD": {
+    "es": "andorrana",
+    "pt": "andorrana",
+    "en": "Andorran"
+  },
+  "AE": {
+    "es": "emiratí",
+    "pt": "emiradense",
+    "en": "Emirati"
+  },
+  "AF": {
+    "es": "afgana",
+    "pt": "afegã",
+    "en": "Afghan"
+  },
+  "AG": {
+    "es": "antiguana",
+    "pt": "antiguana",
+    "en": "Antiguan"
+  },
+  "AI": {
+    "es": "anguilense",
+    "pt": "anguilana",
+    "en": "Anguillan"
+  },
+  "AL": {
+    "es": "albanesa",
+    "pt": "albanesa",
+    "en": "Albanian"
+  },
+  "AM": {
+    "es": "armenia",
+    "pt": "armênia",
+    "en": "Armenian"
+  },
+  "AO": {
+    "es": "angoleña",
+    "pt": "angolana",
+    "en": "Angolan"
+  },
+  "AQ": {
+    "es": null,
+    "pt": null,
+    "en": null
+  },
+  "AR": {
+    "es": "argentina",
+    "pt": "argentina",
+    "en": "Argentine"
+  },
+  "AS": {
+    "es": "samoamericana",
+    "pt": "samoana",
+    "en": "American Samoan"
+  },
+  "AT": {
+    "es": "austriaca",
+    "pt": "austríaca",
+    "en": "Austrian"
+  },
+  "AU": {
+    "es": "australiana",
+    "pt": "australiana",
+    "en": "Australian"
+  },
+  "AW": {
+    "es": "arubeña",
+    "pt": "arubana",
+    "en": "Aruban"
+  },
+  "AX": {
+    "es": "alandesa",
+    "pt": "alandesa",
+    "en": "Aland Island"
+  },
+  "AZ": {
+    "es": "azerbaiyana",
+    "pt": "azerbaijana",
+    "en": "Azerbaijani"
+  },
+  "BA": {
+    "es": "bosnia",
+    "pt": "bósnia",
+    "en": "Bosnian"
+  },
+  "BB": {
+    "es": "barbadense",
+    "pt": "barbadiana",
+    "en": "Barbadian"
+  },
+  "BD": {
+    "es": "bangladesí",
+    "pt": "bangladechiana",
+    "en": "Bangladeshi"
+  },
+  "BE": {
+    "es": "belga",
+    "pt": "belga",
+    "en": "Belgian"
+  },
+  "BF": {
+    "es": "burkinesa",
+    "pt": "burquinense",
+    "en": "Burkinabe"
+  },
+  "BG": {
+    "es": "búlgara",
+    "pt": "búlgara",
+    "en": "Bulgarian"
+  },
+  "BH": {
+    "es": "bareiní",
+    "pt": "bareinita",
+    "en": "Bahraini"
+  },
+  "BI": {
+    "es": "burundesa",
+    "pt": "burundiana",
+    "en": "Burundian"
+  },
+  "BJ": {
+    "es": "beninesa",
+    "pt": "beninense",
+    "en": "Beninese"
+  },
+  "BL": {
+    "es": "sanbartolomeana",
+    "pt": "são-bartolomeense",
+    "en": "Barthelemois"
+  },
+  "BM": {
+    "es": "bermudeña",
+    "pt": "bermudense",
+    "en": "Bermudian"
+  },
+  "BN": {
+    "es": "bruneana",
+    "pt": "bruneana",
+    "en": "Bruneian"
+  },
+  "BO": {
+    "es": "boliviana",
+    "pt": "boliviana",
+    "en": "Bolivian"
+  },
+  "BQ": {
+    "es": null,
+    "pt": null,
+    "en": null
+  },
+  "BR": {
+    "es": "brasileña",
+    "pt": "brasileira",
+    "en": "Brazilian"
+  },
+  "BS": {
+    "es": "bahameña",
+    "pt": "bahamiana",
+    "en": "Bahamian"
+  },
+  "BT": {
+    "es": "butanesa",
+    "pt": "butanesa",
+    "en": "Bhutanese"
+  },
+  "BV": {
+    "es": null,
+    "pt": null,
+    "en": null
+  },
+  "BW": {
+    "es": "botsuana",
+    "pt": "botsuanesa",
+    "en": "Motswana"
+  },
+  "BY": {
+    "es": "bielorrusa",
+    "pt": "bielorrussa",
+    "en": "Belarusian"
+  },
+  "BZ": {
+    "es": "beliceña",
+    "pt": "belizenha",
+    "en": "Belizean"
+  },
+  "CA": {
+    "es": "canadiense",
+    "pt": "canadense",
+    "en": "Canadian"
+  },
+  "CC": {
+    "es": "cocana",
+    "pt": "coquense",
+    "en": "Cocos Island"
+  },
+  "CD": {
+    "es": "congoleña",
+    "pt": "congolesa",
+    "en": "Congolese"
+  },
+  "CF": {
+    "es": "centroafricana",
+    "pt": "centro-africana",
+    "en": "Central African"
+  },
+  "CG": {
+    "es": "congoleña",
+    "pt": "congolesa",
+    "en": "Congolese"
+  },
+  "CH": {
+    "es": "suiza",
+    "pt": "suíça",
+    "en": "Swiss"
+  },
+  "CI": {
+    "es": "marfileña",
+    "pt": "costa-marfinense",
+    "en": "Ivorian"
+  },
+  "CK": {
+    "es": "cookiana",
+    "pt": "cookense",
+    "en": "Cook Island"
+  },
+  "CL": {
+    "es": "chilena",
+    "pt": "chilena",
+    "en": "Chilean"
+  },
+  "CM": {
+    "es": "camerunesa",
+    "pt": "camaronesa",
+    "en": "Cameroonian"
+  },
+  "CN": {
+    "es": "china",
+    "pt": "chinesa",
+    "en": "Chinese"
+  },
+  "CO": {
+    "es": "colombiana",
+    "pt": "colombiana",
+    "en": "Colombian"
+  },
+  "CR": {
+    "es": "costarricense",
+    "pt": "costa-riquenha",
+    "en": "Costa Rican"
+  },
+  "CU": {
+    "es": "cubana",
+    "pt": "cubana",
+    "en": "Cuban"
+  },
+  "CV": {
+    "es": "caboverdiana",
+    "pt": "cabo-verdiana",
+    "en": "Cape Verdean"
+  },
+  "CW": {
+    "es": "curazoleña",
+    "pt": "curaçauense",
+    "en": "Curacaoan"
+  },
+  "CX": {
+    "es": "navideña",
+    "pt": "natalense",
+    "en": "Christmas Island"
+  },
+  "CY": {
+    "es": "chipriota",
+    "pt": "cipriota",
+    "en": "Cypriot"
+  },
+  "CZ": {
+    "es": "checa",
+    "pt": "tcheca",
+    "en": "Czech"
+  },
+  "DE": {
+    "es": "alemana",
+    "pt": "alemã",
+    "en": "German"
+  },
+  "DJ": {
+    "es": "yibutiana",
+    "pt": "djibutiense",
+    "en": "Djiboutian"
+  },
+  "DK": {
+    "es": "danesa",
+    "pt": "dinamarquesa",
+    "en": "Danish"
+  },
+  "DM": {
+    "es": "dominiquesa",
+    "pt": "dominiquesa",
+    "en": "Dominican"
+  },
+  "DO": {
+    "es": "dominicana",
+    "pt": "dominicana",
+    "en": "Dominican"
+  },
+  "DZ": {
+    "es": "argelina",
+    "pt": "argelina",
+    "en": "Algerian"
+  },
+  "EC": {
+    "es": "ecuatoriana",
+    "pt": "equatoriana",
+    "en": "Ecuadorian"
+  },
+  "EE": {
+    "es": "estonia",
+    "pt": "estoniana",
+    "en": "Estonian"
+  },
+  "EG": {
+    "es": "egipcia",
+    "pt": "egípcia",
+    "en": "Egyptian"
+  },
+  "EH": {
+    "es": "saharaui",
+    "pt": "sarauí",
+    "en": "Sahrawi"
+  },
+  "ER": {
+    "es": "eritrea",
+    "pt": "eritreia",
+    "en": "Eritrean"
+  },
+  "ES": {
+    "es": "española",
+    "pt": "espanhola",
+    "en": "Spanish"
+  },
+  "ET": {
+    "es": "etíope",
+    "pt": "etíope",
+    "en": "Ethiopian"
+  },
+  "FI": {
+    "es": "finlandesa",
+    "pt": "finlandesa",
+    "en": "Finnish"
+  },
+  "FJ": {
+    "es": "fiyiana",
+    "pt": "fijiana",
+    "en": "Fijian"
+  },
+  "FK": {
+    "es": "malvinense",
+    "pt": "malvinense",
+    "en": "Falkland Island"
+  },
+  "FM": {
+    "es": "micronesia",
+    "pt": "micronésia",
+    "en": "Micronesian"
+  },
+  "FO": {
+    "es": "feroesa",
+    "pt": "feroesa",
+    "en": "Faroese"
+  },
+  "FR": {
+    "es": "francesa",
+    "pt": "francesa",
+    "en": "French"
+  },
+  "GA": {
+    "es": "gabonesa",
+    "pt": "gabonense",
+    "en": "Gabonese"
+  },
+  "GB": {
+    "es": "británica",
+    "pt": "britânica",
+    "en": "British"
+  },
+  "GD": {
+    "es": "granadina",
+    "pt": "granadina",
+    "en": "Grenadian"
+  },
+  "GE": {
+    "es": "georgiana",
+    "pt": "georgiana",
+    "en": "Georgian"
+  },
+  "GF": {
+    "es": "guayanesa",
+    "pt": "guianense",
+    "en": "French Guianese"
+  },
+  "GG": {
+    "es": "guerneseyesa",
+    "pt": "guernesiana",
+    "en": "Channel Island"
+  },
+  "GH": {
+    "es": "ghanesa",
+    "pt": "ganense",
+    "en": "Ghanaian"
+  },
+  "GI": {
+    "es": "gibraltareña",
+    "pt": "gibraltina",
+    "en": "Gibraltarian"
+  },
+  "GL": {
+    "es": "groenlandesa",
+    "pt": "groenlandesa",
+    "en": "Greenlandic"
+  },
+  "GM": {
+    "es": "gambiana",
+    "pt": "gambiana",
+    "en": "Gambian"
+  },
+  "GN": {
+    "es": "guineana",
+    "pt": "guineana",
+    "en": "Guinean"
+  },
+  "GP": {
+    "es": "guadalupeña",
+    "pt": "guadalupina",
+    "en": "Guadeloupean"
+  },
+  "GQ": {
+    "es": "ecuatoguineana",
+    "pt": "guinéu-equatoriana",
+    "en": "Equatorial Guinean"
+  },
+  "GR": {
+    "es": "griega",
+    "pt": "grega",
+    "en": "Greek"
+  },
+  "GS": {
+    "es": null,
+    "pt": null,
+    "en": null
+  },
+  "GT": {
+    "es": "guatemalteca",
+    "pt": "guatemalteca",
+    "en": "Guatemalan"
+  },
+  "GU": {
+    "es": "guameña",
+    "pt": "guamesa",
+    "en": "Guamanian"
+  },
+  "GW": {
+    "es": "guineana",
+    "pt": "guineense",
+    "en": "Bissau-Guinean"
+  },
+  "GY": {
+    "es": "guyanesa",
+    "pt": "guianense",
+    "en": "Guyanese"
+  },
+  "HK": {
+    "es": "hongkonesa",
+    "pt": "honconguesa",
+    "en": "Hong Kong"
+  },
+  "HM": {
+    "es": null,
+    "pt": null,
+    "en": null
+  },
+  "HN": {
+    "es": "hondureña",
+    "pt": "hondurenha",
+    "en": "Honduran"
+  },
+  "HR": {
+    "es": "croata",
+    "pt": "croata",
+    "en": "Croatian"
+  },
+  "HT": {
+    "es": "haitiana",
+    "pt": "haitiana",
+    "en": "Haitian"
+  },
+  "HU": {
+    "es": "húngara",
+    "pt": "húngara",
+    "en": "Hungarian"
+  },
+  "ID": {
+    "es": "indonesia",
+    "pt": "indonésia",
+    "en": "Indonesian"
+  },
+  "IE": {
+    "es": "irlandesa",
+    "pt": "irlandesa",
+    "en": "Irish"
+  },
+  "IL": {
+    "es": "israelí",
+    "pt": "israelense",
+    "en": "Israeli"
+  },
+  "IM": {
+    "es": "manesa",
+    "pt": "manesa",
+    "en": "Manx"
+  },
+  "IN": {
+    "es": "india",
+    "pt": "indiana",
+    "en": "Indian"
+  },
+  "IO": {
+    "es": null,
+    "pt": null,
+    "en": null
+  },
+  "IQ": {
+    "es": "iraquí",
+    "pt": "iraquiana",
+    "en": "Iraqi"
+  },
+  "IR": {
+    "es": "iraní",
+    "pt": "iraniana",
+    "en": "Iranian"
+  },
+  "IS": {
+    "es": "islandesa",
+    "pt": "islandesa",
+    "en": "Icelandic"
+  },
+  "IT": {
+    "es": "italiana",
+    "pt": "italiana",
+    "en": "Italian"
+  },
+  "JE": {
+    "es": "jerseyesa",
+    "pt": "jersiana",
+    "en": "Channel Island"
+  },
+  "JM": {
+    "es": "jamaicana",
+    "pt": "jamaicana",
+    "en": "Jamaican"
+  },
+  "JO": {
+    "es": "jordana",
+    "pt": "jordana",
+    "en": "Jordanian"
+  },
+  "JP": {
+    "es": "japonesa",
+    "pt": "japonesa",
+    "en": "Japanese"
+  },
+  "KE": {
+    "es": "keniana",
+    "pt": "queniana",
+    "en": "Kenyan"
+  },
+  "KG": {
+    "es": "kirguisa",
+    "pt": "quirguiz",
+    "en": "Kyrgyzstani"
+  },
+  "KH": {
+    "es": "camboyana",
+    "pt": "cambojana",
+    "en": "Cambodian"
+  },
+  "KI": {
+    "es": "kiribatiana",
+    "pt": "quiribatiana",
+    "en": "I-Kiribati"
+  },
+  "KM": {
+    "es": "comorense",
+    "pt": "comorense",
+    "en": "Comoran"
+  },
+  "KN": {
+    "es": "sancristobaleña",
+    "pt": "são-cristovense",
+    "en": "Kittitian"
+  },
+  "KP": {
+    "es": "norcoreana",
+    "pt": "norte-coreana",
+    "en": "North Korean"
+  },
+  "KR": {
+    "es": "surcoreana",
+    "pt": "sul-coreana",
+    "en": "South Korean"
+  },
+  "KW": {
+    "es": "kuwaití",
+    "pt": "kuwaitiana",
+    "en": "Kuwaiti"
+  },
+  "KY": {
+    "es": "caimanesa",
+    "pt": "caimanesa",
+    "en": "Caymanian"
+  },
+  "KZ": {
+    "es": "kazaja",
+    "pt": "cazaque",
+    "en": "Kazakhstani"
+  },
+  "LA": {
+    "es": "laosiana",
+    "pt": "laociana",
+    "en": "Lao"
+  },
+  "LB": {
+    "es": "libanesa",
+    "pt": "libanesa",
+    "en": "Lebanese"
+  },
+  "LC": {
+    "es": "santalucense",
+    "pt": "santa-luciense",
+    "en": "Saint Lucian"
+  },
+  "LI": {
+    "es": "liechtensteiniana",
+    "pt": "liechtensteinense",
+    "en": "Liechtensteiner"
+  },
+  "LK": {
+    "es": "ceilanesa",
+    "pt": "srilankesa",
+    "en": "Sri Lankan"
+  },
+  "LR": {
+    "es": "liberiana",
+    "pt": "liberiana",
+    "en": "Liberian"
+  },
+  "LS": {
+    "es": "lesotense",
+    "pt": "lesotiana",
+    "en": "Basotho"
+  },
+  "LT": {
+    "es": "lituana",
+    "pt": "lituana",
+    "en": "Lithuanian"
+  },
+  "LU": {
+    "es": "luxemburguesa",
+    "pt": "luxemburguesa",
+    "en": "Luxembourgish"
+  },
+  "LV": {
+    "es": "letona",
+    "pt": "letã",
+    "en": "Latvian"
+  },
+  "LY": {
+    "es": "libia",
+    "pt": "líbia",
+    "en": "Libyan"
+  },
+  "MA": {
+    "es": "marroquí",
+    "pt": "marroquina",
+    "en": "Moroccan"
+  },
+  "MC": {
+    "es": "monegasca",
+    "pt": "monegasca",
+    "en": "Monegasque"
+  },
+  "MD": {
+    "es": "moldava",
+    "pt": "moldava",
+    "en": "Moldovan"
+  },
+  "ME": {
+    "es": "montenegrina",
+    "pt": "montenegrina",
+    "en": "Montenegrin"
+  },
+  "MF": {
+    "es": "sanmartitense",
+    "pt": "são-martinhense",
+    "en": "Saint-Martinoise"
+  },
+  "MG": {
+    "es": "malgache",
+    "pt": "malgaxe",
+    "en": "Malagasy"
+  },
+  "MH": {
+    "es": "marshalesa",
+    "pt": "marshallina",
+    "en": "Marshallese"
+  },
+  "MK": {
+    "es": "macedonia",
+    "pt": "macedônia",
+    "en": "Macedonian"
+  },
+  "ML": {
+    "es": "maliense",
+    "pt": "maliana",
+    "en": "Malian"
+  },
+  "MM": {
+    "es": "birmana",
+    "pt": "birmanesa",
+    "en": "Burmese"
+  },
+  "MN": {
+    "es": "mongola",
+    "pt": "mongol",
+    "en": "Mongolian"
+  },
+  "MO": {
+    "es": "macaense",
+    "pt": "macaense",
+    "en": "Macanese"
+  },
+  "MP": {
+    "es": "chamorra",
+    "pt": "norte-marianense",
+    "en": "Northern Marianan"
+  },
+  "MQ": {
+    "es": "martiniqueña",
+    "pt": "martinicana",
+    "en": "Martiniquais"
+  },
+  "MR": {
+    "es": "mauritana",
+    "pt": "mauritana",
+    "en": "Mauritanian"
+  },
+  "MS": {
+    "es": "monserratina",
+    "pt": "monserratense",
+    "en": "Montserratian"
+  },
+  "MT": {
+    "es": "maltesa",
+    "pt": "maltesa",
+    "en": "Maltese"
+  },
+  "MU": {
+    "es": "mauriciana",
+    "pt": "mauriciana",
+    "en": "Mauritian"
+  },
+  "MV": {
+    "es": "maldiva",
+    "pt": "maldívia",
+    "en": "Maldivian"
+  },
+  "MW": {
+    "es": "malauí",
+    "pt": "malauiana",
+    "en": "Malawian"
+  },
+  "MX": {
+    "es": "mexicana",
+    "pt": "mexicana",
+    "en": "Mexican"
+  },
+  "MY": {
+    "es": "malasia",
+    "pt": "malaia",
+    "en": "Malaysian"
+  },
+  "MZ": {
+    "es": "mozambiqueña",
+    "pt": "moçambicana",
+    "en": "Mozambican"
+  },
+  "NA": {
+    "es": "namibia",
+    "pt": "namibiana",
+    "en": "Namibian"
+  },
+  "NC": {
+    "es": "neocaledonia",
+    "pt": "neocaledônia",
+    "en": "New Caledonian"
+  },
+  "NE": {
+    "es": "nigerina",
+    "pt": "nigerense",
+    "en": "Nigerien"
+  },
+  "NF": {
+    "es": "norfolkense",
+    "pt": "norfolquina",
+    "en": "Norfolk Island"
+  },
+  "NG": {
+    "es": "nigeriana",
+    "pt": "nigeriana",
+    "en": "Nigerian"
+  },
+  "NI": {
+    "es": "nicaragüense",
+    "pt": "nicaraguense",
+    "en": "Nicaraguan"
+  },
+  "NL": {
+    "es": "neerlandesa",
+    "pt": "neerlandesa",
+    "en": "Dutch"
+  },
+  "NO": {
+    "es": "noruega",
+    "pt": "norueguesa",
+    "en": "Norwegian"
+  },
+  "NP": {
+    "es": "nepalesa",
+    "pt": "nepalesa",
+    "en": "Nepali"
+  },
+  "NR": {
+    "es": "nauruana",
+    "pt": "nauruana",
+    "en": "Nauruan"
+  },
+  "NU": {
+    "es": "niueña",
+    "pt": "niueana",
+    "en": "Niuean"
+  },
+  "NZ": {
+    "es": "neozelandesa",
+    "pt": "neozelandesa",
+    "en": "New Zealand"
+  },
+  "OM": {
+    "es": "omaní",
+    "pt": "omani",
+    "en": "Omani"
+  },
+  "PA": {
+    "es": "panameña",
+    "pt": "panamenha",
+    "en": "Panamanian"
+  },
+  "PE": {
+    "es": "peruana",
+    "pt": "peruana",
+    "en": "Peruvian"
+  },
+  "PF": {
+    "es": "francopolinesia",
+    "pt": "polinésia",
+    "en": "French Polynesian"
+  },
+  "PG": {
+    "es": "papú",
+    "pt": "papua-nova-guineense",
+    "en": "Papua New Guinean"
+  },
+  "PH": {
+    "es": "filipina",
+    "pt": "filipina",
+    "en": "Philippine"
+  },
+  "PK": {
+    "es": "pakistaní",
+    "pt": "paquistanesa",
+    "en": "Pakistani"
+  },
+  "PL": {
+    "es": "polaca",
+    "pt": "polonesa",
+    "en": "Polish"
+  },
+  "PM": {
+    "es": "sanpedrina",
+    "pt": "são-pedrense",
+    "en": "Saint-Pierrais"
+  },
+  "PN": {
+    "es": "pitcairnesa",
+    "pt": "pitcairnesa",
+    "en": "Pitcairn Island"
+  },
+  "PR": {
+    "es": "puertorriqueña",
+    "pt": "porto-riquenha",
+    "en": "Puerto Rican"
+  },
+  "PS": {
+    "es": "palestina",
+    "pt": "palestina",
+    "en": "Palestinian"
+  },
+  "PT": {
+    "es": "portuguesa",
+    "pt": "portuguesa",
+    "en": "Portuguese"
+  },
+  "PW": {
+    "es": "palauana",
+    "pt": "palauana",
+    "en": "Palauan"
+  },
+  "PY": {
+    "es": "paraguaya",
+    "pt": "paraguaia",
+    "en": "Paraguayan"
+  },
+  "QA": {
+    "es": "catarí",
+    "pt": "catariana",
+    "en": "Qatari"
+  },
+  "RE": {
+    "es": "reunionesa",
+    "pt": "reunionense",
+    "en": "Reunionese"
+  },
+  "RO": {
+    "es": "rumana",
+    "pt": "romena",
+    "en": "Romanian"
+  },
+  "RS": {
+    "es": "serbia",
+    "pt": "sérvia",
+    "en": "Serbian"
+  },
+  "RU": {
+    "es": "rusa",
+    "pt": "russa",
+    "en": "Russian"
+  },
+  "RW": {
+    "es": "ruandesa",
+    "pt": "ruandesa",
+    "en": "Rwandan"
+  },
+  "SA": {
+    "es": "saudí",
+    "pt": "saudita",
+    "en": "Saudi"
+  },
+  "SB": {
+    "es": "salomonense",
+    "pt": "salomonense",
+    "en": "Solomon Island"
+  },
+  "SC": {
+    "es": "seychellense",
+    "pt": "seichelense",
+    "en": "Seychellois"
+  },
+  "SD": {
+    "es": "sudanesa",
+    "pt": "sudanesa",
+    "en": "Sudanese"
+  },
+  "SE": {
+    "es": "sueca",
+    "pt": "sueca",
+    "en": "Swedish"
+  },
+  "SG": {
+    "es": "singapurense",
+    "pt": "singapuriana",
+    "en": "Singaporean"
+  },
+  "SH": {
+    "es": null,
+    "pt": "santa-helenense",
+    "en": "Saint Helenian"
+  },
+  "SI": {
+    "es": "eslovena",
+    "pt": "eslovena",
+    "en": "Slovenian"
+  },
+  "SJ": {
+    "es": "svalbarense",
+    "pt": "esvalbardense",
+    "en": "Svalbard"
+  },
+  "SK": {
+    "es": "eslovaca",
+    "pt": "eslovaca",
+    "en": "Slovak"
+  },
+  "SL": {
+    "es": "sierraleonesa",
+    "pt": "serra-leonesa",
+    "en": "Sierra Leonean"
+  },
+  "SM": {
+    "es": "sanmarinense",
+    "pt": "são-marinhense",
+    "en": "Sammarinese"
+  },
+  "SN": {
+    "es": "senegalesa",
+    "pt": "senegalesa",
+    "en": "Senegalese"
+  },
+  "SO": {
+    "es": "somalí",
+    "pt": "somali",
+    "en": "Somali"
+  },
+  "SR": {
+    "es": "surinamesa",
+    "pt": "surinamesa",
+    "en": "Surinamese"
+  },
+  "SS": {
+    "es": "sursudanesa",
+    "pt": "sul-sudanesa",
+    "en": "South Sudanese"
+  },
+  "ST": {
+    "es": "santotomense",
+    "pt": "são-tomense",
+    "en": "Sao Tomean"
+  },
+  "SV": {
+    "es": "salvadoreña",
+    "pt": "salvadorenha",
+    "en": "Salvadoran"
+  },
+  "SX": {
+    "es": "sanmartitense",
+    "pt": "são-martinhense",
+    "en": "Sint Maarten"
+  },
+  "SY": {
+    "es": "siria",
+    "pt": "síria",
+    "en": "Syrian"
+  },
+  "SZ": {
+    "es": "suazi",
+    "pt": "essuatiniana",
+    "en": "Swazi"
+  },
+  "TC": {
+    "es": "turcocaiqueña",
+    "pt": null,
+    "en": "Turks and Caicos Island"
+  },
+  "TD": {
+    "es": "chadiana",
+    "pt": "chadiana",
+    "en": "Chadian"
+  },
+  "TF": {
+    "es": null,
+    "pt": null,
+    "en": null
+  },
+  "TG": {
+    "es": "togolesa",
+    "pt": "togolesa",
+    "en": "Togolese"
+  },
+  "TH": {
+    "es": "tailandesa",
+    "pt": "tailandesa",
+    "en": "Thai"
+  },
+  "TJ": {
+    "es": "tayika",
+    "pt": "tajique",
+    "en": "Tajikistani"
+  },
+  "TK": {
+    "es": "tokelauense",
+    "pt": "toquelauana",
+    "en": "Tokelauan"
+  },
+  "TL": {
+    "es": "timorense",
+    "pt": "timorense",
+    "en": "Timorese"
+  },
+  "TM": {
+    "es": "turcomana",
+    "pt": "turcomena",
+    "en": "Turkmen"
+  },
+  "TN": {
+    "es": "tunecina",
+    "pt": "tunisiana",
+    "en": "Tunisian"
+  },
+  "TO": {
+    "es": "tongana",
+    "pt": "tonganesa",
+    "en": "Tongan"
+  },
+  "TR": {
+    "es": "turca",
+    "pt": "turca",
+    "en": "Turkish"
+  },
+  "TT": {
+    "es": "trinitense",
+    "pt": "trinitária",
+    "en": "Trinidadian"
+  },
+  "TV": {
+    "es": "tuvaluana",
+    "pt": "tuvaluana",
+    "en": "Tuvaluan"
+  },
+  "TW": {
+    "es": "taiwanesa",
+    "pt": "taiwanesa",
+    "en": "Taiwanese"
+  },
+  "TZ": {
+    "es": "tanzana",
+    "pt": "tanzaniana",
+    "en": "Tanzanian"
+  },
+  "UA": {
+    "es": "ucraniana",
+    "pt": "ucraniana",
+    "en": "Ukrainian"
+  },
+  "UG": {
+    "es": "ugandesa",
+    "pt": "ugandense",
+    "en": "Ugandan"
+  },
+  "UM": {
+    "es": null,
+    "pt": null,
+    "en": null
+  },
+  "US": {
+    "es": "estadounidense",
+    "pt": "estadunidense",
+    "en": "American"
+  },
+  "UY": {
+    "es": "uruguaya",
+    "pt": "uruguaia",
+    "en": "Uruguayan"
+  },
+  "UZ": {
+    "es": "uzbeka",
+    "pt": "usbeque",
+    "en": "Uzbekistani"
+  },
+  "VA": {
+    "es": "vaticana",
+    "pt": "vaticana",
+    "en": "Vatican"
+  },
+  "VC": {
+    "es": "sanvicentina",
+    "pt": "são-vicentina",
+    "en": "Saint Vincentian"
+  },
+  "VE": {
+    "es": "venezolana",
+    "pt": "venezuelana",
+    "en": "Venezuelan"
+  },
+  "VG": {
+    "es": "virgenense británica",
+    "pt": "virginense",
+    "en": "British Virgin Island"
+  },
+  "VI": {
+    "es": "virgenense estadounidense",
+    "pt": "virginense",
+    "en": "U.S. Virgin Island"
+  },
+  "VN": {
+    "es": "vietnamita",
+    "pt": "vietnamita",
+    "en": "Vietnamese"
+  },
+  "VU": {
+    "es": "vanuatuense",
+    "pt": "vanuatuense",
+    "en": "Ni-Vanuatu"
+  },
+  "WF": {
+    "es": "walisiana",
+    "pt": "wallisense",
+    "en": "Wallis and Futuna"
+  },
+  "WS": {
+    "es": "samoana",
+    "pt": "samoana",
+    "en": "Samoan"
+  },
+  "XK": {
+    "es": "kosovar",
+    "pt": "cossovar",
+    "en": "Kosovar"
+  },
+  "YE": {
+    "es": "yemení",
+    "pt": "iemenita",
+    "en": "Yemeni"
+  },
+  "YT": {
+    "es": "mahoresa",
+    "pt": "maiotense",
+    "en": "Mahoran"
+  },
+  "ZA": {
+    "es": "sudafricana",
+    "pt": "sul-africana",
+    "en": "South African"
+  },
+  "ZM": {
+    "es": "zambiana",
+    "pt": "zambiana",
+    "en": "Zambian"
+  },
+  "ZW": {
+    "es": "zimbabuense",
+    "pt": "zimbabuana",
+    "en": "Zimbabwean"
+  }
+}

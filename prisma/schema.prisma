@@ -1,0 +1,545 @@
+// /*******************************************************************************
+// * Copyright (c) 2026 Agilmind SRL. All rights reserved.
+// *
+// * This software is the confidential and proprietary information of
+// * Agilmind SRL. You shall not disclose such Confidential Information
+// * and shall use it only in accordance with the terms of the license
+// * agreement you entered into with Agilmind SRL.
+// *
+// * UNAUTHORIZED COPYING, DISTRIBUTION, OR MODIFICATION OF THIS FILE,
+// * VIA ANY MEDIUM, IS STRICTLY PROHIBITED.
+// *******************************************************************************/
+
+datasource db {
+  provider   = "postgres"
+  // pg_stat_statements y pgaudit las crea el init de postgres-service, no
+  // nosotros. Van declaradas igual porque si no, Prisma las ve como DERIVA de la
+  // base y exige un reset: le pasó a agilpost recién creado, y le va a pasar a
+  // todo proyecto nuevo. Los que ya existen tienen contenedores anteriores a esas
+  // líneas del init y por eso no lo notaron.
+  extensions = [pgmq, vector, pg_trgm, pg_stat_statements, pgaudit]
+}
+
+generator client {
+  provider        = "prisma-client"
+  previewFeatures = ["fullTextSearchPostgres", "postgresqlExtensions"]
+  output          = "../src/prisma/generated-client"
+  compilerBuild = "fast" 
+}
+
+generator paljs {
+  provider = "paljs-generator"
+  output   = "../src/paljs-generated"
+}
+
+//generator erd {
+//  provider                  = "prisma-erd-generator"
+//  includeRelationFromFields = true
+//  output                    = "../docs/ERD.svg"
+//}
+
+//generator dbml {
+//  provider = "prisma-dbml-generator"
+//}
+
+enum AbStatementStatus {
+  queued
+  processing
+  read
+  failed
+}
+
+enum AbCorrectionReview {
+  pending
+  confirmed
+  rejected
+}
+
+enum Language {
+  es
+  en
+  pt
+}
+
+enum TenantIvaCondition {
+  registeredResponsible
+  monotax
+  exempt
+}
+
+enum TenantStatus {
+  active
+  suspended
+}
+
+enum IntegrationClientStatus {
+  active
+  revoked
+}
+
+enum IdempotencyStatus {
+  in_progress
+  done
+  failed
+}
+
+enum NotificationType {
+  mention
+  assignment
+  comment
+  alert
+  system
+}
+
+enum NotificationPriority {
+  high
+  medium
+  low
+}
+
+enum EmailFrequency {
+  immediate
+  daily_digest
+  weekly_digest
+}
+
+enum EmailVerificationStatus {
+  pending
+  verified
+  expired
+  revoked
+}
+
+model RefreshToken {
+  id String @id @default(cuid())
+  token String @unique @db.Text
+  userId String @map("user_id")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family String @default(cuid())
+  browserName String? @map("browser_name")
+  browserVersion String? @map("browser_version")
+  osName String? @map("os_name")
+  deviceType String? @map("device_type")
+  ipAddress String? @map("ip_address")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  replacedBy String? @map("replaced_by")
+  replacedAt DateTime? @map("replaced_at")
+  revokedAt DateTime? @map("revoked_at")
+  revokedReason String? @map("revoked_reason")
+
+
+  @@index([userId])
+  @@index([family])
+  @@index([expiresAt])
+  @@index([token], type: Hash)
+  @@map("refresh_tokens")
+}
+
+model TrustedDevice {
+  id String @id @default(cuid())
+  tokenHash String @unique @map("token_hash")
+  userId String @map("user_id")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  browserName String? @map("browser_name")
+  browserVersion String? @map("browser_version")
+  osName String? @map("os_name")
+  deviceType String? @map("device_type")
+  ipAddress String? @map("ip_address")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  revokedAt DateTime? @map("revoked_at")
+  revokedReason String? @map("revoked_reason")
+
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("trusted_devices")
+}
+
+model SystemStatus {
+  id String @id @default("system")
+  status String
+  message String?
+  scheduledAt DateTime? @map("scheduled_at")
+  startedAt DateTime? @map("started_at")
+  estimatedEnd DateTime? @map("estimated_end")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+
+  @@map("system_status")
+}
+
+model AbStatement {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  createdBy_          User      @relation("AbStatement_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("AbStatement_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  tenant_             Tenant     @relation("AbStatement_tenant_", fields: [tenant_id_], references: [id])
+  tenant_id_          String    @map("tenant__id__")
+  file String  
+  file_server_data Json @map("file__server_data")
+  file_data Json @map("file__data")
+  originalName String @map("original_name")
+  contentHash String? @map("content_hash")
+  status AbStatementStatus  @default(queued)
+  verdict String?
+  bankCode String? @map("bank_code")
+  cbu String?
+  periodFrom DateTime? @map("period_from")
+  periodTo DateTime? @map("period_to")
+  openingBalance Decimal? @map("opening_balance")
+  closingBalance Decimal? @map("closing_balance")
+  lineCount Int? @map("line_count")
+  declaredAccount Json? @map("declared_account")
+  reading Json?
+  error String?
+  processedAt DateTime? @map("processed_at")
+
+  @@unique([tenant_id_, contentHash])
+  @@index([tenant_id_, createdAt_])
+
+  @@map(name: "ab_statement")
+}
+
+model AbConceptCorrection {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  createdBy_          User      @relation("AbConceptCorrection_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("AbConceptCorrection_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  tenant_             Tenant     @relation("AbConceptCorrection_tenant_", fields: [tenant_id_], references: [id])
+  tenant_id_          String    @map("tenant__id__")
+  bankCode String? @map("bank_code")
+  operationCode String? @map("operation_code")
+  bankText String @map("bank_text")
+  canonicalType String @map("canonical_type")
+  rate Decimal?
+  review AbCorrectionReview  @default(pending)
+  reviewedAt DateTime? @map("reviewed_at")
+
+  @@index([tenant_id_])
+
+  @@map(name: "ab_concept_correction")
+}
+
+model User {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  createdBy_          User?      @relation("User_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String?    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("User_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  tenant_             Tenant     @relation("User_tenant_", fields: [tenant_id_], references: [id])
+  tenant_id_          String    @map("tenant__id__")
+  tenantDisplayName String? @map("tenant_display_name")
+  email String @unique
+  name String
+  active Boolean
+  language Language  @default(es)
+  avatar String?  
+  avatar_server_data Json? @map("avatar__server_data")
+  avatar_data Json? @map("avatar__data")
+  cellphone String?
+  twoFaseAuth Boolean?  @default(false) @map("two_fase_auth")
+  twoFaSecret String? @map("two_fa_secret")
+  twoFaBackupCodes String? @map("two_fa_backup_codes")
+  twoFaVerifiedAt DateTime? @map("two_fa_verified_at")
+  passwordResetToken String? @map("password_reset_token")
+  passwordResetExpiresAt DateTime? @map("password_reset_expires_at")
+  profile Json?
+  roles Role[] @relation("User_roles")
+  password String
+  welcomeEmailsentAt DateTime? @map("welcome_email_sent_at__")
+  passwordResetEmailsentAt DateTime? @map("password_reset_email_sent_at__")
+  lastEmailError_ String? @map("last_email_error__")
+  refreshTokens RefreshToken[]
+  trustedDevices TrustedDevice[]
+  AbStatement_createdBy_ AbStatement[] @relation("AbStatement_createdBy_")
+  AbStatement_lastUpdatedBy_ AbStatement[]  @relation("AbStatement_lastUpdatedBy_")
+  AbConceptCorrection_createdBy_ AbConceptCorrection[] @relation("AbConceptCorrection_createdBy_")
+  AbConceptCorrection_lastUpdatedBy_ AbConceptCorrection[]  @relation("AbConceptCorrection_lastUpdatedBy_")
+  User_createdBy_ User[] @relation("User_createdBy_")
+  User_lastUpdatedBy_ User[]  @relation("User_lastUpdatedBy_")
+  Role_createdBy_ Role[] @relation("Role_createdBy_")
+  Role_lastUpdatedBy_ Role[]  @relation("Role_lastUpdatedBy_")
+  Permission_createdBy_ Permission[] @relation("Permission_createdBy_")
+  Permission_lastUpdatedBy_ Permission[]  @relation("Permission_lastUpdatedBy_")
+  Tenant_createdBy_ Tenant[] @relation("Tenant_createdBy_")
+  Tenant_lastUpdatedBy_ Tenant[]  @relation("Tenant_lastUpdatedBy_")
+  WorkerEvent_triggerUserId WorkerEvent[] @relation("WorkerEvent_triggerUserId")
+  WorkerEvent_createdBy_ WorkerEvent[] @relation("WorkerEvent_createdBy_")
+  WorkerEvent_lastUpdatedBy_ WorkerEvent[]  @relation("WorkerEvent_lastUpdatedBy_")
+  IntegrationClient_serviceUser IntegrationClient[] @relation("IntegrationClient_serviceUser")
+  IntegrationClient_createdBy_ IntegrationClient[] @relation("IntegrationClient_createdBy_")
+  IntegrationClient_lastUpdatedBy_ IntegrationClient[]  @relation("IntegrationClient_lastUpdatedBy_")
+  IdempotencyRecord_createdBy_ IdempotencyRecord[] @relation("IdempotencyRecord_createdBy_")
+  IdempotencyRecord_lastUpdatedBy_ IdempotencyRecord[]  @relation("IdempotencyRecord_lastUpdatedBy_")
+  UserNotification_actorUser UserNotification[] @relation("UserNotification_actorUser")
+  UserNotification_createdBy_ UserNotification[] @relation("UserNotification_createdBy_")
+  UserNotification_lastUpdatedBy_ UserNotification[]  @relation("UserNotification_lastUpdatedBy_")
+  UserNotificationPreference_createdBy_ UserNotificationPreference[] @relation("UserNotificationPreference_createdBy_")
+  UserNotificationPreference_lastUpdatedBy_ UserNotificationPreference[]  @relation("UserNotificationPreference_lastUpdatedBy_")
+  EmailVerification_requestedBy EmailVerification[] @relation("EmailVerification_requestedBy")
+  EmailVerification_createdBy_ EmailVerification[] @relation("EmailVerification_createdBy_")
+  EmailVerification_lastUpdatedBy_ EmailVerification[]  @relation("EmailVerification_lastUpdatedBy_")
+
+  @@map(name: "user")
+}
+
+model Role {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  createdBy_          User      @relation("Role_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("Role_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  tenant_             Tenant     @relation("Role_tenant_", fields: [tenant_id_], references: [id])
+  tenant_id_          String    @map("tenant__id__")
+  name String
+  permissions Permission[] @relation("Role_permissions")
+  isForAllTenants Boolean @map("is_for_all_tenants")
+  User_roles User[] @relation("User_roles")
+  @@index([tenant_id_])
+  @@unique([tenant_id_, name])
+
+  @@map(name: "role")
+}
+
+model Permission {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  createdBy_          User      @relation("Permission_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("Permission_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  name String @unique
+  Role_permissions Role[] @relation("Role_permissions")
+
+  @@map(name: "permission")
+}
+
+model Tenant {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  createdBy_          User?      @relation("Tenant_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String?    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("Tenant_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  name String @unique
+  taxId String? @map("tax_id")
+  status TenantStatus  @default(active)
+  ivaCondition TenantIvaCondition  @default(registeredResponsible) @map("iva_condition")
+  grossReceiptsJurisdiction String? @map("gross_receipts_jurisdiction")
+  withholdingAgent Boolean  @default(false) @map("withholding_agent")
+  imputationMinConfidence Int? @map("imputation_min_confidence")
+  logo String?  
+  logo_server_data Json? @map("logo__server_data")
+  logo_data Json? @map("logo__data")
+  AbStatement_tenant_ AbStatement[]  @relation("AbStatement_tenant_")
+  AbConceptCorrection_tenant_ AbConceptCorrection[]  @relation("AbConceptCorrection_tenant_")
+  User_tenant_ User[]  @relation("User_tenant_")
+  Role_tenant_ Role[]  @relation("Role_tenant_")
+  WorkerEvent_tenant_ WorkerEvent[]  @relation("WorkerEvent_tenant_")
+  IntegrationClient_tenant_ IntegrationClient[]  @relation("IntegrationClient_tenant_")
+  IdempotencyRecord_tenant_ IdempotencyRecord[]  @relation("IdempotencyRecord_tenant_")
+  UserNotification_tenant_ UserNotification[]  @relation("UserNotification_tenant_")
+  UserNotificationPreference_tenant_ UserNotificationPreference[]  @relation("UserNotificationPreference_tenant_")
+  EmailVerification_tenant_ EmailVerification[]  @relation("EmailVerification_tenant_")
+
+  @@map(name: "tenant")
+}
+
+model WorkerEvent {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  /// @userScopedForRoles: SiteUser
+  createdBy_          User      @relation("WorkerEvent_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("WorkerEvent_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  tenant_             Tenant     @relation("WorkerEvent_tenant_", fields: [tenant_id_], references: [id])
+  tenant_id_          String    @map("tenant__id__")
+  queueName String @map("queue_name")
+  jobType String @map("job_type")
+  status String
+  enqueuedAt DateTime @map("enqueued_at")
+  startedAt DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  payload Json
+  result Json?
+  error Json?
+  retryCount Int @map("retry_count")
+  manualRetryCount Int  @default(0) @map("manual_retry_count")
+  nextRetryAt DateTime? @map("next_retry_at")
+  duration Int?
+  correlationId String? @map("correlation_id")
+  triggerUserId User @relation("WorkerEvent_triggerUserId", fields: [triggerUserId_id], references: [id])
+  triggerUserId_id String @map("trigger_user_id__id")
+
+  @@index([triggerUserId_id, enqueuedAt])
+  @@index([correlationId])
+  @@index([jobType, completedAt])
+  @@index([queueName, status])
+  @@index([tenant_id_, enqueuedAt])
+
+  @@map(name: "worker_event")
+}
+
+model IntegrationClient {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  createdBy_          User      @relation("IntegrationClient_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("IntegrationClient_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  tenant_             Tenant     @relation("IntegrationClient_tenant_", fields: [tenant_id_], references: [id])
+  tenant_id_          String    @map("tenant__id__")
+  name String
+  tokenHash String @map("token_hash")
+  scopes String
+  status IntegrationClientStatus  @default(active)
+  serviceUser User @relation("IntegrationClient_serviceUser", fields: [serviceUser_id], references: [id])
+  serviceUser_id String @map("service_user__id")
+  expiresAt DateTime? @map("expires_at")
+
+  @@unique([tenant_id_, name])
+  @@index([tokenHash])
+  @@index([tenant_id_])
+  @@index([serviceUser_id])
+
+  @@map(name: "integration_client")
+}
+
+model IdempotencyRecord {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  createdBy_          User      @relation("IdempotencyRecord_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("IdempotencyRecord_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  tenant_             Tenant     @relation("IdempotencyRecord_tenant_", fields: [tenant_id_], references: [id])
+  tenant_id_          String    @map("tenant__id__")
+  client String
+  key String
+  bodyHash String @map("body_hash")
+  status IdempotencyStatus  @default(in_progress)
+  result Json?
+  failureReason String? @map("failure_reason")
+  completedAt DateTime? @map("completed_at")
+
+  @@unique([tenant_id_, client, key])
+  @@index([status])
+  @@index([tenant_id_, createdAt_])
+
+  @@map(name: "idempotency_record")
+}
+
+model UserNotification {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  /// @ownerScoped
+  createdBy_          User      @relation("UserNotification_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("UserNotification_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  tenant_             Tenant     @relation("UserNotification_tenant_", fields: [tenant_id_], references: [id])
+  tenant_id_          String    @map("tenant__id__")
+  type NotificationType
+  priority NotificationPriority?  @default(medium)
+  title String
+  body String?
+  actorUser User? @relation("UserNotification_actorUser", fields: [actorUser_id], references: [id])
+  actorUser_id String? @map("actor_user__id")
+  objectType String? @map("object_type")
+  objectId String? @map("object_id")
+  actionUrl String? @map("action_url")
+  readAt DateTime? @map("read_at")
+  notificationCreatedAt DateTime? @map("notification_created_at")
+  archivedAt DateTime? @map("archived_at")
+  metadata Json?
+
+  @@index([actorUser_id])
+  @@index([tenant_id_, notificationCreatedAt])
+
+  @@map(name: "user_notification")
+}
+
+model UserNotificationPreference {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  /// @ownerScoped
+  createdBy_          User      @relation("UserNotificationPreference_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("UserNotificationPreference_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  tenant_             Tenant     @relation("UserNotificationPreference_tenant_", fields: [tenant_id_], references: [id])
+  tenant_id_          String    @map("tenant__id__")
+  notificationType NotificationType @map("notification_type")
+  inAppEnabled Boolean  @default(true) @map("in_app_enabled")
+  emailEnabled Boolean  @default(false) @map("email_enabled")
+  emailFrequency EmailFrequency  @default(daily_digest) @map("email_frequency")
+
+  @@index([tenant_id_, notificationType])
+
+  @@map(name: "user_notification_preference")
+}
+
+model EmailVerification {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  createdBy_          User      @relation("EmailVerification_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("EmailVerification_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  tenant_             Tenant     @relation("EmailVerification_tenant_", fields: [tenant_id_], references: [id])
+  tenant_id_          String    @map("tenant__id__")
+  email String
+  status EmailVerificationStatus  @default(pending)
+  expiresAt DateTime @map("expires_at")
+  sentAt DateTime? @map("sent_at")
+  verifiedAt DateTime? @map("verified_at")
+  sentCount Int  @default(0) @map("sent_count")
+  lastSentAt DateTime? @map("last_sent_at")
+  requestedBy User @relation("EmailVerification_requestedBy", fields: [requestedBy_id], references: [id])
+  requestedBy_id String @map("requested_by__id")
+  sourceEntity String? @map("source_entity")
+  sourceRecordId String? @map("source_record_id")
+  validationChanges Json? @map("validation_changes")
+  validationSubmittedAt DateTime? @map("validation_submitted_at")
+
+  @@index([tenant_id_])
+  @@index([requestedBy_id])
+  @@unique([tenant_id_, email])
+
+  @@map(name: "email_verification")
+}

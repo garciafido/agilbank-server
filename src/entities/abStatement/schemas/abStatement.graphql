@@ -1,0 +1,104 @@
+type AbStatement {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  file: String!
+  file_data: FileData!
+  originalName: String!
+  contentHash: String
+  status: AbStatementStatus!
+  verdict: String
+  bankCode: String
+  cbu: String
+  periodFrom: Date
+  periodTo: Date
+  openingBalance: Decimal
+  closingBalance: Decimal
+  lineCount: Int
+  declaredAccount: Json
+  reading: Json
+  error: String
+  processedAt: DateTime
+}
+
+extend type Mutation {
+  abStatementDelete(id: String!): AbStatement!
+}
+
+extend type Query {
+  abStatementOne(id: String!): AbStatement!
+  abStatementListWithOffset(
+    where: AbStatement_Filter
+    orderBy: [AbStatement_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [AbStatement]!
+  abStatementListWithCursor(
+    where: AbStatement_Filter
+    orderBy: AbStatement_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [AbStatement]!
+}
+
+input AbStatement_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  file: FilterString
+  originalName: FilterString
+  contentHash: FilterString
+  status: FilterString
+  verdict: FilterString
+  bankCode: FilterString
+  cbu: FilterString
+  periodFrom: FilterDate
+  periodTo: FilterDate
+  openingBalance: FilterDecimal
+  closingBalance: FilterDecimal
+  lineCount: FilterInt
+  declaredAccount: FilterJson
+  reading: FilterJson
+  error: FilterString
+  processedAt: FilterDateTime
+  AND: [AbStatement_Filter!]
+  OR: [AbStatement_Filter!]
+  NOT: [AbStatement_Filter!]
+}
+
+input AbStatement_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  file: SortOrder
+  originalName: SortOrder
+  contentHash: SortOrder
+  status: SortOrder
+  verdict: SortOrder
+  bankCode: SortOrder
+  cbu: SortOrder
+  periodFrom: SortOrder
+  periodTo: SortOrder
+  openingBalance: SortOrder
+  closingBalance: SortOrder
+  lineCount: SortOrder
+  declaredAccount: SortOrder
+  reading: SortOrder
+  error: SortOrder
+  processedAt: SortOrder
+}
+
+input AbStatement_OrderByCursor {
+  id: SortOrder
+}

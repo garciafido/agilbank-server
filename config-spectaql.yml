@@ -1,0 +1,38 @@
+spectaql:
+  logoFile: ./test/fixtures/logo.png
+  faviconFile: ./test/fixtures/favicon.png
+  displayAllServers: true
+
+introspection:
+  url: http://localhost:4030/graphql
+  spectaqlDirective:
+    enable: true
+
+extensions:
+  graphqlScalarExamples: true
+
+info:
+  title: GraphQL API Reference
+  description: Welcome to Agilbank!
+  termsOfService: https://Agilbank.example/terms
+  contact:
+    name: API Support
+    url: https://Agilbank.example/graphql
+    email: support@example
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  x-introItems:
+    - title: Important thing 1
+      description: Some important stuff we wanted you to know. Supports `markdown`
+
+servers:
+  - url: https://staging.Agilbank.example/graphql
+    description: Staging
+  - url: https://Agilbank.example/graphql
+    description: Production
+    production: true
+    headers:
+      - name: Authorization
+        example: Bearer <YOUR_TOKEN_HERE>
+        comment: Agilbank

@@ -1,0 +1,99 @@
+type UserNotificationPreference {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  notificationType: NotificationType!
+  inAppEnabled: Boolean!
+  emailEnabled: Boolean!
+  emailFrequency: EmailFrequency!
+}
+
+extend type Mutation {
+  userNotificationPreferenceCreate(
+    notificationType: NotificationType!
+    inAppEnabled: Boolean!
+    emailEnabled: Boolean!
+    emailFrequency: EmailFrequency!
+    idempotencyKey_: String
+  ): UserNotificationPreference!
+  userNotificationPreferenceUpdate(
+    id: String!
+    version_: String!
+    notificationType: NotificationType
+    inAppEnabled: Boolean
+    emailEnabled: Boolean
+    emailFrequency: EmailFrequency
+    idempotencyKey_: String
+  ): UserNotificationPreference!
+  userNotificationPreferenceDelete(id: String!): UserNotificationPreference!
+}
+
+extend type Query {
+  userNotificationPreferenceOne(id: String!): UserNotificationPreference!
+  userNotificationPreferenceListWithOffset(
+    where: UserNotificationPreference_Filter
+    orderBy: [UserNotificationPreference_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [UserNotificationPreference]!
+  userNotificationPreferenceListWithCursor(
+    where: UserNotificationPreference_Filter
+    orderBy: UserNotificationPreference_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [UserNotificationPreference]!
+}
+
+input UserNotificationPreference_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  notificationType: FilterString
+  inAppEnabled: FilterBoolean
+  emailEnabled: FilterBoolean
+  emailFrequency: FilterString
+  AND: [UserNotificationPreference_Filter!]
+  OR: [UserNotificationPreference_Filter!]
+  NOT: [UserNotificationPreference_Filter!]
+}
+
+input UserNotificationPreference_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  notificationType: SortOrder
+  inAppEnabled: SortOrder
+  emailEnabled: SortOrder
+  emailFrequency: SortOrder
+}
+
+input UserNotificationPreference_OrderByCursor {
+  id: SortOrder
+}
+
+input UserNotificationPreference_CreateInput {
+  notificationType: NotificationType!
+  inAppEnabled: Boolean!
+  emailEnabled: Boolean!
+  emailFrequency: EmailFrequency!
+}
+
+input UserNotificationPreference_UpdateInput {
+  id: String!
+  version_: String!
+  notificationType: NotificationType
+  inAppEnabled: Boolean
+  emailEnabled: Boolean
+  emailFrequency: EmailFrequency
+}

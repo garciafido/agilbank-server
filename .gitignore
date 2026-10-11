@@ -1,0 +1,86 @@
+# misc
+.DS_Store
+# Worktrees de sesiones de agente: NUNCA al repo (el add -A de la regeneración
+# los levantaba como gitlinks rotos)
+.claude/worktrees/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+CLAUDE.local.md
+*.local.md
+
+backups/
+uploads/
+# Storage local de campos file en dev (StorageFactory: UPLOAD_DIR || ./public)
+/public/
+wal-archive/
+coverage/
+prisma-test/client
+prisma-test/test.db-journal
+
+# Compiled config (Prisma reads .ts directly)
+prisma.config.js
+
+# Jest compiled files
+jest.config.js
+jest.setup.js
+jest.global-setup.js
+jest.global-teardown.js
+
+node_modules/
+frontend/
+src/common/public/
+src/common/tmp/
+# Lo que los bancos de prueba escriben al correr (salidas de sandbox, archivos
+# entregados, descargas). Va acá y no en la zona del proyecto porque el commit
+# de la regeneración se hace sobre la rama base, donde el único .gitignore que
+# existe es este:
+# un tmp/ ignorado únicamente en develop igual se cuela en la historia, y lo
+# que se cuela puede ser un dato de una persona real.
+/tmp/
+dist/
+build/
+src/generated/
+created_users.txt
+src/prisma/generated-client
+src/paljs-generated/
+# Environment files (but keep examples)
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.dev
+# Escrow de secretos (SOPS/age): el .env.production CIFRADO sí se commitea
+!.env.production.enc
+
+# Database
+*.db
+
+# TLS Certificates (sensitive!)
+certs/
+
+# IDEs
+.idea/
+
+# pnpm lock file (project uses npm)
+pnpm-lock.yaml
+
+# Logs
+*.log
+
+# Deployment artifacts
+deployment/*.tar.gz
+deployment/logs/
+.deploy.lock
+deployment/staging-*.tar.gz
+deployment/production-*.tar.gz
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DE ACÁ PARA ABAJO ES DEL PROYECTO
+#
+# El generador no escribe en esta zona. Poné acá lo que el proyecto necesite
+# ignorar: intercalarlo arriba hace que choque con lo que el generador agregue
+# cerca, y ese conflicto no dice nada — las dos listas solo se estaban pisando
+# el lugar.
+# ═══════════════════════════════════════════════════════════════════════════
