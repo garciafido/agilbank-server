@@ -1,0 +1,324 @@
+<meta charset="utf-8">
+<title>Qué hace AgilBank</title>
+<style>
+/* Hoja privada de este documento. Las clases van en castellano porque nombran
+ * roles editoriales, no mecanismos. Misma convención que revision-imputacion.html. */
+
+:root {
+  --tinta: #141a1f;
+  --tinta-suave: #55636c;
+  --papel: #f7f5f0;
+  --papel-alto: #fffefb;
+  --linea: #ddd8cf;
+  --acento: #0f6f6c;
+  --acento-tenue: #e3efee;
+  --senal: #9c4f18;
+  --senal-tenue: #f6e9df;
+  --codigo-fondo: #eceae4;
+
+  --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --tinta: #e6e4de; --tinta-suave: #9aa6ad; --papel: #14171a;
+    --papel-alto: #1b1f23; --linea: #2e3439; --acento: #56b7b1;
+    --acento-tenue: #16302f; --senal: #d9924f; --senal-tenue: #2e2318;
+    --codigo-fondo: #1e2226;
+  }
+}
+
+:root[data-theme="dark"] {
+  --tinta: #e6e4de; --tinta-suave: #9aa6ad; --papel: #14171a;
+  --papel-alto: #1b1f23; --linea: #2e3439; --acento: #56b7b1;
+  --acento-tenue: #16302f; --senal: #d9924f; --senal-tenue: #2e2318;
+  --codigo-fondo: #1e2226;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0; background: var(--papel); color: var(--tinta);
+  font-family: var(--sans); font-size: 16.5px; line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hoja { max-width: 54rem; margin: 0 auto; padding: 4rem 1.75rem 6rem; }
+
+.portada { border-bottom: 2px solid var(--tinta); padding-bottom: 2rem; margin-bottom: 3rem; }
+
+.rotulo {
+  font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--acento); margin: 0 0 0.9rem;
+}
+
+h1 {
+  font-family: var(--serif); font-size: clamp(2rem, 5vw, 2.9rem);
+  line-height: 1.1; font-weight: 600; margin: 0 0 1rem; text-wrap: balance;
+}
+
+.bajada { font-size: 1.08rem; color: var(--tinta-suave); margin: 0; max-width: 44rem; }
+
+h2 {
+  font-family: var(--serif); font-size: 1.7rem; font-weight: 600;
+  line-height: 1.2; margin: 3.5rem 0 0.4rem; text-wrap: balance;
+  display: flex; align-items: baseline; gap: 0.7rem;
+}
+
+h2 .nro {
+  font-family: var(--mono); font-size: 0.95rem; font-weight: 400;
+  color: var(--acento); flex: none; padding-top: 0.25rem;
+}
+
+h3 {
+  font-family: var(--sans); font-size: 1.02rem; font-weight: 650;
+  letter-spacing: -0.005em; margin: 2.4rem 0 0.3rem;
+}
+
+h3 .verbo {
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em;
+  background: var(--acento); color: var(--papel-alto);
+  padding: 0.13em 0.5em; border-radius: 3px; margin-right: 0.5rem;
+  vertical-align: 0.09em;
+}
+
+h4 {
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--tinta-suave);
+  margin: 1.8rem 0 0.4rem; font-weight: 500;
+}
+
+p { margin: 0.75rem 0; max-width: 44rem; }
+ul, ol { margin: 0.75rem 0; padding-left: 1.3rem; max-width: 44rem; }
+li { margin: 0.35rem 0; }
+
+a { color: var(--acento); text-underline-offset: 0.16em; }
+strong, b { font-weight: 650; }
+
+blockquote {
+  margin: 0.9rem 0 0.9rem 1rem; padding-left: 1rem;
+  border-left: 2px solid var(--acento); font-style: italic;
+  color: var(--tinta-suave); max-width: 42rem;
+}
+
+code {
+  font-family: var(--mono); font-size: 0.855em; background: var(--codigo-fondo);
+  padding: 0.1em 0.34em; border-radius: 3px;
+}
+
+pre {
+  background: var(--codigo-fondo); border-left: 2px solid var(--acento);
+  padding: 0.95rem 1.1rem; overflow-x: auto; margin: 1rem 0;
+  font-size: 0.83rem; line-height: 1.55;
+}
+
+pre code { background: none; padding: 0; font-size: 1em; }
+.cmt { color: var(--tinta-suave); font-style: italic; }
+
+.prueba {
+  border-left: 2px solid var(--linea); padding: 0.15rem 0 0.15rem 1rem;
+  margin: 1rem 0; color: var(--tinta-suave); font-size: 0.94rem;
+}
+
+.prueba b { color: var(--tinta); font-weight: 650; }
+
+.limite, .nota {
+  border-radius: 4px; padding: 0.95rem 1.15rem; margin: 1.4rem 0; font-size: 0.95rem;
+}
+
+.limite { background: var(--senal-tenue); border-left: 3px solid var(--senal); }
+.nota { background: var(--acento-tenue); border-left: 3px solid var(--acento); }
+.limite > :first-child, .nota > :first-child { margin-top: 0; }
+.limite > :last-child, .nota > :last-child { margin-bottom: 0; }
+.limite b { color: var(--senal); }
+
+.desborde { overflow-x: auto; margin: 1.2rem 0; }
+
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; background: var(--papel-alto); }
+
+th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--linea); vertical-align: top; }
+
+th {
+  font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--tinta-suave); font-weight: 500;
+  border-bottom: 1px solid var(--tinta-suave); white-space: nowrap;
+}
+
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+th.num { text-align: right; }
+td code { white-space: nowrap; }
+tbody tr:last-child td { border-bottom: none; }
+
+.oblig {
+  font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--senal); white-space: nowrap;
+}
+
+.pie {
+  margin-top: 4rem; padding-top: 1.2rem; border-top: 1px solid var(--linea);
+  font-size: 0.85rem; color: var(--tinta-suave);
+}
+
+hr { border: none; border-top: 1px solid var(--linea); margin: 3rem 0 0; }
+
+/* Impresión: este documento se manda en PDF. */
+@page { size: A4; margin: 16mm 15mm; }
+@media print {
+  body { font-size: 10.5pt; line-height: 1.5; }
+  .hoja { max-width: none; padding: 0; }
+  .portada { margin-bottom: 1.5rem; padding-bottom: 1.2rem; }
+  h2 { margin-top: 1.8rem; }
+  .desborde { overflow: visible; }
+  h2, h3 { break-after: avoid; }
+  tr, pre, li { break-inside: avoid; }
+}
+</style>
+<div class="hoja">
+
+<header class="portada">
+<p class="rotulo">Para el área contable de BDL · 13-10-2026</p>
+<h1>Qué hace AgilBank</h1>
+<p class="bajada">AgilBank es el motor de Pronto IEB, la conciliación bancaria de ProntoNet.
+Este documento explica qué información toma, qué devuelve y cómo aprende de las decisiones de
+cada empresa. También indica qué parte ya está desarrollada y qué parte llega en las próximas
+etapas.</p>
+</header>
+
+<h2><span class="nro">01</span> En resumen</h2>
+
+<p>AgilBank recibe el extracto tal como lo entrega el banco y lo lee. Devuelve cada movimiento
+con su tipo y controla que los saldos encadenen. Con los movimientos pendientes de ProntoNet,
+AgilBank propone qué hacer con cada renglón: aparearlo con un movimiento que ya está en
+ProntoNet, crear un débito o un crédito bancario, o dejarlo pendiente de contabilizar. AgilBank
+no graba ni contabiliza nada. La decisión es siempre del tesorero.</p>
+
+<div class="desborde"><pre><code>  ProntoNet                                AgilBank
+
+  1  Envía el extracto y la cuenta    ──►  Lee el extracto
+                                      ◄──  Devuelve renglones y controles
+
+  2  Descarta los renglones que ya tenía y asigna cada uno a su mes
+
+  3  Envía los movimientos pendientes ──►  Propone qué hacer con cada renglón
+     y los catálogos                  ◄──
+
+  4  El tesorero revisa y confirma
+
+  5  Informa lo que decidió           ──►  Lo guarda como antecedente</code></pre></div>
+
+<table>
+<thead><tr><th>Parte</th><th>Estado</th></tr></thead>
+<tbody>
+<tr><td>La lectura de extractos en Excel, CSV y texto, con sus controles y las correcciones de tipos de cada empresa</td><td>Desarrollada en el motor y medida con los extractos de ejemplo que envió BDL. Todavía no se puede usar desde ProntoNet.</td></tr>
+<tr><td>La conexión con ProntoNet: enviar el extracto, consultar la lectura y enviar las correcciones</td><td>El contrato está en borrador. La conexión se desarrolla en una próxima etapa.</td></tr>
+<tr><td>La lectura de extractos en PDF y en foto</td><td>Próxima etapa.</td></tr>
+<tr><td>La propuesta para cada renglón y el aprendizaje de las decisiones del tesorero</td><td>Próximas etapas, con las reglas ya acordadas con BDL (secciones 03 y 04).</td></tr>
+</tbody>
+</table>
+
+<h2><span class="nro">02</span> Qué toma AgilBank</h2>
+
+<table>
+<thead><tr><th>Información</th><th>Para qué la usa</th></tr></thead>
+<tbody>
+<tr><td>El extracto, tal como lo entrega el banco</td><td>El extracto es la única información obligatoria. Nadie tiene que retocar el archivo ni elegir un formato por banco.</td></tr>
+<tr><td>Los datos de la cuenta: el banco, el número, el CBU, la moneda, el período y los saldos inicial y final</td><td>Con estos datos AgilBank controla que el archivo sea de esa cuenta y que sus saldos coincidan con los de ProntoNet. Todos son opcionales, pero cuantos más datos se envían, más se controla.</td></tr>
+<tr><td>Los movimientos pendientes de la cuenta</td><td>Los cheques, las transferencias y los depósitos pendientes son los candidatos para aparear cada renglón.</td></tr>
+<tr><td>Los catálogos: los tipos de gastos bancarios, las cuentas contables, los proveedores y los clientes con su CUIT y su CBU, y las cuentas propias</td><td>Los catálogos permiten proponer el débito o el crédito bancario con su tipo y su cuenta, reconocer a la contraparte y reconocer las transferencias entre cuentas propias.</td></tr>
+<tr><td>Las correcciones de tipos y las decisiones del tesorero</td><td>AgilBank aprende de ellas (sección 04).</td></tr>
+</tbody>
+</table>
+
+<h2><span class="nro">03</span> Qué devuelve AgilBank</h2>
+
+<h3>El extracto leído</h3>
+
+<ul>
+<li>El encabezado: el banco, que AgilBank identifica por el CBU, la cuenta, la moneda, las fechas del primer y del último renglón, y los saldos inicial y final.</li>
+<li>Cada renglón: la fecha y la fecha valor, el importe con signo, el saldo, la referencia y lo que dice el banco tal cual. El signo sigue el criterio de ProntoNet: un importe positivo es dinero que entra.</li>
+<li>La referencia de cada renglón: el número de cheque, de comprobante o de operación, tal como lo informa el banco.</li>
+<li>La contraparte: el CUIT, el nombre y el CBU de la otra parte, cuando el banco los informa.</li>
+<li>El tipo de cada renglón, tomado de una tabla común de tipos: transferencia recibida o enviada, comisión, impuesto a los débitos y créditos, IVA, percepciones, SIRCREB y otros. Cada renglón indica de dónde salió su tipo: de una corrección de la empresa, de la tabla común o de una regla general.</li>
+<li>Un identificador estable por renglón. El mismo movimiento conserva su identificador en el extracto del día y en el del mes, aunque el texto del concepto cambie. Con ese identificador ProntoNet descarta los renglones que ya tenía, y el extracto se puede subir todos los días.</li>
+</ul>
+
+<h3>Los controles</h3>
+
+<ul>
+<li><b>El encadenamiento de los saldos.</b> AgilBank controla, renglón por renglón, que el saldo anterior más el importe dé el saldo que informa el banco, y marca los renglones donde no se cumple.</li>
+<li><b>El cierre.</b> AgilBank controla que el saldo inicial más los renglones dé el saldo final. Cuando ProntoNet envía el período y los saldos, controla además que coincidan con los del archivo.</li>
+<li><b>La cuenta.</b> AgilBank avisa cuando el CBU del archivo no es el de la cuenta, y cuando el archivo trae movimientos de más de una cuenta.</li>
+<li><b>Los conceptos nuevos.</b> Un concepto que no está en la tabla común igual recibe un tipo, con menos confianza, y AgilBank avisa con el texto del banco para sumarlo a la tabla.</li>
+</ul>
+
+<p>El resultado de la lectura se resume en un veredicto:</p>
+
+<table>
+<thead><tr><th>Veredicto</th><th>Significa</th></tr></thead>
+<tbody>
+<tr><td><b>Verificada</b></td><td>Los saldos encadenan de punta a punta y no hay ningún aviso que frene las propuestas.</td></tr>
+<tr><td><b>A revisar</b></td><td>El extracto se leyó, pero algo no cierra: hay saltos de saldo, el archivo no trae saldos, o hay un aviso que frena las propuestas.</td></tr>
+<tr><td><b>Sin lectura</b></td><td>No se pudo armar la tabla de movimientos. AgilBank informa el motivo en castellano.</td></tr>
+<tr><td><b>No disponible</b></td><td>Una falla nuestra impidió leer el archivo. El veredicto no dice nada del extracto, y el archivo se vuelve a leer cuando se envía de nuevo.</td></tr>
+</tbody>
+</table>
+
+<h3>La propuesta para cada renglón</h3>
+
+<p>Esta parte llega en las próximas etapas. Para cada renglón, AgilBank va a proponer una de
+tres cosas, con su confianza y los datos que coincidieron:</p>
+
+<ul>
+<li><b>El apareo con un movimiento de ProntoNet.</b> El importe tiene que ser exacto. El número manda sobre la fecha: si el número coincide, la fecha no importa, y sin número las fechas pueden diferir como mucho cinco días. Cuando el banco muestra solo los últimos dígitos del número, como Credicoop en los cheques electrónicos, alcanza con que coincidan esos dígitos. Cuando un renglón reúne varios movimientos, como un depósito de varios cheques o un pago masivo, AgilBank busca la combinación que da exactamente el total. Si hay más de una combinación posible, AgilBank no elige y deja el renglón para el tesorero.</li>
+<li><b>El débito o el crédito bancario.</b> AgilBank propone el tipo de gasto, la cuenta contable y el importe. Cuando una comisión viene acompañada de su IVA y su percepción, AgilBank los propone juntos, en un solo débito.</li>
+<li><b>El pendiente de contabilizar.</b> Lo que todavía no está en ProntoNet, como un cobro sin recibo, queda pendiente para que alguien lo registre.</li>
+</ul>
+
+<p>Ningún renglón del extracto queda sin una propuesta o sin un aviso de que hay que
+revisarlo.</p>
+
+<h2><span class="nro">04</span> Cómo aprende AgilBank</h2>
+
+<p>AgilBank aprende en dos lugares: el tipo de cada concepto del banco y la conciliación de
+cada empresa.</p>
+
+<h3>El tipo de cada concepto</h3>
+
+<ul>
+<li>Un usuario puede corregir el tipo de un concepto, o su alícuota. La corrección vale desde la lectura siguiente, solamente para su empresa.</li>
+<li>Nosotros revisamos cada corrección. Lo confirmado pasa a la tabla común y llega a todas las empresas. Lo que corrige una empresa nunca se aplica a otra sin esa revisión.</li>
+</ul>
+
+<h3>La conciliación</h3>
+
+<p>Esta parte llega con la propuesta para cada renglón.</p>
+
+<ul>
+<li>AgilBank va a aprender de lo que el tesorero acepta, corrige o rechaza. ProntoNet le informa cada decisión, con lo propuesto y lo elegido.</li>
+<li>El tipo de gasto y la cuenta contable de cada débito o crédito bancario se aprenden por empresa, de su historia de gastos bancarios y de las decisiones del tesorero.</li>
+<li>Las alícuotas sirven como pistas para asociar cada cargo con su IVA y su percepción, no como reglas fijas, porque algunas cambian según la jurisdicción y el contribuyente.</li>
+<li>Lo que AgilBank aprende con los datos de una empresa se usa solamente para esa empresa.</li>
+<li>La meta acordada con BDL es que, a partir del tercer mes de uso en una cuenta, al menos nueve de cada diez propuestas se acepten sin corregir.</li>
+</ul>
+
+<h3>Lo que no se aprende</h3>
+
+<p>AgilBank no aprende un formato por banco: lee cada extracto sin plantillas. Por eso un
+banco nuevo, o un banco que cambia su formato, no requiere ninguna configuración. Las mejoras de
+la lectura las hacemos nosotros, y valen para todas las empresas.</p>
+
+<h2><span class="nro">05</span> Qué conviene cuidar</h2>
+
+<ol>
+<li>Enviar siempre los datos de la cuenta, con la misma identificación: el CBU o, si no se tiene, el número. El identificador de cada renglón depende de esa identificación.</li>
+<li>Enviar el período junto con los saldos. Sin el período, AgilBank no compara los saldos.</li>
+<li>Subir el archivo tal como lo entrega el banco, sin retocarlo.</li>
+<li>Corregir el tipo de un concepto cuando no corresponde. La corrección vale enseguida para la empresa.</li>
+<li>Cuando esté la conciliación, informar siempre lo que decidió el tesorero, también cuando aceptó la propuesta sin cambios.</li>
+</ol>
+
+<p class="pie">AgilBank · 13-10-2026</p>
+
+</div>
