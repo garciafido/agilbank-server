@@ -132,6 +132,7 @@ export type AbStatement = {
   periodFrom?: Maybe<Scalars['Date']['output']>;
   periodTo?: Maybe<Scalars['Date']['output']>;
   processedAt?: Maybe<Scalars['DateTime']['output']>;
+  readStarts: Scalars['Int']['output'];
   reading?: Maybe<Scalars['Json']['output']>;
   status: AbStatementStatus;
   verdict?: Maybe<Scalars['String']['output']>;
@@ -175,6 +176,7 @@ export type AbStatement_Filter = {
   periodFrom?: InputMaybe<FilterDate>;
   periodTo?: InputMaybe<FilterDate>;
   processedAt?: InputMaybe<FilterDateTime>;
+  readStarts?: InputMaybe<FilterInt>;
   reading?: InputMaybe<FilterJson>;
   status?: InputMaybe<FilterString>;
   verdict?: InputMaybe<FilterString>;
@@ -200,6 +202,7 @@ export type AbStatement_OrderBy = {
   periodFrom?: InputMaybe<SortOrder>;
   periodTo?: InputMaybe<SortOrder>;
   processedAt?: InputMaybe<SortOrder>;
+  readStarts?: InputMaybe<SortOrder>;
   reading?: InputMaybe<SortOrder>;
   status?: InputMaybe<SortOrder>;
   verdict?: InputMaybe<SortOrder>;
@@ -2474,6 +2477,7 @@ export type AbStatementResolvers<ContextType = MyApolloContext, ParentType exten
   periodFrom?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   periodTo?: Resolver<Maybe<ResolversTypes['Date']>, ParentType, ContextType>;
   processedAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  readStarts?: Resolver<ResolversTypes['Int'], ParentType, ContextType>;
   reading?: Resolver<Maybe<ResolversTypes['Json']>, ParentType, ContextType>;
   status?: Resolver<ResolversTypes['AbStatementStatus'], ParentType, ContextType>;
   verdict?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
