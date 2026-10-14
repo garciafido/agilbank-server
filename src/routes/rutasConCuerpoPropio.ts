@@ -24,4 +24,8 @@
 // Lo que NO va acá: subir el techo de todo el sistema. Eso es cambiar el
 // `json()` global, y le daría el mismo margen a GraphQL.
 
-export const rutasConCuerpoPropio: string[] = [];
+export const rutasConCuerpoPropio: string[] = [
+  // La API de ProntoNet (agilbankApi.routes.ts) lee sus cuerpos: el envío con
+  // busboy y las correcciones con su propio json() de 64 KB.
+  "/api/v1/",
+];

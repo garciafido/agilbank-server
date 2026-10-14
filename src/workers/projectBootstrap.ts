@@ -25,4 +25,12 @@
  * Decidir si toca es del scheduler, no del worker.
  */
 
-export {};
+import { configureBackgroundReading, markStatementFailed } from "@agilbank/motor";
+import { getStorageProvider } from "../common/storage";
+import { deadLetterHandlers } from "./deadLetterHandlers";
+
+// La lectura del extracto baja el archivo con el almacenamiento del producto.
+configureBackgroundReading({ storage: getStorageProvider });
+
+// Al agotarse los reintentos, el extracto queda `fallido` (mientras tanto, la API dice `en-proceso`).
+deadLetterHandlers["AbStatementRead"] = markStatementFailed;

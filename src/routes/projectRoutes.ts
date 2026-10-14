@@ -19,6 +19,10 @@
 
 import { Router } from "express";
 
+import agilbankApiRoutes from "./agilbankApi.routes";
+
 const router = Router();
+
+router.use(agilbankApiRoutes);
 
 export default router;
