@@ -243,10 +243,10 @@ describe("readStatement", () => {
     ["un PDF", Buffer.from("%PDF-1.7\n...")],
     ["una foto JPG", Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0])],
     ["una foto PNG", Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0])],
-  ])("%s todavía no se lee: sin lectura, con el motivo", async (_name, file) => {
+  ])("%s no se lee por esta vía: sin lectura, con el motivo", async (_name, file) => {
     const r = await readStatement(file);
     expect(r).toMatchObject({ verdict: "abstained", lines: [], header: null, checks: null });
-    expect(r.reason).toMatch(/PDF/);
+    expect(r.reason).toBe("Este formato no se lee por esta vía: manden el extracto en Excel, CSV o texto.");
     expect(r.fingerprint).toMatch(/^[0-9a-f]{64}$/);
   });
 

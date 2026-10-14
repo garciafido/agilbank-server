@@ -16,8 +16,19 @@ export interface CorrectionInput {
 
 type Parsed = { ok: true; value: CorrectionInput } | { ok: false; field: string | null };
 
-const optionalText = (value: unknown, max: number): { ok: true; value: string | null } | { ok: false } =>
-  value === undefined || value === null ? { ok: true, value: null } : typeof value === "string" && value.length <= max ? { ok: true, value } : { ok: false };
+type Optional = { ok: true; value: string | null } | { ok: false };
+
+/** Un texto opcional, recortado: ausente, null o vacío es null. */
+const optionalText = (value: unknown, accepts: (text: string) => boolean): Optional => {
+  if (value === undefined || value === null) return { ok: true, value: null };
+  if (typeof value !== "string") return { ok: false };
+  const text = value.trim();
+  if (text === "") return { ok: true, value: null };
+  return accepts(text) ? { ok: true, value: text } : { ok: false };
+};
+
+/** El banco de la corrección es el código de entidad, como el `bankCode` del encabezado: con otra forma no aplicaría nunca. */
+const BANK_CODE = /^\d{3}$/;
 
 /** La corrección del §6 del contrato, validada. */
 export const parseCorrection = (body: unknown): Parsed => {
@@ -26,9 +37,9 @@ export const parseCorrection = (body: unknown): Parsed => {
   const text = b.textoDelBanco;
   if (typeof text !== "string" || text.trim() === "" || text.length > 500) return { ok: false, field: "textoDelBanco" };
   if (typeof b.tipo !== "string" || !CANONICAL_TYPES.has(b.tipo)) return { ok: false, field: "tipo" };
-  const bank = optionalText(b.banco, 10);
+  const bank = optionalText(b.banco, (text) => BANK_CODE.test(text));
   if (!bank.ok) return { ok: false, field: "banco" };
-  const code = optionalText(b.codigoDelBanco, 50);
+  const code = optionalText(b.codigoDelBanco, (text) => text.length <= 50);
   if (!code.ok) return { ok: false, field: "codigoDelBanco" };
   const rate = b.alicuota;
   if (rate !== undefined && rate !== null && (typeof rate !== "number" || !Number.isFinite(rate) || rate < 0 || rate > 100)) {

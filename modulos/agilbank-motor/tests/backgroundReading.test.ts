@@ -1,4 +1,4 @@
-import { configureBackgroundReading, latestCorrections, markStatementFailed, readStatementStage } from "../src/backgroundReading";
+import { configureBackgroundReading, latestCorrections, MAX_READ_STARTS, markStatementFailed, readStatementStage } from "../src/backgroundReading";
 import { fakeDb } from "./api/fakeDb";
 
 const CSV = Buffer.from(
@@ -112,7 +112,7 @@ describe("readStatementStage", () => {
     }
     await readStatementStage({ prisma: b.db, currentUser: { tenant_id_: "T1" } }, "s1");
     expect(selects).toEqual({
-      abStatement: { id: true, originalName: true, file_server_data: true, declaredAccount: true },
+      abStatement: { id: true, originalName: true, file_server_data: true, declaredAccount: true, readStarts: true },
       abConceptCorrection: { bankCode: true, operationCode: true, bankText: true, canonicalType: true },
     });
   });
@@ -235,5 +235,129 @@ describe("markStatementFailed", () => {
     for (const payload of payloads) await markStatementFailed({ payload, prisma: b.db });
     expect(b.wheres).toEqual([]);
     expect(b.rows.abStatement[0].status).toBe("queued");
+  });
+});
+
+describe("readStatementStage: los arranques, lo ya leído y las marcas de cada escritura", () => {
+  const OLD = new Date(2026, 0, 1);
+  const ctx = (db: unknown) => ({ prisma: db as never, currentUser: { tenant_id_: "T1" } });
+  const UUID = /^[0-9a-f-]{36}$/;
+
+  it("se rinde a la tercera: MAX_READ_STARTS es 3", () => {
+    expect(MAX_READ_STARTS).toBe(3);
+  });
+
+  it("cada arranque suma uno al marcar processing; uno que lee bien lo deja sumado", async () => {
+    let startsWhileDownloading: unknown;
+    const b = fakeDb({ abStatement: [statement({ readStarts: 1 })] });
+    configureBackgroundReading({ storage: () => ({ downloadBuffer: async () => { startsWhileDownloading = b.rows.abStatement[0].readStarts; return CSV; } }) });
+    expect(await readStatementStage(ctx(b.db), "s1")).toEqual({ status: "read" });
+    expect(startsWhileDownloading).toBe(2);
+    expect(b.rows.abStatement[0].readStarts).toBe(2);
+  });
+
+  it("sin la columna cargada cuenta desde cero", async () => {
+    configureBackgroundReading({ storage: storage({ [KEY]: CSV }).storage });
+    const b = fakeDb({ abStatement: [statement()] });
+    await readStatementStage(ctx(b.db), "s1");
+    expect(b.rows.abStatement[0].readStarts).toBe(1);
+  });
+
+  it("un error que el worker reintenta no cuenta como interrupción: el arranque se descuenta", async () => {
+    configureBackgroundReading({ storage: storage({}).storage });
+    const b = fakeDb({ abStatement: [statement({ readStarts: 2 })] });
+    await expect(readStatementStage(ctx(b.db), "s1")).rejects.toThrow("no está");
+    expect(b.rows.abStatement[0].readStarts).toBe(2);
+    await expect(readStatementStage(ctx(b.db), "s1")).rejects.toThrow("no está");
+    expect(b.rows.abStatement[0]).toMatchObject({ status: "queued", readStarts: 2 });
+  });
+
+  it.each([3, 4])("con %i arranques ya hechos lo marca failed sin leer, con la causa", async (starts) => {
+    const s = storage({ [KEY]: CSV });
+    configureBackgroundReading({ storage: s.storage });
+    const b = fakeDb({ abStatement: [statement({ status: "processing", readStarts: starts, version_: "v0", lastUpdatedAt_: OLD })] });
+    expect(await readStatementStage(ctx(b.db), "s1")).toEqual({ status: "failed" });
+    expect(s.asked).toEqual([]);
+    const row = b.rows.abStatement[0];
+    expect(row).toMatchObject({ status: "failed", error: "La lectura se interrumpió tres veces.", readStarts: starts });
+    expect(row.reading).toBeUndefined();
+    expect(row.lastUpdatedAt_.getTime()).toBeGreaterThan(OLD.getTime());
+    expect(row.version_).toMatch(UUID);
+    expect(b.wheres.at(-1)).toEqual({ id: "s1", tenant_id_: "T1", status: { not: "read" } });
+  });
+
+  it("con dos arranques todavía lee", async () => {
+    configureBackgroundReading({ storage: storage({ [KEY]: CSV }).storage });
+    const b = fakeDb({ abStatement: [statement({ readStarts: 2 })] });
+    expect(await readStatementStage(ctx(b.db), "s1")).toEqual({ status: "read" });
+    expect(b.rows.abStatement[0].readStarts).toBe(3);
+  });
+
+  it("un extracto ya leído no se baja: un trabajo tardío devuelve read sin leer ni tocarlo", async () => {
+    const s = storage({ [KEY]: CSV });
+    configureBackgroundReading({ storage: s.storage });
+    const leido = statement({ status: "read", verdict: "verified", reading: { x: 1 }, readStarts: 1, version_: "v0", lastUpdatedAt_: OLD });
+    const b = fakeDb({ abStatement: [{ ...leido }] });
+    expect(await readStatementStage(ctx(b.db), "s1")).toEqual({ status: "read" });
+    expect(s.asked).toEqual([]);
+    expect(b.rows.abStatement[0]).toEqual(leido);
+    expect(b.wheres.at(-1)).toEqual({ id: "s1", tenant_id_: "T1", status: { not: "read" } });
+  });
+
+  it("un error después de que otro trabajo lo leyó no lo baja: sigue read y el error se relanza", async () => {
+    const b = fakeDb({ abStatement: [statement({ readStarts: 1 })] });
+    configureBackgroundReading({
+      storage: () => ({
+        downloadBuffer: async () => {
+          Object.assign(b.rows.abStatement[0], { status: "read", verdict: "verified" });
+          throw new Error("se cayó la descarga");
+        },
+      }),
+    });
+    await expect(readStatementStage(ctx(b.db), "s1")).rejects.toThrow("se cayó la descarga");
+    expect(b.rows.abStatement[0]).toMatchObject({ status: "read", verdict: "verified" });
+    expect(b.wheres.at(-1)).toEqual({ id: "s1", tenant_id_: "T1", status: { not: "read" } });
+  });
+
+  it("uno ya leído con los arranques agotados tampoco se baja a failed", async () => {
+    configureBackgroundReading({ storage: storage({ [KEY]: CSV }).storage });
+    const b = fakeDb({ abStatement: [statement({ status: "read", verdict: "verified", readStarts: 3 })] });
+    expect(await readStatementStage(ctx(b.db), "s1")).toEqual({ status: "read" });
+    expect(b.rows.abStatement[0].status).toBe("read");
+  });
+
+  it("marcar processing, guardar la lectura y volver a queued dejan lastUpdatedAt_ y una version_ nueva cada vez", async () => {
+    const b = fakeDb({ abStatement: [statement({ version_: "v0", lastUpdatedAt_: OLD })] });
+    const writes: Array<{ status: string; version_: string; lastUpdatedAt_: Date }> = [];
+    const original = b.db.abStatement.updateMany;
+    b.db.abStatement.updateMany = async (args: { data: { status: string; version_: string; lastUpdatedAt_: Date } }) => {
+      writes.push(args.data);
+      return original(args as never);
+    };
+    configureBackgroundReading({ storage: storage({ [KEY]: CSV }).storage });
+    await readStatementStage(ctx(b.db), "s1");
+    expect(writes.map((w) => w.status)).toEqual(["processing", "read"]);
+    b.rows.abStatement[0].status = "queued";
+    writes.length = 0;
+    configureBackgroundReading({ storage: storage({}).storage });
+    await expect(readStatementStage(ctx(b.db), "s1")).rejects.toThrow();
+    expect(writes.map((w) => w.status)).toEqual(["processing", "queued"]);
+    configureBackgroundReading({ storage: storage({ [KEY]: CSV }).storage });
+    await readStatementStage(ctx(b.db), "s1");
+    expect(writes.map((w) => w.status)).toEqual(["processing", "queued", "processing", "read"]);
+    expect(writes.every((w) => UUID.test(w.version_) && w.lastUpdatedAt_ instanceof Date && w.lastUpdatedAt_ > OLD)).toBe(true);
+    expect(new Set(writes.map((w) => w.version_)).size).toBe(4);
+  });
+});
+
+describe("markStatementFailed: las marcas de la escritura", () => {
+  it("deja lastUpdatedAt_ y una version_ nueva", async () => {
+    const OLD = new Date(2026, 0, 1);
+    const b = fakeDb({ abStatement: [statement({ version_: "v0", lastUpdatedAt_: OLD })], workerEvent: [{ id: "w1", tenant_id_: "T1" }] });
+    await markStatementFailed({ payload: { workerEventId: "w1", input: { statementId: "s1" } }, prisma: b.db });
+    const row = b.rows.abStatement[0];
+    expect(row.status).toBe("failed");
+    expect(row.lastUpdatedAt_.getTime()).toBeGreaterThan(OLD.getTime());
+    expect(row.version_).toMatch(/^[0-9a-f-]{36}$/);
   });
 });

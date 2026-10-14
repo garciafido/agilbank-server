@@ -53,10 +53,13 @@ describe("readUpload", () => {
     expect(antes.ok && antes.upload.account).toEqual({ moneda: "Pesos" });
   });
 
-  it("sin nombre en ningún lado, el archivo se llama extracto; sin tipo, application/octet-stream", async () => {
-    const r = await readUpload(request(body([{ name: "archivo", value: FILE, filename: "" }])));
-    expect(r.ok && r.upload.fileName).toBe("extracto");
-    expect(r.ok && r.upload.mimeType).toBe("application/octet-stream");
+  it("con filename vacío la parte llega como texto: unnamed-file, no un archivo recodificado", async () => {
+    expect(await readUpload(request(body([{ name: "archivo", value: FILE, filename: "" }])))).toEqual({ ok: false, problem: "unnamed-file" });
+  });
+
+  it("un filename de solo espacios: el archivo se llama extracto; con tipo octet-stream, application/octet-stream", async () => {
+    const r = await readUpload(request(body([{ name: "archivo", value: FILE, filename: "  ", type: "application/octet-stream" }])));
+    expect(r.ok && [r.upload.fileName, r.upload.mimeType, r.upload.file.equals(FILE)]).toEqual(["extracto", "application/octet-stream", true]);
   });
 
   it("un cuerpo que no es multipart: not-multipart (también urlencoded y sin encabezado)", async () => {
@@ -117,19 +120,13 @@ describe("readUpload: formas de las partes", () => {
     expect(await readUpload(request(FILE, "multipart/form-data"))).toEqual({ ok: false, problem: "not-multipart" });
   });
 
-  it("archivo como campo de texto (sin nombre de archivo ni tipo): se toma como archivo", async () => {
-    const r = await readUpload(request(body([{ name: "archivo", value: "a;b\n1;2\n" }])));
-    expect(r).toEqual({ ok: true, upload: { file: Buffer.from("a;b\n1;2\n"), fileName: "extracto", mimeType: "application/octet-stream", account: undefined } });
-  });
-
-  it("archivo como campo de texto de más de 64 KB: invalid, no un archivo cortado", async () => {
-    const r = await readUpload(request(body([{ name: "archivo", value: "x".repeat(64 * 1024 + 1) }])));
-    expect(r).toEqual({ ok: false, problem: "invalid" });
-  });
-
-  it("un archivo binario sin nombre de archivo (octet-stream): se llama extracto y conserva el tipo", async () => {
-    const r = await readUpload(request(body([{ name: "archivo", value: FILE, type: "application/octet-stream" }])));
-    expect(r.ok && [r.upload.fileName, r.upload.mimeType, r.upload.file.equals(FILE)]).toEqual(["extracto", "application/octet-stream", true]);
+  it.each([
+    ["sin nombre de archivo ni tipo (llega como texto)", { name: "archivo", value: "a;b\n1;2\n" }],
+    ["como texto de más de 64 KB", { name: "archivo", value: "x".repeat(64 * 1024 + 1) }],
+    ["con el tipo de XLSX y sin filename (también llega como texto)", { name: "archivo", value: Buffer.from([0x50, 0x4b, 0xff, 0xfe]), type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }],
+    ["binaria sin filename (octet-stream)", { name: "archivo", value: FILE, type: "application/octet-stream" }],
+  ] as Array<[string, Part]>)("una parte archivo %s: unnamed-file", async (_caso, part) => {
+    expect(await readUpload(request(body([part, { name: "cuenta", value: "{}" }])))).toEqual({ ok: false, problem: "unnamed-file" });
   });
 
   it.each([
@@ -144,13 +141,12 @@ describe("readUpload: formas de las partes", () => {
     expect(await readUpload(request(body([{ name: "adjunto", value: FILE, filename: "a.csv", type: "text/csv" }])))).toEqual({ ok: false, problem: "missing-file" });
   });
 
-  it("un archivo con otro nombre de parte no se confunde con el archivo", async () => {
+  it("un archivo con otro nombre de parte antes del archivo: invalid, el envío lleva una sola parte de archivo", async () => {
     const r = await readUpload(request(body([
       { name: "adjunto", value: Buffer.from("otro"), filename: "otro.csv", type: "text/csv" },
-      { name: "archivo", value: "el extracto" },
+      { name: "archivo", value: "el extracto", filename: "e.csv" },
     ])));
-    expect(r.ok && r.upload.file.toString()).toBe("el extracto");
-    expect(r.ok && r.upload.fileName).toBe("extracto");
+    expect(r).toEqual({ ok: false, problem: "invalid" });
   });
 
   it("una cuenta de más de 64 KB: invalid-account-json aunque lo que entró sea un JSON completo", async () => {

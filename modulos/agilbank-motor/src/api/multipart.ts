@@ -18,16 +18,17 @@ export interface Upload {
   account: unknown;
 }
 
-export type UploadProblem = "not-multipart" | "invalid" | "missing-file" | "too-large" | "invalid-account-json";
+export type UploadProblem = "not-multipart" | "invalid" | "unnamed-file" | "missing-file" | "too-large" | "invalid-account-json";
 
 export type UploadResult = { ok: true; upload: Upload } | { ok: false; problem: UploadProblem };
 
 /**
  * El extracto y sus partes. Busboy corta el archivo un byte después del tope (avisa al llegar al límite,
  * también cuando el archivo mide justo eso), así que un envío grande nunca pasa entero a memoria y la
- * respuesta es siempre nuestra. Una parte `archivo` sin nombre de archivo ni tipo binario llega como
- * campo de texto: se toma igual como archivo, salvo que haya pasado el tope de campo. La parte `cuenta` puede llegar antes o
- * después del archivo.
+ * respuesta es siempre nuestra. Una parte `archivo` sin `filename` se rechaza: busboy la entrega como
+ * texto decodificado en UTF-8 (un binario o un CSV en latin1 llegarían cambiados, con otra huella), y la
+ * regla es una sola aunque con `application/octet-stream` los bytes llegarían enteros. La parte `cuenta`
+ * puede llegar antes o después del archivo.
  */
 export const readUpload = (req: UploadRequest, maxBytes = MAX_UPLOAD_BYTES): Promise<UploadResult> =>
   new Promise((resolve) => {
@@ -55,7 +56,7 @@ export const readUpload = (req: UploadRequest, maxBytes = MAX_UPLOAD_BYTES): Pro
     }
     const chunks: Buffer[] = [];
     let seen = false;
-    let unreadable = false;
+    let unnamed = false;
     let extraFile = false;
     let originalName = "";
     let mimeType = "application/octet-stream";
@@ -68,7 +69,12 @@ export const readUpload = (req: UploadRequest, maxBytes = MAX_UPLOAD_BYTES): Pro
         return;
       }
       seen = true;
-      originalName = info.filename ?? "";
+      if (info.filename === undefined) {
+        unnamed = true;
+        stream.resume();
+        return;
+      }
+      originalName = info.filename;
       if (info.mimeType && info.mimeType !== "application/octet-stream") mimeType = info.mimeType;
       stream.on("data", (chunk: Buffer) => chunks.push(chunk));
       stream.on("error", () => undefined);
@@ -81,18 +87,15 @@ export const readUpload = (req: UploadRequest, maxBytes = MAX_UPLOAD_BYTES): Pro
         fields.set(name, { value, truncated: info.valueTruncated });
         return;
       }
-      if (seen) {
-        extraFile = true;
-        return;
-      }
+      if (seen) extraFile = true;
       seen = true;
-      unreadable = info.valueTruncated;
-      chunks.push(Buffer.from(value));
+      unnamed = true;
     });
     parser.on("error", () => done({ ok: false, problem: "invalid" }));
     parser.on("close", () => {
       const file = Buffer.concat(chunks);
-      if (extraFile || unreadable) return done({ ok: false, problem: "invalid" });
+      if (extraFile) return done({ ok: false, problem: "invalid" });
+      if (unnamed) return done({ ok: false, problem: "unnamed-file" });
       if (!seen || file.length === 0) return done({ ok: false, problem: "missing-file" });
       if (file.length > maxBytes) return done({ ok: false, problem: "too-large" });
       const accountField = fields.get("cuenta");
