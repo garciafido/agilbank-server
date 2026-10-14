@@ -172,7 +172,7 @@ hr { border: none; border-top: 1px solid var(--linea); margin: 3rem 0 0; }
   h2 { margin-top: 1.8rem; }
   .desborde { overflow: visible; }
   h2, h3 { break-after: avoid; }
-  tr, pre, li { break-inside: avoid; }
+  tr, pre, li, .junto { break-inside: avoid; }
 }
 </style>
 <div class="hoja">
@@ -261,9 +261,9 @@ con él ProntoNet descarta lo que ya tenía.</p>
 <div class="desborde"><table>
 <thead><tr><th>Parte</th><th>Obligatoria</th><th>Qué es</th></tr></thead>
 <tbody>
-<tr><td><code>archivo</code></td><td><span class="oblig">Sí</span></td><td>El extracto, tal como lo entregó el banco. Una sola parte de archivo por pedido, con su nombre de archivo (<code>filename</code>). Hasta 60 MB</td></tr>
+<tr><td><code>archivo</code></td><td><span class="oblig">Sí</span></td><td>El extracto, tal como lo entregó el banco. Una sola parte de archivo por pedido, siempre con su nombre de archivo (<code>filename</code>). Hasta 60 MB</td></tr>
 <tr><td><code>cuenta</code></td><td>No</td><td>JSON con lo que ProntoNet sabe de la cuenta, como campo de texto (no como archivo). Hasta 64 KB. Se describe abajo</td></tr>
-<tr><td><code>nombre</code></td><td>No</td><td>El nombre original del archivo, como campo de texto. Si falta, se usa el del <code>filename</code>. Se guarda solo el nombre base, sin carpetas</td></tr>
+<tr><td><code>nombre</code></td><td>No</td><td>El nombre original del archivo, como campo de texto. Si falta, se usa el del <code>filename</code>. Se guarda solo el nombre base, sin carpetas ni caracteres de control y hasta 200 caracteres; si no queda nada, o queda «.» o «..», se guarda «extracto»</td></tr>
 </tbody>
 </table></div>
 
@@ -322,14 +322,15 @@ nuevo.</p>
 <div class="desborde"><table>
 <thead><tr><th>Estado del envío anterior</th><th>Respuesta</th></tr></thead>
 <tbody>
-<tr><td><code>en-proceso</code>, o <code>leido</code> con cualquier veredicto salvo <code>no-disponible</code></td><td><b>200</b> con el estado actual, igual que una consulta. Con <code>en-proceso</code> trae <code>reintentarEn</code></td></tr>
+<tr><td><code>en-proceso</code> con cambios en los últimos 30 minutos, o <code>leido</code> con cualquier veredicto salvo <code>no-disponible</code></td><td><b>200</b> con el estado actual, igual que una consulta. Con <code>en-proceso</code> trae <code>reintentarEn</code></td></tr>
 <tr><td><code>fallido</code></td><td><b>202</b> con el mismo <code>idExtracto</code> y <code>"estado": "en-proceso"</code>. Se lee de nuevo</td></tr>
 <tr><td><code>leido</code> con veredicto <code>no-disponible</code></td><td><b>202</b>, igual que el anterior. Se lee de nuevo</td></tr>
+<tr><td><code>en-proceso</code> sin cambios desde hace más de 30 minutos</td><td><b>202</b>, igual que el anterior. Se lee de nuevo</td></tr>
 </tbody>
 </table></div>
 
-<p>Esos dos estados dependen de una falla de AgilBank y no dicen nada del archivo. Por eso el
-reenvío los lee de nuevo. La lectura usa siempre la <code>cuenta</code> del primer envío; la
+<p>Esos tres casos dependen de una falla de AgilBank y no dicen nada del archivo: en el último, la
+lectura se perdió en el camino. Por eso el reenvío los lee de nuevo. La lectura usa siempre la <code>cuenta</code> del primer envío; la
 <code>cuenta</code> de un reenvío se ignora.</p>
 
 <p>Si dos envíos del mismo archivo llegan a la vez, uno recibe 202 y el otro 200, con el mismo
@@ -354,7 +355,7 @@ autenticación va antes de leer el cuerpo.</p>
 <tr><td class="num">3</td><td>La credencial no está asociada a una empresa. No ocurre con credenciales emitidas por nosotros</td><td>403</td><td><code>SIN_EMPRESA</code></td></tr>
 <tr><td class="num">4</td><td>La credencial no tiene usuario de servicio. No ocurre con credenciales emitidas por nosotros</td><td>403</td><td><code>SIN_USUARIO_DE_SERVICIO</code></td></tr>
 <tr><td class="num">5</td><td>El pedido no es <code>multipart/form-data</code></td><td>415</td><td><code>ENVIO_NO_MULTIPART</code></td></tr>
-<tr><td class="num">6</td><td>El cuerpo está mal formado o cortado, o trae más de una parte de archivo, sea cual sea su nombre (por ejemplo, la <code>cuenta</code> enviada como archivo)</td><td>400</td><td><code>ENVIO_INVALIDO</code></td></tr>
+<tr><td class="num">6</td><td>El cuerpo está mal formado o cortado, o trae más de una parte de archivo, sea cual sea su nombre (por ejemplo, la <code>cuenta</code> enviada como archivo), o la parte <code>archivo</code> no trae <code>filename</code></td><td>400</td><td><code>ENVIO_INVALIDO</code></td></tr>
 <tr><td class="num">7</td><td>Falta la parte <code>archivo</code>, o llegó vacía</td><td>400</td><td><code>FALTA_ARCHIVO</code></td></tr>
 <tr><td class="num">8</td><td>El archivo pesa más de 60 MB</td><td>413</td><td><code>ARCHIVO_DEMASIADO_GRANDE</code></td></tr>
 <tr><td class="num">9</td><td>La parte <code>cuenta</code> no es un JSON válido, no es un objeto o pasa de 64 KB</td><td>400</td><td><code>CUENTA_INVALIDA</code>, con <code>"campo": null</code></td></tr>
@@ -364,11 +365,11 @@ autenticación va antes de leer el cuerpo.</p>
 
 <p>Un archivo de exactamente 60 MB se acepta.</p>
 
-<p>Manden siempre el archivo con su nombre (<code>filename</code>). Una parte <code>archivo</code> sin
-<code>filename</code> y sin <code>Content-Type: application/octet-stream</code> llega como texto: si
-pasa de 64 KB, la respuesta es 400 <code>ENVIO_INVALIDO</code>; si no, su contenido se toma como
-texto UTF-8 y un archivo binario se corrompe. Con <code>Content-Type: application/octet-stream</code>
-la parte es un archivo aunque no tenga <code>filename</code>.</p>
+<p>La parte <code>archivo</code> tiene que llevar su nombre de archivo (<code>filename</code>), con
+cualquier <code>Content-Type</code>. Sin <code>filename</code>, la respuesta es 400
+<code>ENVIO_INVALIDO</code> con el mensaje «La parte archivo tiene que llevar el nombre del archivo
+(filename).». En .NET, <code>MultipartFormDataContent.Add(contenido, "archivo", "extracto.xlsx")</code>:
+sin el tercer argumento, la parte sale sin <code>filename</code>.</p>
 
 <h2><span class="nro">05</span> Consultar un extracto</h2>
 
@@ -385,7 +386,7 @@ guardó el <code>idExtracto</code>. La huella son 64 caracteres hexadecimales; a
 <tbody>
 <tr><td><code>en-proceso</code></td><td>Todavía se está leyendo. Incluye los reintentos internos: el extracto no pasa a <code>fallido</code> mientras se reintenta</td><td><code>reintentarEn</code>: los segundos que conviene esperar para preguntar de nuevo (5)</td></tr>
 <tr><td><code>leido</code></td><td>La lectura terminó, con cualquier veredicto, también <code>sin-lectura</code> y <code>no-disponible</code></td><td><code>lectura</code>, siempre (sección 06)</td></tr>
-<tr><td><code>fallido</code></td><td>AgilBank no pudo terminar la lectura por un error interno: agotó los reintentos o no se pudo poner en cola. No es una conclusión sobre el archivo</td><td>Ninguna. Enviar el mismo archivo otra vez lo lee de nuevo</td></tr>
+<tr><td><code>fallido</code></td><td>AgilBank no pudo terminar la lectura por un error interno: agotó los reintentos, no se pudo poner en cola, o la lectura se interrumpió tres veces. No es una conclusión sobre el archivo</td><td>Ninguna. Enviar el mismo archivo otra vez lo lee de nuevo</td></tr>
 </tbody>
 </table></div>
 
@@ -393,6 +394,8 @@ guardó el <code>idExtracto</code>. La huella son 64 caracteres hexadecimales; a
 <code>en-proceso</code>. Si envían muchos extractos a la vez, conviene espaciar las consultas: por
 ejemplo, cada 30 segundos después de los primeros dos minutos. La instalación tiene un cupo de
 pedidos (sección 09): respeten el encabezado <code>Retry-After</code> de un 429.</p>
+
+<p>Si un extracto sigue <code>en-proceso</code> más de 30 minutos, envíenlo de nuevo: se vuelve a leer.</p>
 
 <h4>Los errores de la consulta</h4>
 
@@ -512,7 +515,7 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <div class="desborde"><table>
 <thead><tr><th>Código</th><th>Cuándo</th><th>¿Frena las propuestas?</th></tr></thead>
 <tbody>
-<tr><td><code>no-cierra</code></td><td>El saldo inicial más los renglones no da el saldo final, o los saldos del archivo no son los que mandaron (solo si mandaron el período y el archivo lo cubre). Si el archivo no trae saldos y mandaron el período y los dos saldos, se parte del saldo inicial que mandaron y se suman los renglones: si no da el saldo final que mandaron, también sale <code>no-cierra</code>. Puede venir más de una vez</td><td>Sí</td></tr>
+<tr><td><code>no-cierra</code></td><td>El saldo inicial más los renglones no da el saldo final, o los saldos del archivo no son los que mandaron (solo si mandaron el período y el archivo lo cubre). Si el archivo no trae saldos, mandaron el período y los dos saldos, y el archivo lo cubre, se parte del saldo inicial que mandaron y se suman los renglones: si no da el saldo final que mandaron, también sale <code>no-cierra</code>. Puede venir más de una vez</td><td>Sí</td></tr>
 <tr><td><code>varias-cuentas</code></td><td>El archivo trae movimientos de más de una cuenta. <code>datos.cuentas</code> las identifica</td><td>Sí</td></tr>
 <tr><td><code>cuenta-distinta</code></td><td>El CBU del archivo no es el que mandaron. <code>datos.cbuDelArchivo</code> y <code>datos.cbuDeProntoNet</code> dicen cuáles son</td><td>Sí</td></tr>
 <tr><td><code>sin-saldos</code></td><td>Ningún renglón se pudo controlar contra el saldo anterior: el archivo no trae saldos, trae solo los saldos inicial y final, trae un solo saldo, tiene una columna de saldo que no encadena con los importes, o sus saldos no se controlan entre sí. <code>detalle</code> dice cuál</td><td>No</td></tr>
@@ -564,18 +567,35 @@ respuesta es <code>CORRECCION_INVALIDA</code> con <code>"campo": "textoDelBanco"
 <tbody>
 <tr><td><code>textoDelBanco</code></td><td><span class="oblig">Sí</span></td><td>Texto no vacío, hasta 500 caracteres. Es el texto del concepto, tal como lo dice el banco</td></tr>
 <tr><td><code>tipo</code></td><td><span class="oblig">Sí</span></td><td>Un código del anexo</td></tr>
-<tr><td><code>banco</code></td><td>No</td><td>Texto de hasta 10 caracteres, o <code>null</code>. El código de entidad</td></tr>
-<tr><td><code>codigoDelBanco</code></td><td>No</td><td>Texto de hasta 50 caracteres, o <code>null</code>. El código de operación del banco</td></tr>
-<tr><td><code>alicuota</code></td><td>No</td><td>Número de 0 a 100, o <code>null</code>. Se guarda con la corrección y la usa la etapa de débitos y créditos</td></tr>
+<tr><td><code>banco</code></td><td>No</td><td>Los tres dígitos del código de entidad, como <code>banco.codigo</code> de la lectura (<code>"007"</code>, no <code>"7"</code> ni el nombre del banco). Vacío o <code>null</code> vale para cualquier banco. Otra forma responde <code>CORRECCION_INVALIDA</code> con <code>"campo": "banco"</code></td></tr>
+<tr><td><code>codigoDelBanco</code></td><td>No</td><td>Texto de hasta 50 caracteres, o <code>null</code>. El código de operación del banco. Vacío es <code>null</code></td></tr>
+<tr><td><code>alicuota</code></td><td>No</td><td>Número de 0 a 100, o <code>null</code>. Se guarda con la corrección; se usa al proponer débitos y créditos bancarios</td></tr>
 </tbody>
 </table></div>
 
+<div class="junto">
 <p><b>201</b></p>
 
 <div class="desborde"><pre><code>{ "idCorreccion": "…", "vigente": "empresa", "revision": "pendiente" }</code></pre></div>
+</div>
 
 <p>La corrección vale desde la lectura siguiente, solo para su empresa. Nosotros la revisamos: lo
 confirmado pasa a la tabla común, con la versión siguiente, y les llega a todos.</p>
+
+<p>AgilBank recorta los espacios de los extremos de <code>banco</code> y <code>codigoDelBanco</code>;
+los topes se miden sin ellos.</p>
+
+<h4>Cómo encuentra sus renglones una corrección</h4>
+
+<ul>
+<li><b>El banco.</b> Con <code>banco</code> vacío o <code>null</code>, la corrección vale para los extractos de cualquier banco. Con un código, solo para los de ese banco.</li>
+<li><b>El código de operación gana sobre el texto.</b> Si <code>codigoDelBanco</code> es igual al código de operación del renglón, la corrección aplica sin mirar el texto.</li>
+<li><b>El texto vale como comienzo, por palabras.</b> Si no, aplica cuando <code>textoDelBanco</code> es el comienzo del texto del renglón, por palabras enteras: «IVA» toma «IVA 21% s/Comis» y todo lo que empieza con la palabra «IVA», pero no «IVAN». El texto se compara sin mayúsculas, tildes, números ni signos.</li>
+<li><b>El signo.</b> La corrección solo aplica a renglones cuyo signo cabe en el tipo: una corrección a <code>transferencia-recibida</code> no cambia un renglón con importe negativo, ni una a <code>comision</code> uno con importe positivo. Ese renglón sigue con la tabla común.</li>
+</ul>
+
+<p>Si varias correcciones aplican a un renglón, gana la de su banco sobre la de cualquier banco; después,
+la del código sobre la del texto, y entre textos el más largo. A igual peso, rige la más nueva.</p>
 
 <p>Reenviar un archivo ya leído no aplica una corrección nueva: responde 200 con la lectura anterior.
 La corrección vale desde la lectura siguiente de un archivo nuevo.</p>
@@ -610,7 +630,7 @@ problema es del cuerpo entero.</p>
 <tr><td><code>SIN_EMPRESA</code></td><td class="num">403</td><td>La credencial no está asociada a una empresa. No ocurre con credenciales emitidas por nosotros</td></tr>
 <tr><td><code>SIN_USUARIO_DE_SERVICIO</code></td><td class="num">403</td><td>Enviar o corregir con una credencial sin usuario de servicio. Las consultas no lo piden. No ocurre con credenciales emitidas por nosotros</td></tr>
 <tr><td><code>ENVIO_NO_MULTIPART</code></td><td class="num">415</td><td>El envío del extracto no es <code>multipart/form-data</code></td></tr>
-<tr><td><code>ENVIO_INVALIDO</code></td><td class="num">400</td><td>El cuerpo del envío está mal formado o cortado, o trae más de una parte de archivo, sea cual sea su nombre</td></tr>
+<tr><td><code>ENVIO_INVALIDO</code></td><td class="num">400</td><td>El cuerpo del envío está mal formado o cortado, trae más de una parte de archivo, sea cual sea su nombre, o la parte <code>archivo</code> no trae <code>filename</code></td></tr>
 <tr><td><code>FALTA_ARCHIVO</code></td><td class="num">400</td><td>Falta la parte <code>archivo</code>, o llegó vacía</td></tr>
 <tr><td><code>ARCHIVO_DEMASIADO_GRANDE</code></td><td class="num">413</td><td>El archivo pesa más de 60 MB</td></tr>
 <tr><td><code>CUENTA_INVALIDA</code></td><td class="num">400</td><td>La parte <code>cuenta</code> no es un JSON válido o un dato no tiene la forma indicada. Trae <code>campo</code></td></tr>
@@ -640,7 +660,9 @@ problema es del cuerpo entero.</p>
 <tr><td>Las partes de archivo de un envío</td><td>Una</td></tr>
 <tr><td>Un dato de texto de la <code>cuenta</code></td><td>200 caracteres</td></tr>
 <tr><td>El cuerpo de una corrección</td><td>64 KB</td></tr>
-<tr><td><code>textoDelBanco</code>, <code>banco</code>, <code>codigoDelBanco</code></td><td>500, 10 y 50 caracteres</td></tr>
+<tr><td><code>textoDelBanco</code>, <code>codigoDelBanco</code></td><td>500 y 50 caracteres</td></tr>
+<tr><td><code>banco</code> de una corrección</td><td>Tres dígitos</td></tr>
+<tr><td>El nombre del archivo que se guarda</td><td>200 caracteres</td></tr>
 <tr><td><code>alicuota</code></td><td>De 0 a 100</td></tr>
 <tr><td>Pedidos a la API</td><td>Un cupo por instalación, por dirección IP, en ventanas de 15 minutos. El valor lo informamos al dar de alta la credencial. Al pasarlo, la respuesta es 429 con <code>Retry-After</code></td></tr>
 <tr><td>Renglones por extracto</td><td>No hay un tope en la cantidad. Un archivo que pasa los topes de tamaño de abajo vuelve <code>leido</code> con el veredicto <code>sin-lectura</code> y su motivo; no hay un rechazo HTTP</td></tr>
@@ -657,7 +679,7 @@ problema es del cuerpo entero.</p>
 <li>un «XLS» de HTML o XML 2003 con más de 20 MB, 100.000 celdas o 2.000 celdas combinadas.</li>
 </ul>
 
-<p>Un extracto diario suele leerse en menos de un minuto. No es un plazo: consulten hasta que el estado deje de ser <code>en-proceso</code>.</p>
+<p>Un extracto diario suele leerse en menos de un minuto. No es un plazo: consulten hasta que el estado deje de ser <code>en-proceso</code>. Si sigue <code>en-proceso</code> más de 30 minutos, envíenlo de nuevo: se vuelve a leer.</p>
 
 <h2><span class="nro">10</span> Anexo: los tipos canónicos</h2>
 
