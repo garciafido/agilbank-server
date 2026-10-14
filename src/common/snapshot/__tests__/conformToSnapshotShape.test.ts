@@ -13,6 +13,21 @@ describe("conformToSnapshotShape", () => {
     expect(conformToSnapshotShape(5, intS)).toBe(5);
   });
 
+  it("scalar date (día de calendario): el día; un ISO con hora (snapshot viejo) o un Date → su día UTC; lo demás → null", () => {
+    const dateS: ShapeDescriptor = { kind: "scalar", type: "date" };
+    expect(conformToSnapshotShape("1985-03-12", dateS)).toBe("1985-03-12");
+    expect(conformToSnapshotShape("1985-03-12T03:00:00.000Z", dateS)).toBe("1985-03-12");
+    expect(conformToSnapshotShape(new Date("1985-03-12T00:00:00.000Z"), dateS)).toBe("1985-03-12");
+    expect(conformToSnapshotShape(undefined, dateS)).toBe(null);
+    expect(conformToSnapshotShape("12/03/1985", dateS)).toBe(null);
+    expect(conformToSnapshotShape(19850312, dateS)).toBe(null);
+  });
+
+  it("scalar dateTime: passthrough, como antes", () => {
+    const dateTimeS: ShapeDescriptor = { kind: "scalar", type: "dateTime" };
+    expect(conformToSnapshotShape("2026-10-11T23:30:00.000Z", dateTimeS)).toBe("2026-10-11T23:30:00.000Z");
+  });
+
   it("scalar string: passthrough; ausente → null", () => {
     expect(conformToSnapshotShape("hola", strS)).toBe("hola");
     expect(conformToSnapshotShape(undefined, strS)).toBe(null);

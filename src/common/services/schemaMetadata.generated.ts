@@ -115,7 +115,7 @@ export const generatedSchemaMetadata: SchemaMetadataMap = new Map([
           "periodFrom",
           {
             name: "periodFrom",
-            type: "DateTime",
+            type: "Date",
             kind: "scalar",
             isList: false,
             isRequired: false,
@@ -127,7 +127,7 @@ export const generatedSchemaMetadata: SchemaMetadataMap = new Map([
           "periodTo",
           {
             name: "periodTo",
-            type: "DateTime",
+            type: "Date",
             kind: "scalar",
             isList: false,
             isRequired: false,
@@ -228,6 +228,7 @@ export const generatedSchemaMetadata: SchemaMetadataMap = new Map([
     {
       modelName: "AbConceptCorrection" as Prisma.ModelName,
       tenantIdField: "tenant_id_",
+      crossTenantForRoles: { roles: ["SysAdmin"], mode: "onRequest" },
       relations: new Map([]),
       fields: new Map([
         [

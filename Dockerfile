@@ -1,6 +1,6 @@
 # Multi-stage build optimized for layer caching
 # Dependencies stage - cache package installations
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package*.json ./
@@ -11,7 +11,7 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 RUN --mount=type=cache,target=/root/.npm     npm ci --omit=dev
 
 # Dev dependencies stage - for building
-FROM node:20-alpine AS dev-deps
+FROM node:22-alpine AS dev-deps
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package*.json ./
@@ -57,7 +57,7 @@ RUN npm run build:fast
 RUN test -d dist || (echo "Build failed: dist directory not created" && exit 1)
 
 # Production stage - minimal final image
-FROM node:20-alpine AS production
+FROM node:22-alpine AS production
 # openssl: firma CMS de los pedidos a ARCA. Alpine trae las librerías pero no
 # siempre el binario, y sin él la firma falla en runtime con un ENOENT que
 # manda a buscar el problema al código.

@@ -91,6 +91,7 @@ export const abConceptCorrectionResolvers: {
         skip: args.offset, // Map GQL 'offset' to Prisma 'skip'
         take: args.take,
         select,
+        allTenants: (args as any).allTenants ?? undefined,
       });
     },
     abConceptCorrectionListWithCursor: async (
@@ -122,6 +123,7 @@ export const abConceptCorrectionResolvers: {
         cursorKey: args.cursorKey ? { id: args.cursorKey } : undefined, // Assuming cursor is on 'id' field
         take: args.take,
         select,
+        allTenants: (args as any).allTenants ?? undefined,
       });
     },
   },

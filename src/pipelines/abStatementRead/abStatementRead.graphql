@@ -1,0 +1,8 @@
+type AbStatementReadReturn {
+  result: String!
+  status: String!
+}
+
+extend type Mutation {
+  abStatementRead(statementId: String!): AbStatementReadReturn!
+}

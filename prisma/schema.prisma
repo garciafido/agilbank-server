@@ -192,8 +192,8 @@ model AbStatement {
   verdict String?
   bankCode String? @map("bank_code")
   cbu String?
-  periodFrom DateTime? @map("period_from")
-  periodTo DateTime? @map("period_to")
+  periodFrom DateTime? @db.Date @map("period_from")
+  periodTo DateTime? @db.Date @map("period_to")
   openingBalance Decimal? @map("opening_balance")
   closingBalance Decimal? @map("closing_balance")
   lineCount Int? @map("line_count")

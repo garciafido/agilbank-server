@@ -10,6 +10,8 @@
 import { SearchContext } from "../types";
 import { VisibleSchema, VisibleEntity, QueryPatterns } from "../security/types";
 import { formatPatternsAsPrompt, SupportedLang } from "./multilangPatterns";
+import { hoyEnElProyecto } from "../../../common/utils/calendarDate";
+import { PROJECT_TIME_ZONE } from "../../../config/projectTimeZone";
 
 /**
  * Options for generating the system prompt
@@ -116,6 +118,13 @@ export function generateSystemPrompt(
   // SECTION 1: BASE INSTRUCTIONS
   // ═══════════════════════════════════════════════════════════════
   parts.push(BASE_PROMPT);
+
+  // Hoy, en la zona del proyecto: lo relativo ("el mes pasado", "este año", "ayer")
+  // se calcula desde este día, no desde la zona del servidor ni la del modelo.
+  parts.push(`## TODAY
+
+Today is ${hoyEnElProyecto()} (time zone ${PROJECT_TIME_ZONE}). Resolve relative dates ("last month", "this year", "yesterday") from this day, and write dates as YYYY, YYYY-MM or YYYY-MM-DD.
+`);
 
   // ═══════════════════════════════════════════════════════════════
   // SECTION 2: DATA MODEL (Schema Context)

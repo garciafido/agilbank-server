@@ -3,7 +3,10 @@
 // (string/""→num/null), completa listas ausentes con [], recursea objetos. `data_`
 // NO se modifica; esto solo ajusta el valor que se devuelve a GraphQL. Defensivo:
 // nunca tira; ante mismatch degrada a passthrough/null. Ver snapshotShapes.ts (descriptor
-// generado) y el resolver de data_.
+// generado) y el resolver de data_. Un `date` (día de calendario) se devuelve como
+// "AAAA-MM-DD": un snapshot de antes de la fecha sin hora lo tiene con hora.
+
+import { diaDeCalendario } from "../utils/calendarDate";
 
 export type ScalarTypeName =
   | "string" | "number" | "integer" | "boolean" | "date" | "dateTime" | "decimal" | "json";
@@ -27,6 +30,9 @@ export function conformToSnapshotShape(value: any, shape: ShapeDescriptor): any 
         if (typeof value === "number") return value;
         const n = Number(value);
         return Number.isNaN(n) ? null : n;
+      }
+      if (shape.type === "date") {
+        return value instanceof Date || typeof value === "string" ? diaDeCalendario(value) : null;
       }
       return value ?? null;
     }

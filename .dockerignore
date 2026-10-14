@@ -32,6 +32,10 @@ lerna-debug.log*
 !.env.example
 !.env.*.example
 
+# Fecha sin hora: el estado local del ciclo de haiku a mitad de un cambio de tipo. Nunca en la imagen.
+prisma/.fechaSinHoraEnCurso
+prisma/fechaSinHoraApartada/
+
 # Version control
 .git/
 .gitignore

@@ -45,6 +45,10 @@ src/generated/
 created_users.txt
 src/prisma/generated-client
 src/paljs-generated/
+# Fecha sin hora: el estado local del ciclo de haiku a mitad de un cambio de tipo (la marca
+# de la migración que está creando y la que apartó hasta después del conteo). Nunca al repo.
+/prisma/.fechaSinHoraEnCurso
+/prisma/fechaSinHoraApartada/
 # Environment files (but keep examples)
 .env
 .env.*

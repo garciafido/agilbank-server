@@ -317,6 +317,16 @@ jest.mock("../../src/common/externalValidation/registry", () => {
             nullable: true,
             multilang: false,
           },
+          // Un día de calendario obligatorio (fecha sin hora).
+          {
+            name: "born",
+            type: "Date",
+            label: {},
+            readOnly: false,
+            required: true,
+            nullable: false,
+            multilang: false,
+          },
           // Sin refPrismaModel: un registry sin el modelo de la fila referenciada.
           {
             name: "province",
@@ -343,6 +353,7 @@ jest.mock("../../src/common/externalValidation/registry", () => {
           floors: true,
           subscribed: true,
           province_id: true,
+          born: true,
         },
         editableFields: [
           "firstName",
@@ -357,6 +368,7 @@ jest.mock("../../src/common/externalValidation/registry", () => {
           "floors",
           "subscribed",
           "province",
+          "born",
         ],
         // Los catálogos de las referencias editables: el de países trae el código de
         // cada fila (extraFields); el de provincias, no.
@@ -400,6 +412,7 @@ const OLD = {
   floors: 2,
   subscribed: true,
   province_id: "00000000-0000-4000-8000-000000000002",
+  born: new Date("1985-03-12T00:00:00.000Z"),
 };
 const SIG = generateVerificationSignature("v1", "ana@example.com", "t1");
 let router: any;
@@ -777,12 +790,12 @@ describe("los errores de validación y los Enum", () => {
   });
 });
 
-describe("un obligatorio que no es texto, en blanco (número, booleano, referencia)", () => {
+describe("un obligatorio que no es texto, en blanco (número, booleano, referencia, día)", () => {
   // Como el UpdateService generado: un obligatorio en null es un NullValueError con
   // "args.<campo>" (en una referencia, el campo sin el Id del argumento).
   const rejectsNull = () =>
     mockServiceUpdate.mockImplementation((args: Record<string, unknown>) => {
-      for (const name of ["age", "ratio", "active"]) {
+      for (const name of ["age", "ratio", "active", "born"]) {
         if (args[name] === null) throw new NullValueError("args." + name);
       }
       if (args.countryId === null) throw new NullValueError("args.country");
@@ -793,6 +806,7 @@ describe("un obligatorio que no es texto, en blanco (número, booleano, referenc
     ["un Decimal obligatorio", "ratio", { ratio: null }],
     ["un Boolean obligatorio", "active", { active: null }],
     ["una referencia obligatoria", "country", { countryId: null }],
+    ["un date obligatorio", "born", { born: null }],
   ])(
     "%s en blanco llega null (no 0, false ni vacío): el servicio lo rechaza y el 422 dice el campo",
     async (_what, field, sent) => {

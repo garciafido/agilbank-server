@@ -8,7 +8,11 @@ export const nullToUndefinedRecursive = <T>(o: T): WithoutNull<T> => {
   return o as WithoutNull<T>;
 };
 
-type WithoutNull<T> = T extends Array<infer I>
+// Un Date (el escalar Date de GraphQL, en un where) queda como Date: sus métodos no
+// son datos que haya que limpiar de null.
+type WithoutNull<T> = T extends Date
+  ? T
+  : T extends Array<infer I>
   ? Array<WithoutNull<I>>
   : T extends object
   ? { [K in keyof T]: WithoutNull<T[K]> }

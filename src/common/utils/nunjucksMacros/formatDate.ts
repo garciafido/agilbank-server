@@ -26,7 +26,10 @@ export function formatDateFilter(
       // Si es un objeto Date de JavaScript
       dt = DateTime.fromJSDate(dateObj, { zone: "utc" });
     } else if (typeof dateObj === "string") {
-      if (dateObj.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+      if (dateObj.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Un día de calendario "AAAA-MM-DD" (un campo date): ese día, sin zona
+        dt = DateTime.fromISO(dateObj, { zone: "utc" });
+      } else if (dateObj.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
         // Formato ISO 8601 (parcial)
         dt = DateTime.fromISO(dateObj, { zone: "utc" });
       } else if (dateObj.match(/^\d{2}\/\d{2}\/\d{4}$/)) {

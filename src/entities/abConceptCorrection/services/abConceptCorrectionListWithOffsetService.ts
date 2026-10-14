@@ -23,6 +23,8 @@ interface ListWithOffsetArgs {
   include?: Prisma.AbConceptCorrectionInclude;
   skip: number; // Renamed from offset
   take: number;
+  /** Lectura administrativa cross-tenant explícita (crossTenantForRoles onRequest). */
+  allTenants?: boolean;
 }
 
 // Constants for pagination limits
@@ -68,7 +70,10 @@ export class AbConceptCorrectionListWithOffsetService {
       );
     }
 
-    const db = this.db;
+    // Lectura cross-tenant EXPLÍCITA (crossTenantForRoles onRequest): instancia
+    // derivada de SecurePrismaOps — valida el rol, no muta el contexto, no
+    // salta permisos (solo omite el filtro de tenant en esta operación).
+    const db = args.allTenants ? this.db.forAllTenants() : this.db;
 
     // 1. Validate Pagination Limits (Business Rule)
     if (args.take > MAX_PAGE_SIZE) {

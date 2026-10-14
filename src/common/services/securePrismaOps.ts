@@ -500,6 +500,22 @@ export class SecurePrismaOps<M extends PrismaModelName> {
     );
   }
 
+  /**
+   * Si este contexto ve las filas de un modelo cuando llegan por una relación: el
+   * criterio de la poda del select (_pruneRecursive), que saca la relación sin el
+   * permiso de ver ese modelo. Lo usa también la edición: una referencia que el
+   * usuario no ve le llega vacía porque se podó, no porque lo esté, así que vaciarla
+   * se ignora (null o "" no la desconectan).
+   */
+  canSeeRelated(relatedModelName: string): boolean {
+    return (
+      this.context.isSystemMode ||
+      this.context
+        .permissions()
+        .has(`${this.pascalToCamelCase(relatedModelName)}_retrieve`)
+    );
+  }
+
   /** Checks if the current user has the required permission for the action. Throws UnauthorizedError if not. */
   private checkPermission(
     actionSuffix: "_create" | "_retrieve" | "_update" | "_delete"
@@ -1037,12 +1053,7 @@ export class SecurePrismaOps<M extends PrismaModelName> {
       if (relationMeta) {
         // It's a relation
         const relatedModelName = relationMeta.relatedModelName;
-        const permissionModelName = this.pascalToCamelCase(relatedModelName);
-        const requiredPermission = `${permissionModelName}_retrieve`;
-        if (
-          !this.context.isSystemMode &&
-          !this.context.permissions().has(requiredPermission)
-        ) {
+        if (!this.canSeeRelated(relatedModelName)) {
           delete currentLevelObj[key];
         } else if (value && typeof value === "object") {
           // Has permission and value is object (nested select/include) -> Recurse deeper

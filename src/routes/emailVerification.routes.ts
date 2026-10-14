@@ -25,6 +25,8 @@ import { isTransactionConflict } from '../common/services/saveRetry';
 // Lo que va al log de un error: tipo, código y dónde falló, nunca su mensaje (ver utils/errorKind).
 import { errorKind } from '../utils/errorKind';
 import { DeadlineExceededError, withDeadline } from '../utils/withDeadline';
+// Un campo `date` es un día de calendario ("AAAA-MM-DD", sin hora ni zona).
+import { calendarDateToDate, diaDeCalendario, isCalendarDate } from '../common/utils/calendarDate';
 import { sseManager } from '../services/sse/SSEManager';
 import {
   externalValidationRegistry,
@@ -181,6 +183,20 @@ function invalidFieldOf(err: any): string | undefined {
   if (err?.extensions?.code !== 'VALIDATION_REQUIRED' || typeof err.customMessage !== 'string') return undefined;
   const match = /^args\.(.+)$/.exec(err.customMessage);
   return match ? match[1] : undefined;
+}
+
+/**
+ * Los campos `date` (día de calendario) del registro, como "AAAA-MM-DD": Prisma los
+ * da como el Date de su medianoche UTC, y por JSON saldrían con hora.
+ */
+function withCalendarDays(entityRecord: Record<string, unknown>, evConfig: ExternalValidationConfig): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...entityRecord };
+  for (const field of evConfig.fields) {
+    if (field.type === 'Date' && field.name in out) {
+      out[field.name] = diaDeCalendario(out[field.name] as Date | string | null | undefined);
+    }
+  }
+  return out;
 }
 
 /**
@@ -577,7 +593,7 @@ router.get('/public/verify-email/info', async (req, res) => {
           // De qué entidad es: la página pública elige con esto la pantalla
           // propia del proyecto (src/common/pages/externalValidationPages.tsx).
           entityName: record.sourceEntity,
-          entityData: entityRecord,
+          entityData: withCalendarDays(entityRecord, evConfig),
           fields: evConfig.fields,
           groups: evConfig.groups,
           editableFields: evConfig.editableFields,
@@ -725,6 +741,18 @@ router.post('/public/external-validation/submit', async (req, res) => {
             coerced = !fieldConfig.nullable && (value == null || String(value).trim() === '') ? null : !!value;
             break;
           case 'Date':
+            // Un día de calendario: solo "AAAA-MM-DD" de un día que existe. Al servicio
+            // va el Date de su medianoche UTC, que es lo que Prisma escribe en la
+            // columna date: la zona del proceso no interviene. En blanco, null (en uno
+            // obligatorio, el UpdateService lo rechaza como faltante).
+            if (value == null || (typeof value === 'string' && value.trim() === '')) {
+              coerced = null;
+            } else if (isCalendarDate(value)) {
+              coerced = calendarDateToDate(value);
+            } else {
+              rejectedFields.push(key); continue;
+            }
+            break;
           case 'DateTime':
             if (value != null && value !== '') {
               const d = new Date(String(value));
@@ -824,17 +852,28 @@ router.post('/public/external-validation/submit', async (req, res) => {
 
     // Compute diff (only fields that actually changed)
     const changes: { field: string; oldValue: any; newValue: any }[] = [];
+    // Un día de calendario se compara por su texto ("AAAA-MM-DD"): lo guardado a otra
+    // hora del mismo día (un dato de antes de la fecha sin hora) no es un cambio. Las
+    // demás fechas, por su instante; lo demás, como texto.
+    const asText = (fc: ExternalValidationFieldConfig | undefined, v: unknown): string =>
+      fc?.type === 'Date'
+        ? diaDeCalendario(v as Date | string | null | undefined) ?? ''
+        : v instanceof Date ? v.toISOString() : String(v ?? '');
     for (const [key, newValue] of Object.entries(sanitizedData)) {
       const fc = fieldConfigByName[key];
       const dbKey = fc?.type === 'Ref' ? `${key}_id` : key;
       const oldValue = oldRecord[dbKey];
-      // Compare as strings for dates, direct comparison otherwise
-      const oldStr = oldValue instanceof Date ? oldValue.toISOString() : String(oldValue ?? '');
-      const newStr = newValue instanceof Date ? (newValue as Date).toISOString() : String(newValue ?? '');
-      if (oldStr !== newStr) {
+      if (asText(fc, oldValue) !== asText(fc, newValue)) {
         changes.push({ field: key, oldValue, newValue });
       }
     }
+
+    // El registro de cambios guarda un día de calendario como "AAAA-MM-DD" (sin hora);
+    // al UpdateService le siguen llegando los valores de changes (el Date del día).
+    const auditChange = (c: { field: string; oldValue: any; newValue: any }) =>
+      fieldConfigByName[c.field]?.type === 'Date'
+        ? { ...c, oldValue: diaDeCalendario(c.oldValue), newValue: diaDeCalendario(c.newValue) }
+        : c;
 
     const now = new Date();
     // La sesión del UpdateService: tenant del token + usuario SYSTEM (auditoría).
@@ -921,7 +960,7 @@ router.post('/public/external-validation/submit', async (req, res) => {
               data: {
                 status: 'verified',
                 verifiedAt: now,
-                validationChanges: changes.length > 0 ? changes : undefined,
+                validationChanges: changes.length > 0 ? changes.map(auditChange) : undefined,
                 validationSubmittedAt: now,
                 version_: randomUUID(),
                 lastUpdatedAt_: now,

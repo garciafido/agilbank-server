@@ -78,6 +78,7 @@ const roleData: Prisma.RoleCreateInput[] = [
         { id: "emailVerification_update" },
         { id: "emailVerification_delete" },
         { id: "simulation_run" },
+        { id: "abStatementRead_retry" },
       ],
     },
   },

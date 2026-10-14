@@ -27,6 +27,8 @@ interface ListWithCursorArgs {
   include?: Prisma.AbConceptCorrectionInclude;
   cursorKey?: string | number; // The value of the unique cursor field from the last item
   take: number; // Number of items per page
+  /** Lectura administrativa cross-tenant explícita (crossTenantForRoles onRequest). */
+  allTenants?: boolean;
 }
 
 // Constants for pagination limits
@@ -71,7 +73,9 @@ export class AbConceptCorrectionListWithCursorService {
       );
     }
 
-    const db = this.db;
+    // Lectura cross-tenant EXPLÍCITA (crossTenantForRoles onRequest): instancia
+    // derivada — valida rol, no muta contexto, no salta permisos.
+    const db = args.allTenants ? this.db.forAllTenants() : this.db;
 
     // 1. Validate Pagination Limits
     if (args.take > MAX_PAGE_SIZE) {

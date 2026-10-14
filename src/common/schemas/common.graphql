@@ -173,19 +173,18 @@ input FilterString {
   search: String
 }
 
+# Un día de calendario (fecha sin hora): las comparaciones van con el escalar Date,
+# "AAAA-MM-DD". Son las que usan los filtros del cliente (día, año, mes, rango, vacío).
 input FilterDate {
-  equals: String
-  not: String
-  in: [String!]
-  notIn: [String!]
-  lt: String
-  lte: String
-  gt: String
-  gte: String
-  range: String
+  equals: Date
+  not: Date
+  in: [Date!]
+  lt: Date
+  lte: Date
+  gt: Date
+  gte: Date
   isNull: Boolean
   isEmpty: Boolean
-  regex: String
 }
 
 input FilterDateTime {
