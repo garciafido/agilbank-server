@@ -191,7 +191,8 @@ banco. AgilBank lo lee y devuelve el resumen bancario canónico: el encabezado, 
 tipo y los controles de saldos.</p>
 
 <p>La empresa sale de la credencial. Ningún pedido lleva el identificador de la empresa, y lo de una
-empresa nunca se ve ni se usa desde otra.</p>
+empresa nunca se ve ni se usa desde otra. La única excepción es lo que se confirma en nuestra
+revisión de las correcciones de tipos: pasa a la tabla común (sección 07).</p>
 
 <div class="desborde"><table>
 <thead><tr><th>Ruta</th><th>Qué hace</th><th>Ámbito</th></tr></thead>
@@ -220,8 +221,9 @@ están en castellano.</p>
 </tbody>
 </table>
 
-<p>La credencial pertenece a una empresa. Para enviar un extracto o una corrección, la credencial
-también necesita un usuario de servicio. Para consultar no hace falta.</p>
+<p>La credencial pertenece a una empresa y tiene un usuario de servicio. Las credenciales que emitimos
+nosotros traen las dos cosas. Si se da de baja el usuario de servicio de la credencial, la credencial
+deja de valer en todas las rutas (401).</p>
 
 <p>Una credencial con los dos ámbitos se emite desde la consola de la instalación:</p>
 
@@ -259,9 +261,9 @@ con él ProntoNet descarta lo que ya tenía.</p>
 <div class="desborde"><table>
 <thead><tr><th>Parte</th><th>Obligatoria</th><th>Qué es</th></tr></thead>
 <tbody>
-<tr><td><code>archivo</code></td><td><span class="oblig">Sí</span></td><td>El extracto, tal como lo entregó el banco. Una sola parte <code>archivo</code> por pedido, con su nombre de archivo (<code>filename</code>). Hasta 60 MB</td></tr>
-<tr><td><code>cuenta</code></td><td>No</td><td>JSON con lo que ProntoNet sabe de la cuenta. Hasta 64 KB. Se describe abajo</td></tr>
-<tr><td><code>nombre</code></td><td>No</td><td>El nombre original del archivo. Si falta, se usa el del <code>filename</code>. Se guarda solo el nombre base, sin carpetas</td></tr>
+<tr><td><code>archivo</code></td><td><span class="oblig">Sí</span></td><td>El extracto, tal como lo entregó el banco. Una sola parte de archivo por pedido, con su nombre de archivo (<code>filename</code>). Hasta 60 MB</td></tr>
+<tr><td><code>cuenta</code></td><td>No</td><td>JSON con lo que ProntoNet sabe de la cuenta, como campo de texto (no como archivo). Hasta 64 KB. Se describe abajo</td></tr>
+<tr><td><code>nombre</code></td><td>No</td><td>El nombre original del archivo, como campo de texto. Si falta, se usa el del <code>filename</code>. Se guarda solo el nombre base, sin carpetas</td></tr>
 </tbody>
 </table></div>
 
@@ -337,7 +339,7 @@ queda <code>fallido</code>: enviar el mismo archivo otra vez lo lee de nuevo.</p
 <h4>Formatos</h4>
 
 <p>XLSX, XLS, CSV y TXT. También el «XLS» que en realidad es una tabla HTML o una planilla XML 2003.
-PDF, JPG y PNG todavía no se leen: vuelven con el veredicto <code>sin-lectura</code> y el motivo.</p>
+PDF, JPG y PNG vuelven <code>leido</code> con el veredicto <code>sin-lectura</code> y su motivo.</p>
 
 <h4>Los controles del envío</h4>
 
@@ -347,12 +349,12 @@ autenticación va antes de leer el cuerpo.</p>
 <div class="desborde"><table>
 <thead><tr><th class="num">#</th><th>Control</th><th>HTTP</th><th>Código</th></tr></thead>
 <tbody>
-<tr><td class="num">1</td><td>La credencial falta, es inválida, venció o fue revocada, o su usuario de servicio está inactivo</td><td>401</td><td><code>NO_AUTORIZADO</code></td></tr>
+<tr><td class="num">1</td><td>La credencial falta, es inválida, venció o fue revocada, o se dio de baja su usuario de servicio</td><td>401</td><td><code>NO_AUTORIZADO</code></td></tr>
 <tr><td class="num">2</td><td>La credencial no tiene el ámbito <code>ab:leer</code></td><td>403</td><td><code>AMBITO_INSUFICIENTE</code></td></tr>
-<tr><td class="num">3</td><td>La credencial no está asociada a una empresa</td><td>403</td><td><code>SIN_EMPRESA</code></td></tr>
-<tr><td class="num">4</td><td>La credencial no tiene usuario de servicio</td><td>403</td><td><code>SIN_USUARIO_DE_SERVICIO</code></td></tr>
+<tr><td class="num">3</td><td>La credencial no está asociada a una empresa. No ocurre con credenciales emitidas por nosotros</td><td>403</td><td><code>SIN_EMPRESA</code></td></tr>
+<tr><td class="num">4</td><td>La credencial no tiene usuario de servicio. No ocurre con credenciales emitidas por nosotros</td><td>403</td><td><code>SIN_USUARIO_DE_SERVICIO</code></td></tr>
 <tr><td class="num">5</td><td>El pedido no es <code>multipart/form-data</code></td><td>415</td><td><code>ENVIO_NO_MULTIPART</code></td></tr>
-<tr><td class="num">6</td><td>El cuerpo está mal formado o cortado, o trae más de una parte <code>archivo</code></td><td>400</td><td><code>ENVIO_INVALIDO</code></td></tr>
+<tr><td class="num">6</td><td>El cuerpo está mal formado o cortado, o trae más de una parte de archivo, sea cual sea su nombre (por ejemplo, la <code>cuenta</code> enviada como archivo)</td><td>400</td><td><code>ENVIO_INVALIDO</code></td></tr>
 <tr><td class="num">7</td><td>Falta la parte <code>archivo</code>, o llegó vacía</td><td>400</td><td><code>FALTA_ARCHIVO</code></td></tr>
 <tr><td class="num">8</td><td>El archivo pesa más de 60 MB</td><td>413</td><td><code>ARCHIVO_DEMASIADO_GRANDE</code></td></tr>
 <tr><td class="num">9</td><td>La parte <code>cuenta</code> no es un JSON válido, no es un objeto o pasa de 64 KB</td><td>400</td><td><code>CUENTA_INVALIDA</code>, con <code>"campo": null</code></td></tr>
@@ -360,9 +362,13 @@ autenticación va antes de leer el cuerpo.</p>
 </tbody>
 </table></div>
 
-<p>Un archivo de exactamente 60 MB se acepta. Si el <code>archivo</code> va sin
-<code>filename</code>, AgilBank lo toma como un campo de texto y el tope de 64 KB lo corta: envíen
-siempre el <code>filename</code>.</p>
+<p>Un archivo de exactamente 60 MB se acepta.</p>
+
+<p>Manden siempre el archivo con su nombre (<code>filename</code>). Una parte <code>archivo</code> sin
+<code>filename</code> y sin <code>Content-Type: application/octet-stream</code> llega como texto: si
+pasa de 64 KB, la respuesta es 400 <code>ENVIO_INVALIDO</code>; si no, su contenido se toma como
+texto UTF-8 y un archivo binario se corrompe. Con <code>Content-Type: application/octet-stream</code>
+la parte es un archivo aunque no tenga <code>filename</code>.</p>
 
 <h2><span class="nro">05</span> Consultar un extracto</h2>
 
@@ -379,19 +385,20 @@ guardó el <code>idExtracto</code>. La huella son 64 caracteres hexadecimales; a
 <tbody>
 <tr><td><code>en-proceso</code></td><td>Todavía se está leyendo. Incluye los reintentos internos: el extracto no pasa a <code>fallido</code> mientras se reintenta</td><td><code>reintentarEn</code>: los segundos que conviene esperar para preguntar de nuevo (5)</td></tr>
 <tr><td><code>leido</code></td><td>La lectura terminó, con cualquier veredicto, también <code>sin-lectura</code> y <code>no-disponible</code></td><td><code>lectura</code>, siempre (sección 06)</td></tr>
-<tr><td><code>fallido</code></td><td>AgilBank no pudo terminar la lectura por un error interno, y agotó los reintentos. No es una conclusión sobre el archivo</td><td>Ninguna. Enviar el mismo archivo otra vez lo lee de nuevo</td></tr>
+<tr><td><code>fallido</code></td><td>AgilBank no pudo terminar la lectura por un error interno: agotó los reintentos o no se pudo poner en cola. No es una conclusión sobre el archivo</td><td>Ninguna. Enviar el mismo archivo otra vez lo lee de nuevo</td></tr>
 </tbody>
 </table></div>
 
 <p>Pregunten cada <code>reintentarEn</code> segundos hasta que el estado deje de ser
-<code>en-proceso</code>.</p>
+<code>en-proceso</code>. Si envían muchos extractos a la vez, conviene espaciar las consultas: por
+ejemplo, cada 30 segundos después de los primeros dos minutos. La instalación tiene un cupo de
+pedidos (sección 09): respeten el encabezado <code>Retry-After</code> de un 429.</p>
 
 <h4>Los errores de la consulta</h4>
 
 <ul>
 <li><b>404</b> <code>NO_ENCONTRADO</code>: no hay un extracto con ese identificador o esa huella en la empresa de la credencial. Un extracto de otra empresa responde lo mismo que uno que no existe.</li>
 <li><b>400</b> <code>HUELLA_INVALIDA</code>: la huella no tiene 64 caracteres hexadecimales.</li>
-<li><b>400</b> <code>SIN_IDENTIFICADOR</code>: falta el identificador en la ruta.</li>
 </ul>
 
 <h2><span class="nro">06</span> La lectura</h2>
@@ -468,7 +475,7 @@ guardó el <code>idExtracto</code>. La huella son 64 caracteres hexadecimales; a
 <div class="desborde"><table>
 <thead><tr><th>Campo</th><th>Qué es</th></tr></thead>
 <tbody>
-<tr><td><code>banco.codigo</code>, <code>banco.nombre</code></td><td>El código de entidad (los tres primeros dígitos del CBU) y el nombre. Si el banco todavía no está en nuestra tabla, viene el código y <code>nombre</code> en <code>null</code></td></tr>
+<tr><td><code>banco.codigo</code>, <code>banco.nombre</code></td><td>El código de entidad (los tres primeros dígitos del CBU) y el nombre. Si el banco todavía no está en nuestra tabla, viene el código y <code>nombre</code> en <code>null</code>. Si el CBU no trae un código de entidad válido, el código sale de buscar el banco que mandaron en <code>cuenta.banco</code> en nuestra tabla; si no aparece, <code>codigo</code> y <code>nombre</code> vienen en <code>null</code></td></tr>
 <tr><td><code>cuenta</code>, <code>moneda</code></td><td>Los que mandaron</td></tr>
 <tr><td><code>cbu</code></td><td>El del archivo si lo trae; si no, el que mandaron</td></tr>
 <tr><td><code>periodoDesde</code>, <code>periodoHasta</code></td><td>La fecha del primer y del último renglón. <b>Describen el archivo, no el resumen del mes</b>: un extracto diario cubre unos días y uno mensual puede cruzar de mes</td></tr>
@@ -486,7 +493,7 @@ guardó el <code>idExtracto</code>. La huella son 64 caracteres hexadecimales; a
 <tr><td><code>fecha</code>, <code>fechaValor</code></td><td>Con formato <code>AAAA-MM-DD</code>. <code>fechaValor</code> solo si el banco la informa</td></tr>
 <tr><td><code>tipo.codigo</code></td><td>El tipo canónico (anexo)</td></tr>
 <tr><td><code>tipo.segun</code></td><td>De dónde salió: <code>empresa</code> (una corrección de la empresa), <code>tabla</code> (la tabla común), <code>regla</code> (una regla general: viene con el aviso <code>concepto-nuevo</code>) o <code>ninguna</code> (quedó <code>sin-clasificar</code>)</td></tr>
-<tr><td><code>importe</code></td><td>Número con signo, desde el punto de vista del banco: positivo entra plata. Igual que en ProntoNet</td></tr>
+<tr><td><code>importe</code></td><td>Número con signo: positivo es dinero que entra a la cuenta, negativo es dinero que sale, como en ProntoNet</td></tr>
 <tr><td><code>saldo</code></td><td>El saldo de la fila, si el archivo lo trae</td></tr>
 <tr><td><code>referencia</code></td><td>El número de comprobante, de cheque o de operación, tal como lo trae el banco</td></tr>
 <tr><td><code>contraparte</code></td><td>CUIT, nombre y CBU de la otra parte, cuando el extracto los trae. El nombre puede venir cortado por el banco</td></tr>
@@ -505,13 +512,13 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <div class="desborde"><table>
 <thead><tr><th>Código</th><th>Cuándo</th><th>¿Frena las propuestas?</th></tr></thead>
 <tbody>
-<tr><td><code>no-cierra</code></td><td>El saldo inicial más los renglones no da el saldo final, o los saldos del archivo no son los que mandaron (solo si mandaron el período y el archivo lo cubre). Puede venir más de una vez</td><td>Sí</td></tr>
+<tr><td><code>no-cierra</code></td><td>El saldo inicial más los renglones no da el saldo final, o los saldos del archivo no son los que mandaron (solo si mandaron el período y el archivo lo cubre). Si el archivo no trae saldos y mandaron el período y los dos saldos, se parte del saldo inicial que mandaron y se suman los renglones: si no da el saldo final que mandaron, también sale <code>no-cierra</code>. Puede venir más de una vez</td><td>Sí</td></tr>
 <tr><td><code>varias-cuentas</code></td><td>El archivo trae movimientos de más de una cuenta. <code>datos.cuentas</code> las identifica</td><td>Sí</td></tr>
 <tr><td><code>cuenta-distinta</code></td><td>El CBU del archivo no es el que mandaron. <code>datos.cbuDelArchivo</code> y <code>datos.cbuDeProntoNet</code> dicen cuáles son</td><td>Sí</td></tr>
 <tr><td><code>sin-saldos</code></td><td>Ningún renglón se pudo controlar contra el saldo anterior: el archivo no trae saldos, trae solo los saldos inicial y final, trae un solo saldo, tiene una columna de saldo que no encadena con los importes, o sus saldos no se controlan entre sí. <code>detalle</code> dice cuál</td><td>No</td></tr>
 <tr><td><code>no-encadena</code></td><td>Hay renglones cuyo saldo no encadena con el anterior</td><td>No</td></tr>
 <tr><td><code>concepto-nuevo</code></td><td>Un concepto que no está en la tabla. <code>datos.texto</code> trae el texto del banco, <code>datos.codigo</code> su código de operación (o <code>null</code>) y <code>datos.tipo</code> lo que se propuso</td><td>No</td></tr>
-<tr><td><code>lectura-parcial</code></td><td>La lectura se cortó a mitad (tiempo o páginas). Se usa desde la lectura de PDF</td><td>No</td></tr>
+<tr><td><code>lectura-parcial</code></td><td>La lectura se cortó a mitad (por tiempo o por páginas)</td><td>No</td></tr>
 </tbody>
 </table></div>
 
@@ -523,7 +530,7 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <tr><td><code>sentido</code></td><td><code>cronologico</code> o <code>inverso</code>: si el más nuevo está arriba</td></tr>
 <tr><td><code>saldoDeLaFila</code></td><td><code>despues</code> o <code>antes</code>: si el saldo impreso es el que queda después del movimiento o el que había antes, como el saldo de apertura del día</td></tr>
 <tr><td><code>renglonesConSaldo</code>, <code>renglonesQueEncadenan</code></td><td>Cuántos renglones tienen saldo y cuántos encadenan</td></tr>
-<tr><td><code>cierraConSusSaldos</code>, <code>cierraConProntoNet</code></td><td>Si los saldos cierran con los del archivo y con los que mandaron. <code>null</code> si no hay con qué comparar</td></tr>
+<tr><td><code>cierraConSusSaldos</code>, <code>cierraConProntoNet</code></td><td>Si los saldos cierran con los del archivo y con los que mandaron. <code>null</code> si no hay con qué comparar: no mandaron el período o alguno de los dos saldos, o el archivo no cubre el período</td></tr>
 </tbody>
 </table></div>
 
@@ -532,8 +539,9 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <ul>
 <li><code>encabezado</code> y <code>controles</code> son <code>null</code> cuando el veredicto es <code>sin-lectura</code> o <code>no-disponible</code>. En ese caso <code>renglones</code> viene vacío.</li>
 <li><code>controles.saldoDeLaFila</code> es <code>null</code> cuando el archivo no trae saldos.</li>
+<li><code>banco.codigo</code> y <code>banco.nombre</code> son <code>null</code> cuando no se pudo identificar el banco (arriba).</li>
 <li><code>contraparte</code> es <code>null</code> cuando el renglón no trae ni CUIT ni CBU. Cuando viene, <code>nombre</code> puede ser <code>null</code>.</li>
-<li><code>motivo</code> es <code>null</code> salvo en <code>sin-lectura</code> y <code>no-disponible</code>.</li>
+<li><code>motivo</code> viene siempre con <code>sin-lectura</code>. Con <code>verificada</code> y <code>a-revisar</code> es <code>null</code>.</li>
 </ul>
 
 <h2><span class="nro">07</span> Las correcciones</h2>
@@ -541,7 +549,8 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <h3><span class="verbo">POST</span> <code>/api/v1/correcciones</code></h3>
 
 <p>Corrige el tipo canónico de un concepto del banco. El cuerpo es JSON, con
-<code>Content-Type: application/json</code>, en UTF-8 y sin comprimir.</p>
+<code>Content-Type: application/json</code>, en UTF-8. Sin ese encabezado el cuerpo se ignora y la
+respuesta es <code>CORRECCION_INVALIDA</code> con <code>"campo": "textoDelBanco"</code>.</p>
 
 <div class="desborde"><pre><code>{
   "banco": "191",
@@ -568,17 +577,25 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <p>La corrección vale desde la lectura siguiente, solo para su empresa. Nosotros la revisamos: lo
 confirmado pasa a la tabla común, con la versión siguiente, y les llega a todos.</p>
 
-<p>El cuerpo pesa hasta 64 KB. AgilBank valida las claves en este orden: <code>textoDelBanco</code>,
+<p>Reenviar un archivo ya leído no aplica una corrección nueva: responde 200 con la lectura anterior.
+La corrección vale desde la lectura siguiente de un archivo nuevo.</p>
+
+<p>AgilBank lee el cuerpo antes de mirar la credencial: un cuerpo demasiado grande (413), mal
+formado (400) o con una codificación no aceptada (415) responde ese error aunque la credencial no
+sea válida. El cuerpo pesa hasta 64 KB. AgilBank valida las claves en este orden: <code>textoDelBanco</code>,
 <code>tipo</code>, <code>banco</code>, <code>codigoDelBanco</code>, <code>alicuota</code>. El primer
 error se informa en <code>campo</code>. Si el cuerpo no es un objeto JSON, <code>campo</code> viene
 en <code>null</code>.</p>
 
 <h2><span class="nro">08</span> Errores</h2>
 
-<p>Todo error trae el código HTTP y un cuerpo JSON:</p>
+<p>Los errores de las rutas de esta referencia traen el código HTTP y un cuerpo JSON:</p>
 
-<div class="desborde"><pre><code>{ "codigo": "CUENTA_INVALIDA", "error": "Un dato de la cuenta no tiene la forma del contrato.",
-  "campo": "periodoDesde" }</code></pre></div>
+<div class="desborde"><pre><code>{
+  "codigo": "CUENTA_INVALIDA",
+  "error": "Un dato de la cuenta no tiene la forma del contrato.",
+  "campo": "periodoDesde"
+}</code></pre></div>
 
 <p><code>codigo</code> es estable: programen contra él. <code>error</code> es un mensaje en castellano,
 para mostrar o registrar, y puede cambiar. <code>campo</code> viene solo en <code>CUENTA_INVALIDA</code> y
@@ -588,28 +605,30 @@ problema es del cuerpo entero.</p>
 <div class="desborde"><table>
 <thead><tr><th>Código</th><th class="num">HTTP</th><th>Cuándo</th></tr></thead>
 <tbody>
-<tr><td><code>NO_AUTORIZADO</code></td><td class="num">401</td><td>La credencial falta, es inválida, venció o fue revocada, o su usuario de servicio está inactivo</td></tr>
+<tr><td><code>NO_AUTORIZADO</code></td><td class="num">401</td><td>La credencial falta, es inválida, venció o fue revocada, o se dio de baja su usuario de servicio</td></tr>
 <tr><td><code>AMBITO_INSUFICIENTE</code></td><td class="num">403</td><td>La credencial no tiene el ámbito que pide la ruta</td></tr>
-<tr><td><code>SIN_EMPRESA</code></td><td class="num">403</td><td>La credencial no está asociada a una empresa</td></tr>
-<tr><td><code>SIN_USUARIO_DE_SERVICIO</code></td><td class="num">403</td><td>Enviar o corregir con una credencial sin usuario de servicio. Las consultas no lo piden</td></tr>
+<tr><td><code>SIN_EMPRESA</code></td><td class="num">403</td><td>La credencial no está asociada a una empresa. No ocurre con credenciales emitidas por nosotros</td></tr>
+<tr><td><code>SIN_USUARIO_DE_SERVICIO</code></td><td class="num">403</td><td>Enviar o corregir con una credencial sin usuario de servicio. Las consultas no lo piden. No ocurre con credenciales emitidas por nosotros</td></tr>
 <tr><td><code>ENVIO_NO_MULTIPART</code></td><td class="num">415</td><td>El envío del extracto no es <code>multipart/form-data</code></td></tr>
-<tr><td><code>ENVIO_INVALIDO</code></td><td class="num">400</td><td>El cuerpo del envío está mal formado o cortado, o trae más de una parte <code>archivo</code></td></tr>
+<tr><td><code>ENVIO_INVALIDO</code></td><td class="num">400</td><td>El cuerpo del envío está mal formado o cortado, o trae más de una parte de archivo, sea cual sea su nombre</td></tr>
 <tr><td><code>FALTA_ARCHIVO</code></td><td class="num">400</td><td>Falta la parte <code>archivo</code>, o llegó vacía</td></tr>
 <tr><td><code>ARCHIVO_DEMASIADO_GRANDE</code></td><td class="num">413</td><td>El archivo pesa más de 60 MB</td></tr>
 <tr><td><code>CUENTA_INVALIDA</code></td><td class="num">400</td><td>La parte <code>cuenta</code> no es un JSON válido o un dato no tiene la forma indicada. Trae <code>campo</code></td></tr>
 <tr><td><code>HUELLA_INVALIDA</code></td><td class="num">400</td><td>La huella de la ruta no son 64 caracteres hexadecimales</td></tr>
-<tr><td><code>SIN_IDENTIFICADOR</code></td><td class="num">400</td><td>Falta el identificador del extracto en la ruta</td></tr>
 <tr><td><code>NO_ENCONTRADO</code></td><td class="num">404</td><td>No hay un extracto con ese identificador o esa huella en la empresa de la credencial</td></tr>
 <tr><td><code>CORRECCION_INVALIDA</code></td><td class="num">400</td><td>La corrección no tiene la forma indicada, el cuerpo no es un JSON válido o llegó incompleto. Trae <code>campo</code></td></tr>
 <tr><td><code>CUERPO_DEMASIADO_GRANDE</code></td><td class="num">413</td><td>El cuerpo de la corrección pesa más de 64 KB</td></tr>
-<tr><td><code>CUERPO_NO_SOPORTADO</code></td><td class="num">415</td><td>El cuerpo de la corrección usa una codificación o un juego de caracteres que no se acepta: JSON en UTF-8, sin comprimir</td></tr>
+<tr><td><code>CUERPO_NO_SOPORTADO</code></td><td class="num">415</td><td>El cuerpo de la corrección usa una codificación de contenido o un juego de caracteres que no se acepta. Se acepta JSON en UTF-8</td></tr>
 <tr><td><code>ERROR_INTERNO</code></td><td class="num">500</td><td>Una falla de AgilBank. Siempre trae el mensaje «No se pudo completar el pedido.» El pedido se puede repetir</td></tr>
 </tbody>
 </table></div>
 
-<p>La plataforma también puede responder <b>429</b> cuando llegan demasiados pedidos. Esa respuesta
-no trae <code>codigo</code> y sí el encabezado <code>Retry-After</code>, con los segundos que hay que
-esperar.</p>
+<p>Dos respuestas llegan sin <code>codigo</code>:</p>
+
+<ul>
+<li><b>429</b>, cuando se pasa el cupo de pedidos (sección 09). Trae el encabezado <code>Retry-After</code>, con los segundos que faltan para que se reinicie la ventana, y el cuerpo <code>{ "error": "Too many requests, please try again later." }</code>, en inglés.</li>
+<li><b>404</b> de una ruta que no existe. En un <code>GET</code> el cuerpo es <code>{ "error": "Not found", "message": … }</code>. Con otros verbos, la respuesta es la página de error del servidor web, no JSON.</li>
+</ul>
 
 <h2><span class="nro">09</span> Límites</h2>
 
@@ -618,12 +637,13 @@ esperar.</p>
 <tbody>
 <tr><td>El archivo de un extracto</td><td>60 MB. Uno de exactamente 60 MB se acepta</td></tr>
 <tr><td>Una parte de texto del envío (<code>cuenta</code>, <code>nombre</code>)</td><td>64 KB</td></tr>
-<tr><td>Las partes <code>archivo</code> de un envío</td><td>Una</td></tr>
+<tr><td>Las partes de archivo de un envío</td><td>Una</td></tr>
 <tr><td>Un dato de texto de la <code>cuenta</code></td><td>200 caracteres</td></tr>
 <tr><td>El cuerpo de una corrección</td><td>64 KB</td></tr>
 <tr><td><code>textoDelBanco</code>, <code>banco</code>, <code>codigoDelBanco</code></td><td>500, 10 y 50 caracteres</td></tr>
 <tr><td><code>alicuota</code></td><td>De 0 a 100</td></tr>
-<tr><td>Renglones por extracto</td><td>La meta de diseño es 1.500. No hay un tope en esa cantidad: se rechaza por tamaño, como se indica abajo</td></tr>
+<tr><td>Pedidos a la API</td><td>Un cupo por instalación, por dirección IP, en ventanas de 15 minutos. El valor lo informamos al dar de alta la credencial. Al pasarlo, la respuesta es 429 con <code>Retry-After</code></td></tr>
+<tr><td>Renglones por extracto</td><td>No hay un tope en la cantidad. Un archivo que pasa los topes de tamaño de abajo vuelve <code>leido</code> con el veredicto <code>sin-lectura</code> y su motivo; no hay un rechazo HTTP</td></tr>
 </tbody>
 </table></div>
 
@@ -637,7 +657,7 @@ esperar.</p>
 <li>un «XLS» de HTML o XML 2003 con más de 20 MB, 100.000 celdas o 2.000 celdas combinadas.</li>
 </ul>
 
-<p>Un extracto diario se lee en menos de un minuto.</p>
+<p>Un extracto diario suele leerse en menos de un minuto. No es un plazo: consulten hasta que el estado deje de ser <code>en-proceso</code>.</p>
 
 <h2><span class="nro">10</span> Anexo: los tipos canónicos</h2>
 
