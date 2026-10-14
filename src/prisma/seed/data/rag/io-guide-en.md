@@ -26,7 +26,7 @@ iO is the query engine for this system. It allows querying internal data and ind
 #### AbStatement
 
 
-**Queryable fields:** file, originalName, contentHash, status, verdict, bankCode, cbu, periodFrom, periodTo, openingBalance, closingBalance, lineCount, declaredAccount, reading, error, processedAt
+**Queryable fields:** file, originalName, contentHash, status, verdict, bankCode, cbu, periodFrom, periodTo, openingBalance, closingBalance, lineCount, declaredAccount, reading, error, processedAt, readStarts
 
 **Relations:** N/A
 

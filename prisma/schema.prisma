@@ -201,6 +201,7 @@ model AbStatement {
   reading Json?
   error String?
   processedAt DateTime? @map("processed_at")
+  readStarts Int  @default(0) @map("read_starts")
 
   @@unique([tenant_id_, contentHash])
   @@index([tenant_id_, createdAt_])

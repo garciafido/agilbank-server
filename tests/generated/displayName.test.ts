@@ -55,6 +55,7 @@ const MODEL: Record<
       reading: { type: "Json", nullable: true },
       error: { type: "String", nullable: true },
       processedAt: { type: "DateTime", nullable: true },
+      readStarts: { type: "Int", nullable: false },
     },
     relations: {},
   },

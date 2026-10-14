@@ -221,6 +221,17 @@
           "groupable": false
         },
         {
+          "name": "readStarts",
+          "type": "Int",
+          "labels": {
+            "es": {
+              "s": "Arranques",
+              "p": "Lecturas empezadas que no terminaron en error"
+            }
+          },
+          "groupable": false
+        },
+        {
           "name": "createdAt_",
           "type": "DateTime",
           "labels": {

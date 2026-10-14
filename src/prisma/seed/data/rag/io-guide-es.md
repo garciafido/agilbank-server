@@ -26,7 +26,7 @@ iO es el motor de consultas de este sistema. Permite consultar datos internos y 
 #### Extracto Bancario
 Un extracto bancario tal como lo entregó el banco, y su lectura llevada al resumen bancario canónico.
 
-**Campos consultables:** Archivo, Nombre, Huella del Archivo, Estado, Veredicto, Banco, CBU, Desde, Hasta, Saldo Inicial, Saldo Final, Renglones, Cuenta Declarada, Lectura, Error, Leído el
+**Campos consultables:** Archivo, Nombre, Huella del Archivo, Estado, Veredicto, Banco, CBU, Desde, Hasta, Saldo Inicial, Saldo Final, Renglones, Cuenta Declarada, Lectura, Error, Leído el, Arranques
 
 **Relaciones:** N/A
 
