@@ -696,6 +696,15 @@ export interface HaikuThemeConfig {
     loginBackground?: Hex;
     /** El color de los enlaces de esa pantalla. Ausente ⇒ el principal. */
     loginLink?: Hex;
+    /**
+     * `false`: las páginas públicas (la verificación de email y la validación de
+     * datos) van sin tarjeta, con el contenido directamente sobre
+     * `loginBackground` y un tema propio para ese fondo, que se mide como el
+     * resto (pares `publicFrame.*`, ver `design/publicFrame.ts`). Exige
+     * `loginBackground`. Ausente ⇒ la tarjeta sobre el color de marca, como
+     * siempre.
+     */
+    publicCard?: boolean;
   };
   /**
    * Un segundo tema que solo ve una audiencia acotada.

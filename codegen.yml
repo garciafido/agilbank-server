@@ -11,7 +11,9 @@ generates:
 config:
   scalars:
     DateTime: string
-    Date: string
+    Date:
+      input: Date
+      output: Date | string
     Json: any
     Decimal: number
   enumsAsConst: true

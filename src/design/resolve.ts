@@ -576,9 +576,16 @@ export function resolveTheme(
   // `Preset.contrastExceptions`), y se funde con la del proyecto sin pisarla —
   // las dos listas entran a la MISMA comprobación, así que un par sobrante en
   // cualquiera de las dos se denuncia igual, no solo en la del config.
+  //
+  // Las de los pares `publicFrame.*` no entran: son del marco de las páginas
+  // públicas, que se mide aparte (`design/publicFrame.ts`, fuera del kit del
+  // banco); acá quedarían siempre como sobrantes. El prefijo va escrito y no
+  // importado por eso mismo: este archivo viaja al kit y aquel no.
   const exceptions = [
     ...(preset.contrastExceptions ?? []),
-    ...(config.contrast?.exceptions ?? []),
+    ...(config.contrast?.exceptions ?? []).filter(
+      (e) => !e.pair.startsWith("publicFrame.")
+    ),
   ];
   const report = checkPairs(
     [

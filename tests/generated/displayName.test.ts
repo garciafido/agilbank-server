@@ -356,7 +356,7 @@ const SERVER_ONLY: Array<Server & { why: string }> = [];
 
 const ALL: Server[] = [...COMPARED, ...SERVER_ONLY];
 
-/** Las que muestran una fecha: su texto (<entidad>DisplayId) sale en la zona del proceso, su nombre en la del proyecto. */
+/** Las que muestran un instante: su texto (<entidad>DisplayId) sale en la zona del proceso, su nombre en la del proyecto. */
 const ZONE_DEPENDENT: string[] = ["WorkerEvent"];
 
 type Variant = "lleno" | "vacío" | "en blanco";
@@ -368,10 +368,11 @@ function sample(
   column: Column,
   variant: Variant
 ): unknown {
-  // El cliente muestra 31/12/1969 para una fecha vacía (graphqlToDate(null)) y
-  // el server, el símbolo de vacío: las fechas quedan siempre con valor.
-  const date = column.type === "Date" || column.type === "DateTime";
-  if (variant === "vacío" && column.nullable && !date) return null;
+  // Un día vacío da el símbolo de vacío en el cliente y en el server, como los demás
+  // tipos. Un instante vacío no: el cliente muestra 31/12/1969 (graphqlToDateTime(null))
+  // y el server el símbolo, así que los dateTime quedan siempre con valor.
+  const instant = column.type === "DateTime";
+  if (variant === "vacío" && column.nullable && !instant) return null;
   switch (column.type) {
     case "Int":
       return 7;
@@ -380,7 +381,8 @@ function sample(
     case "Boolean":
       return true;
     case "Date":
-      return new Date("2026-03-15T12:00:00.000Z");
+      // Lo que da Prisma de una columna date: la medianoche UTC del día.
+      return new Date("2026-03-15T00:00:00.000Z");
     case "DateTime":
       return new Date("2026-03-15T14:30:00.000Z");
     case "Json":

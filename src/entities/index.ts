@@ -7,6 +7,7 @@ import { profileResolvers } from "../common/resolvers/profileResolvers";
 import { maintenanceResolvers } from "../common/resolvers/maintenance";
 import { botRunCancelResolvers } from "../common/resolvers/botRunCancel";
 import { deletionBlockersResolvers } from "../common/resolvers/deletionBlockers";
+import { DateScalar } from "../common/graphql/dateScalar";
 import { customTypeDefs, customResolvers } from "../graphql/customSchema";
 
 // Notifications
@@ -47,9 +48,9 @@ import { emailVerificationResolvers } from "./emailVerification/resolvers/emailV
 // Projections Resolvers
 
 // Pipelines Type Defs
-
+import { abStatementReadTypeDefs } from "../pipelines";
 // Pipelines Resolvers
-
+import { abStatementReadResolver } from "../pipelines";
 // Workflows Type Defs
 
 // Workflows Resolvers
@@ -74,6 +75,8 @@ const resolvers = merge(
   maintenanceResolvers,
   botRunCancelResolvers,
   deletionBlockersResolvers,
+  // El escalar Date: un día de calendario "AAAA-MM-DD" (fecha sin hora). DateTime no tiene resolver.
+  { Date: DateScalar },
 
   notificationsResolvers,
   alertsResolvers,
@@ -89,6 +92,7 @@ const resolvers = merge(
   userNotificationResolvers,
   userNotificationPreferenceResolvers,
   emailVerificationResolvers,
+  abStatementReadResolver,
   // Extensiones de schema del PROYECTO (graphql/customSchema.ts, punto de
   // extensión — servicios custom sin tocar este archivo generado).
   ...customResolvers
@@ -112,6 +116,7 @@ export const schema: GraphQLSchema = makeExecutableSchema({
     userNotificationTypeDefs,
     userNotificationPreferenceTypeDefs,
     emailVerificationTypeDefs,
+    abStatementReadTypeDefs,
     ...customTypeDefs,
   ],
   resolvers,

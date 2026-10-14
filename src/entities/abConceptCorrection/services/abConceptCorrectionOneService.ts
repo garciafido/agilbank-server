@@ -62,7 +62,9 @@ export class AbConceptCorrectionOneService {
       );
     }
 
-    const db = this.db;
+    // Lectura cross-tenant EXPLÍCITA (crossTenantForRoles onRequest): instancia
+    // derivada — valida rol, no muta contexto, no salta permisos.
+    const db = (args as any).allTenants ? this.db.forAllTenants() : this.db;
 
     // --- Specific Business Logic / Validations ---
 

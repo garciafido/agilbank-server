@@ -126,6 +126,8 @@ AbConceptCorrection: entity
   .description(es=["Lo que un usuario de la empresa marcó para un concepto del banco: su tipo canónico, o una alícuota."])
   .displayId(bankText)
   .listDisplay(bankCode, bankText, canonicalType, review)
+  # SysAdmin revisa las correcciones de todas las empresas para decidir qué pasa a la tabla común.
+  .crossTenantForRoles(SysAdmin, onRequest)
 {
   bankCode: maybe(string)
     .labels(es=["Banco", "Código de entidad, o vacío si vale para cualquier banco", "M"])

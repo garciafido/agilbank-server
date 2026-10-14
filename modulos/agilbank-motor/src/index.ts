@@ -7,3 +7,5 @@ export type {
   StatementLine, StatementReading, TypeSource, Warning, WarningCode,
 } from "./types";
 export type { Verdict } from "./verdict";
+export { agilbankRoutes, type ProductPieces, type Transport } from "./api/routes";
+export { configureBackgroundReading, markStatementFailed, readStatementStage, type BackgroundStorage } from "./backgroundReading";

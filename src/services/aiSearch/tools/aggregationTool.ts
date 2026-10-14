@@ -27,6 +27,7 @@ import {
   normalizeTemporalField,
 } from '../validators';
 import { buildPrismaCondition, sanitizeWhereClause } from '../builders';
+import { convertCalendarDateFilter, dateFilterWhere, DateFilterResult, putDateFilter } from '../builders/calendarDateFilter';
 
 interface FilterInput {
   field: string;
@@ -260,13 +261,17 @@ const GROUPBY_SETTINGS = {
  * Convert string operators on DateTime fields to proper date range queries.
  * Uses Argentina timezone (UTC-3) for date interpretation.
  */
-function convertDateTimeFilter(
+export function convertDateTimeFilter(
   operator: string,
   value: unknown
-): { converted: true; condition: unknown } | { converted: false; error?: string } {
+): DateFilterResult {
   const stringValue = String(value).trim();
 
-  if (!['contains', 'notContains', 'startsWith', 'endsWith'].includes(operator)) {
+  // equals y notEquals con un año, un mes o un día son el período, como contains y
+  // notContains (crudos, Prisma no lee "2025", "2025-06" ni "2025-06-15" como un instante).
+  const periodOperator = ['equals', 'notEquals'].includes(operator) && /^\d{4}([-/]\d{1,2}){0,2}$/.test(stringValue);
+
+  if (!periodOperator && !['contains', 'notContains', 'startsWith', 'endsWith'].includes(operator)) {
     return { converted: false };
   }
 
@@ -298,10 +303,12 @@ function convertDateTimeFilter(
     return { converted: false, error: `Invalid date format '${stringValue}'. Use YYYY, YYYY-MM, or YYYY-MM-DD.` };
   }
 
-  if (operator === 'contains' || operator === 'startsWith') {
+  if (operator === 'equals' || operator === 'contains' || operator === 'startsWith') {
     return { converted: true, condition: { gte: startDate.toISOString(), lt: endDate.toISOString() } };
-  } else if (operator === 'notContains' || operator === 'endsWith') {
-    return { converted: true, condition: { OR: [{ lt: startDate.toISOString() }, { gte: endDate.toISOString() }] } };
+  } else if (operator === 'notEquals' || operator === 'notContains' || operator === 'endsWith') {
+    // Fuera del período: va en el where como NOT (putDateFilter / dateFilterWhere); un OR
+    // dentro del filtro del campo Prisma no lo acepta.
+    return { converted: true, outside: { gte: startDate.toISOString(), lt: endDate.toISOString() } };
   }
 
   return { converted: false };
@@ -361,11 +368,21 @@ function buildWhereFromFilters(
             }
           };
         }
+      } else if (resolved.leafField.type === 'Date') {
+        // Date (día de calendario): rangos de días, sin desfase de hora.
+        const dayConversion = convertCalendarDateFilter(f.operator, f.value);
+        if (dayConversion.converted) {
+          leafCondition = dateFilterWhere(leafSegment.fieldName, dayConversion);
+        } else if ('error' in dayConversion && dayConversion.error) {
+          throw new Error(dayConversion.error);
+        } else {
+          leafCondition = { [leafSegment.fieldName]: buildPrismaCondition(f.operator, f.value) };
+        }
       } else if (isDateTimeField(resolved.leafField.type)) {
         // DateTime leaf - convert string operators
         const dateConversion = convertDateTimeFilter(f.operator, f.value);
         if (dateConversion.converted) {
-          leafCondition = { [leafSegment.fieldName]: dateConversion.condition };
+          leafCondition = dateFilterWhere(leafSegment.fieldName, dateConversion);
         } else if ('error' in dateConversion && dateConversion.error) {
           throw new Error(dateConversion.error);
         } else {
@@ -453,10 +470,20 @@ function buildWhereFromFilters(
           continue;
         }
       } else {
-        if (finalFieldMeta && isDateTimeField(finalFieldMeta.type)) {
+        if (finalFieldMeta?.type === 'Date') {
+          // Date (día de calendario): rangos de días, sin desfase de hora.
+          const dayConversion = convertCalendarDateFilter(f.operator, f.value);
+          if (dayConversion.converted) {
+            putDateFilter(current, resolvedFieldName, dayConversion);
+          } else if ('error' in dayConversion && dayConversion.error) {
+            throw new Error(dayConversion.error);
+          } else {
+            current[resolvedFieldName] = buildPrismaCondition(f.operator, f.value);
+          }
+        } else if (finalFieldMeta && isDateTimeField(finalFieldMeta.type)) {
           const dateConversion = convertDateTimeFilter(f.operator, f.value);
           if (dateConversion.converted) {
-            current[resolvedFieldName] = dateConversion.condition;
+            putDateFilter(current, resolvedFieldName, dateConversion);
           } else if ('error' in dateConversion && dateConversion.error) {
             throw new Error(dateConversion.error);
           } else {
@@ -490,10 +517,20 @@ function buildWhereFromFilters(
           [filterField]: buildPrismaCondition(f.operator, f.value),
         };
       }
+    } else if (fieldMeta.type === 'Date') {
+      // Date (día de calendario): rangos de días, sin desfase de hora.
+      const dayConversion = convertCalendarDateFilter(f.operator, f.value);
+      if (dayConversion.converted) {
+        putDateFilter(where, f.field, dayConversion);
+      } else if ('error' in dayConversion && dayConversion.error) {
+        throw new Error(dayConversion.error);
+      } else {
+        where[f.field] = buildPrismaCondition(f.operator, f.value);
+      }
     } else if (isDateTimeField(fieldMeta.type)) {
       const dateConversion = convertDateTimeFilter(f.operator, f.value);
       if (dateConversion.converted) {
-        where[f.field] = dateConversion.condition;
+        putDateFilter(where, f.field, dateConversion);
       } else if ('error' in dateConversion && dateConversion.error) {
         throw new Error(dateConversion.error);
       } else {

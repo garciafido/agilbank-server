@@ -3,7 +3,14 @@
 // El nombre visible tal como lo arma el cliente: para cada entidad, la misma
 // expresión que <entidad>DisplayId en <Entidad>CommonStore.ts del cliente, con
 // sus funciones de fechas (en la zona del proyecto, como un navegador en esa
-// zona) y su símbolo de vacío. Lo usa displayName.test.ts.
+// zona) y su símbolo de vacío. Lo usa displayName.test.ts. El día de calendario
+// (graphqlToCalendarDate) usa los ayudantes del server, que siguen las mismas reglas
+// que los del cliente (common/calendarDate.ts).
+
+import {
+  diaDeCalendario,
+  formatearDia,
+} from "../../src/common/utils/calendarDate";
 
 export type ClientLanguage = "es";
 
@@ -55,6 +62,20 @@ export const graphqlToDate = (date: string | Date) => {
     month: "2-digit",
     day: "2-digit",
   });
+};
+
+/**
+ * Un día de calendario (un campo date, "AAAA-MM-DD") como DD/MM/AAAA, sin pasar por
+ * la zona del navegador (common/calendarDate.ts). Un Date o un ISO con hora de un dato
+ * viejo dan su día UTC. Sin valor, "..." (el nombre visible no la llama con un vacío:
+ * pone el símbolo de vacío, como el server). Es el nombre visible de un date: el
+ * server lo arma igual (graphqlToDate de su conversions.ts).
+ */
+export const graphqlToCalendarDate = (
+  date: string | Date | null | undefined
+) => {
+  const day = diaDeCalendario(date);
+  return day === null ? "..." : formatearDia(day, "es-AR");
 };
 
 export function abStatementDisplayId(

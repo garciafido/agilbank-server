@@ -1,0 +1,2 @@
+# Specs y planes internos: no viajan a modulos/ de los productos (git archive los saltea).
+docs/superpowers export-ignore

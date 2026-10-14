@@ -6,6 +6,7 @@ type AbConceptCorrection {
   createdBy_: User!
   lastUpdatedAt_: DateTime
   lastUpdatedBy_: User
+  tenant_id_: String
   bankCode: String
   operationCode: String
   bankText: String!
@@ -42,18 +43,20 @@ extend type Mutation {
 }
 
 extend type Query {
-  abConceptCorrectionOne(id: String!): AbConceptCorrection!
+  abConceptCorrectionOne(id: String!, allTenants: Boolean): AbConceptCorrection!
   abConceptCorrectionListWithOffset(
     where: AbConceptCorrection_Filter
     orderBy: [AbConceptCorrection_OrderBy!]
     offset: Int!
     take: Int!
+    allTenants: Boolean
   ): [AbConceptCorrection]!
   abConceptCorrectionListWithCursor(
     where: AbConceptCorrection_Filter
     orderBy: AbConceptCorrection_OrderByCursor!
     cursorKey: String
     take: Int!
+    allTenants: Boolean
   ): [AbConceptCorrection]!
 }
 

@@ -8,6 +8,8 @@
 // Server imports from: ./index (has typeDefs, resolvers)
 // Worker imports from: ./registry (services only)
 
+import { AbStatementReadPipelineService } from "./abStatementRead/abStatementReadService";
+
 // Temporary stub for EditionGenerateFinalPipelineService
 class EditionGenerateFinalPipelineService {
   constructor(_prisma: any, _schemaMetaStore: any) {}
@@ -32,6 +34,7 @@ class EditionGenerateFinalPipelineService {
  * that esbuild cannot resolve.
  */
 export const pipelineServiceRegistry: Record<string, any> = {
+  AbStatementRead: AbStatementReadPipelineService,
   EditionGenerateFinal: EditionGenerateFinalPipelineService,
 };
 
@@ -40,4 +43,19 @@ export const pipelineServiceRegistry: Record<string, any> = {
  * Metadata-only (no imports). Consumed by WorkerEventRetryService to validate/dispatch
  * manual retries. Pipelines without a retry policy are absent → not retryable.
  */
-export const retryPolicyRegistry: Record<string, any> = {};
+export const retryPolicyRegistry: Record<string, any> = {
+  AbStatementRead: {
+    modes: ["stored"],
+    retryableStates: ["failed", "dead_letter"],
+    maxManualRetries: 3,
+    editableFields: [],
+    maxAttempts: 3,
+    backoff: {
+      kind: "exponential",
+      baseSeconds: 30,
+      factor: 3,
+      capSeconds: 300,
+      jitter: true,
+    },
+  },
+};
