@@ -1,0 +1,685 @@
+<meta charset="utf-8">
+<title>API de AgilBank</title>
+<style>
+/* Hoja privada de este documento. Las clases van en castellano porque nombran
+ * roles editoriales, no mecanismos. Misma convención que revision-imputacion.html. */
+
+:root {
+  --tinta: #141a1f;
+  --tinta-suave: #55636c;
+  --papel: #f7f5f0;
+  --papel-alto: #fffefb;
+  --linea: #ddd8cf;
+  --acento: #0f6f6c;
+  --acento-tenue: #e3efee;
+  --senal: #9c4f18;
+  --senal-tenue: #f6e9df;
+  --codigo-fondo: #eceae4;
+
+  --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --tinta: #e6e4de; --tinta-suave: #9aa6ad; --papel: #14171a;
+    --papel-alto: #1b1f23; --linea: #2e3439; --acento: #56b7b1;
+    --acento-tenue: #16302f; --senal: #d9924f; --senal-tenue: #2e2318;
+    --codigo-fondo: #1e2226;
+  }
+}
+
+:root[data-theme="dark"] {
+  --tinta: #e6e4de; --tinta-suave: #9aa6ad; --papel: #14171a;
+  --papel-alto: #1b1f23; --linea: #2e3439; --acento: #56b7b1;
+  --acento-tenue: #16302f; --senal: #d9924f; --senal-tenue: #2e2318;
+  --codigo-fondo: #1e2226;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0; background: var(--papel); color: var(--tinta);
+  font-family: var(--sans); font-size: 16.5px; line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hoja { max-width: 54rem; margin: 0 auto; padding: 4rem 1.75rem 6rem; }
+
+.portada { border-bottom: 2px solid var(--tinta); padding-bottom: 2rem; margin-bottom: 3rem; }
+
+.rotulo {
+  font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--acento); margin: 0 0 0.9rem;
+}
+
+h1 {
+  font-family: var(--serif); font-size: clamp(2rem, 5vw, 2.9rem);
+  line-height: 1.1; font-weight: 600; margin: 0 0 1rem; text-wrap: balance;
+}
+
+.bajada { font-size: 1.08rem; color: var(--tinta-suave); margin: 0; max-width: 44rem; }
+
+h2 {
+  font-family: var(--serif); font-size: 1.7rem; font-weight: 600;
+  line-height: 1.2; margin: 3.5rem 0 0.4rem; text-wrap: balance;
+  display: flex; align-items: baseline; gap: 0.7rem;
+}
+
+h2 .nro {
+  font-family: var(--mono); font-size: 0.95rem; font-weight: 400;
+  color: var(--acento); flex: none; padding-top: 0.25rem;
+}
+
+h3 {
+  font-family: var(--sans); font-size: 1.02rem; font-weight: 650;
+  letter-spacing: -0.005em; margin: 2.4rem 0 0.3rem;
+}
+
+h3 .verbo {
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em;
+  background: var(--acento); color: var(--papel-alto);
+  padding: 0.13em 0.5em; border-radius: 3px; margin-right: 0.5rem;
+  vertical-align: 0.09em;
+}
+
+h4 {
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--tinta-suave);
+  margin: 1.8rem 0 0.4rem; font-weight: 500;
+}
+
+p { margin: 0.75rem 0; max-width: 44rem; }
+ul, ol { margin: 0.75rem 0; padding-left: 1.3rem; max-width: 44rem; }
+li { margin: 0.35rem 0; }
+
+a { color: var(--acento); text-underline-offset: 0.16em; }
+strong, b { font-weight: 650; }
+
+blockquote {
+  margin: 0.9rem 0 0.9rem 1rem; padding-left: 1rem;
+  border-left: 2px solid var(--acento); font-style: italic;
+  color: var(--tinta-suave); max-width: 42rem;
+}
+
+code {
+  font-family: var(--mono); font-size: 0.855em; background: var(--codigo-fondo);
+  padding: 0.1em 0.34em; border-radius: 3px;
+}
+
+pre {
+  background: var(--codigo-fondo); border-left: 2px solid var(--acento);
+  padding: 0.95rem 1.1rem; overflow-x: auto; margin: 1rem 0;
+  font-size: 0.83rem; line-height: 1.55;
+}
+
+pre code { background: none; padding: 0; font-size: 1em; }
+.cmt { color: var(--tinta-suave); font-style: italic; }
+
+.prueba {
+  border-left: 2px solid var(--linea); padding: 0.15rem 0 0.15rem 1rem;
+  margin: 1rem 0; color: var(--tinta-suave); font-size: 0.94rem;
+}
+
+.prueba b { color: var(--tinta); font-weight: 650; }
+
+.limite, .nota {
+  border-radius: 4px; padding: 0.95rem 1.15rem; margin: 1.4rem 0; font-size: 0.95rem;
+}
+
+.limite { background: var(--senal-tenue); border-left: 3px solid var(--senal); }
+.nota { background: var(--acento-tenue); border-left: 3px solid var(--acento); }
+.limite > :first-child, .nota > :first-child { margin-top: 0; }
+.limite > :last-child, .nota > :last-child { margin-bottom: 0; }
+.limite b { color: var(--senal); }
+
+.desborde { overflow-x: auto; margin: 1.2rem 0; }
+
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; background: var(--papel-alto); }
+
+th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--linea); vertical-align: top; }
+
+th {
+  font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--tinta-suave); font-weight: 500;
+  border-bottom: 1px solid var(--tinta-suave); white-space: nowrap;
+}
+
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+th.num { text-align: right; }
+td code { white-space: nowrap; }
+tbody tr:last-child td { border-bottom: none; }
+
+.oblig {
+  font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--senal); white-space: nowrap;
+}
+
+.pie {
+  margin-top: 4rem; padding-top: 1.2rem; border-top: 1px solid var(--linea);
+  font-size: 0.85rem; color: var(--tinta-suave);
+}
+
+hr { border: none; border-top: 1px solid var(--linea); margin: 3rem 0 0; }
+
+/* Impresión: este documento se manda en PDF. */
+@page { size: A4; margin: 16mm 15mm; }
+@media print {
+  body { font-size: 10.5pt; line-height: 1.5; }
+  .hoja { max-width: none; padding: 0; }
+  .portada { margin-bottom: 1.5rem; padding-bottom: 1.2rem; }
+  h2 { margin-top: 1.8rem; }
+  .desborde { overflow: visible; }
+  h2, h3 { break-after: avoid; }
+  tr, pre, li { break-inside: avoid; }
+}
+</style>
+<div class="hoja">
+
+<header class="portada">
+<p class="rotulo">Para el área de sistemas de BDL · 14-10-2026</p>
+<h1>API de AgilBank</h1>
+<p class="bajada">Referencia para enviar extractos bancarios a AgilBank, consultar su lectura y
+enviar las correcciones de tipos. Describe cada ruta, cada campo y cada error.</p>
+</header>
+
+<h2><span class="nro">01</span> En pocas palabras</h2>
+
+<p>La API funciona de servidor a servidor. ProntoNet envía el extracto tal como lo entregó el
+banco. AgilBank lo lee y devuelve el resumen bancario canónico: el encabezado, cada renglón con su
+tipo y los controles de saldos.</p>
+
+<p>La empresa sale de la credencial. Ningún pedido lleva el identificador de la empresa, y lo de una
+empresa nunca se ve ni se usa desde otra.</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Ruta</th><th>Qué hace</th><th>Ámbito</th></tr></thead>
+<tbody>
+<tr><td><code>POST /api/v1/extractos</code></td><td>Envía un extracto</td><td><code>ab:leer</code></td></tr>
+<tr><td><code>GET /api/v1/extractos/{idExtracto}</code></td><td>Consulta un extracto por su identificador</td><td><code>ab:leer</code></td></tr>
+<tr><td><code>GET /api/v1/extractos/por-huella/{huella}</code></td><td>Consulta un extracto por la huella de su archivo</td><td><code>ab:leer</code></td></tr>
+<tr><td><code>POST /api/v1/correcciones</code></td><td>Corrige el tipo de un concepto del banco</td><td><code>ab:corregir</code></td></tr>
+</tbody>
+</table></div>
+
+<p>Las respuestas son JSON en UTF-8. Las claves, las rutas, los códigos de error y los mensajes
+están en castellano.</p>
+
+<h2><span class="nro">02</span> Autenticación</h2>
+
+<p>Cada instalación tiene su credencial. La credencial viaja en cada pedido:</p>
+
+<div class="desborde"><pre><code>Authorization: Bearer &lt;credencial&gt;</code></pre></div>
+
+<table>
+<thead><tr><th>Ámbito</th><th>Permite</th></tr></thead>
+<tbody>
+<tr><td><code>ab:leer</code></td><td>Enviar extractos y consultarlos</td></tr>
+<tr><td><code>ab:corregir</code></td><td>Enviar correcciones de tipos</td></tr>
+</tbody>
+</table>
+
+<p>La credencial pertenece a una empresa. Para enviar un extracto o una corrección, la credencial
+también necesita un usuario de servicio. Para consultar no hace falta.</p>
+
+<p>Una credencial con los dos ámbitos se emite desde la consola de la instalación:</p>
+
+<div class="desborde"><pre><code>node dist/admin/integrationCli.js issue --tenant "&lt;empresa&gt;" --user &lt;email&gt; \
+  --name "&lt;sistema&gt;" --scopes "ab:leer ab:corregir" --expires AAAA-MM-DD</code></pre></div>
+
+<p>El token se muestra una sola vez. Guárdenlo en una variable de entorno o en un gestor de
+secretos, no en el código.</p>
+
+<h2><span class="nro">03</span> El circuito</h2>
+
+<div class="desborde"><pre><code>  ProntoNet                              AgilBank
+
+  1  Envía el extracto y la cuenta  -->  Responde 202 con el idExtracto
+                                         y empieza a leer
+
+  2  Consulta el extracto cada      -->  en-proceso
+     reintentarEn segundos          &lt;--  leido, con la lectura
+
+  3  Descarta los renglones que ya tenía, por su id, y asigna cada
+     renglón nuevo al resumen del mes por su fecha
+
+  4  Corrige el tipo de un concepto -->  Vale desde la lectura siguiente
+     cuando no corresponde               solo para su empresa</code></pre></div>
+
+<p>El extracto se puede enviar todos los días. El identificador de cada renglón es estable, y
+con él ProntoNet descarta lo que ya tenía.</p>
+
+<h2><span class="nro">04</span> Enviar un extracto</h2>
+
+<h3><span class="verbo">POST</span> <code>/api/v1/extractos</code></h3>
+
+<p>El cuerpo es <code>multipart/form-data</code> con tres partes:</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Parte</th><th>Obligatoria</th><th>Qué es</th></tr></thead>
+<tbody>
+<tr><td><code>archivo</code></td><td><span class="oblig">Sí</span></td><td>El extracto, tal como lo entregó el banco. Una sola parte <code>archivo</code> por pedido, con su nombre de archivo (<code>filename</code>). Hasta 60 MB</td></tr>
+<tr><td><code>cuenta</code></td><td>No</td><td>JSON con lo que ProntoNet sabe de la cuenta. Hasta 64 KB. Se describe abajo</td></tr>
+<tr><td><code>nombre</code></td><td>No</td><td>El nombre original del archivo. Si falta, se usa el del <code>filename</code>. Se guarda solo el nombre base, sin carpetas</td></tr>
+</tbody>
+</table></div>
+
+<p>La parte <code>cuenta</code> puede ir antes o después del <code>archivo</code>.</p>
+
+<h4>La cuenta</h4>
+
+<p>Todas las claves son opcionales y pueden ir en <code>null</code>. Cuantos más datos se
+envían, más se controla. Las claves que no figuran en la tabla se ignoran.</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Clave</th><th>Tipo</th><th>Qué es</th></tr></thead>
+<tbody>
+<tr><td><code>banco</code></td><td>texto, hasta 200 caracteres</td><td>El nombre del banco</td></tr>
+<tr><td><code>numero</code></td><td>texto, hasta 200 caracteres</td><td>El número de la cuenta, como lo lleva ProntoNet</td></tr>
+<tr><td><code>cbu</code></td><td>texto, hasta 200 caracteres</td><td>El CBU de la cuenta</td></tr>
+<tr><td><code>moneda</code></td><td>texto, hasta 200 caracteres</td><td>La moneda de la cuenta</td></tr>
+<tr><td><code>periodoDesde</code></td><td>fecha real <code>AAAA-MM-DD</code></td><td>El primer día del período que ProntoNet espera</td></tr>
+<tr><td><code>periodoHasta</code></td><td>fecha real <code>AAAA-MM-DD</code></td><td>El último día de ese período</td></tr>
+<tr><td><code>saldoInicial</code></td><td>número</td><td>El saldo al inicio del período, con punto decimal</td></tr>
+<tr><td><code>saldoFinal</code></td><td>número</td><td>El saldo al cierre del período, con punto decimal</td></tr>
+</tbody>
+</table></div>
+
+<div class="desborde"><pre><code>{
+  "banco": "BANCO CREDICOOP CENTRAL",
+  "numero": "CTA CTE. PESOS $ 191-001-055555/5",
+  "cbu": "1910001800005555555555",
+  "moneda": "Pesos",
+  "periodoDesde": "2026-07-01",
+  "periodoHasta": "2026-07-31",
+  "saldoInicial": 1250432.15,
+  "saldoFinal": 980432.10
+}</code></pre></div>
+
+<div class="nota">
+<p><b>Dos cuidados.</b> Si envían los saldos, envíen también el período: sin período, los saldos
+no se comparan. Y envíen siempre la misma identificación de la cuenta, el CBU o el número: el
+identificador de cada renglón depende de ella.</p>
+</div>
+
+<h4>La respuesta</h4>
+
+<p><b>202</b>. El extracto quedó recibido y se lee en segundo plano.</p>
+
+<div class="desborde"><pre><code>{ "idExtracto": "…", "huella": "…", "estado": "en-proceso" }</code></pre></div>
+
+<p>La <code>huella</code> es el SHA-256 del archivo, en hexadecimal minúscula. ProntoNet puede
+calcularla antes de enviar.</p>
+
+<h4>El reenvío de un archivo</h4>
+
+<p>Un archivo es el mismo si tiene la misma huella y es de la misma empresa. AgilBank no lo lee de
+nuevo.</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Estado del envío anterior</th><th>Respuesta</th></tr></thead>
+<tbody>
+<tr><td><code>en-proceso</code>, o <code>leido</code> con cualquier veredicto salvo <code>no-disponible</code></td><td><b>200</b> con el estado actual, igual que una consulta. Con <code>en-proceso</code> trae <code>reintentarEn</code></td></tr>
+<tr><td><code>fallido</code></td><td><b>202</b> con el mismo <code>idExtracto</code> y <code>"estado": "en-proceso"</code>. Se lee de nuevo</td></tr>
+<tr><td><code>leido</code> con veredicto <code>no-disponible</code></td><td><b>202</b>, igual que el anterior. Se lee de nuevo</td></tr>
+</tbody>
+</table></div>
+
+<p>Esos dos estados dependen de una falla de AgilBank y no dicen nada del archivo. Por eso el
+reenvío los lee de nuevo. La lectura usa siempre la <code>cuenta</code> del primer envío; la
+<code>cuenta</code> de un reenvío se ignora.</p>
+
+<p>Si dos envíos del mismo archivo llegan a la vez, uno recibe 202 y el otro 200, con el mismo
+<code>idExtracto</code>. Si AgilBank no puede dejar la lectura en cola, responde 500 y el extracto
+queda <code>fallido</code>: enviar el mismo archivo otra vez lo lee de nuevo.</p>
+
+<h4>Formatos</h4>
+
+<p>XLSX, XLS, CSV y TXT. También el «XLS» que en realidad es una tabla HTML o una planilla XML 2003.
+PDF, JPG y PNG todavía no se leen: vuelven con el veredicto <code>sin-lectura</code> y el motivo.</p>
+
+<h4>Los controles del envío</h4>
+
+<p>AgilBank controla el pedido en este orden y responde con el primer error que encuentra. La
+autenticación va antes de leer el cuerpo.</p>
+
+<div class="desborde"><table>
+<thead><tr><th class="num">#</th><th>Control</th><th>HTTP</th><th>Código</th></tr></thead>
+<tbody>
+<tr><td class="num">1</td><td>La credencial falta, es inválida, venció o fue revocada, o su usuario de servicio está inactivo</td><td>401</td><td><code>NO_AUTORIZADO</code></td></tr>
+<tr><td class="num">2</td><td>La credencial no tiene el ámbito <code>ab:leer</code></td><td>403</td><td><code>AMBITO_INSUFICIENTE</code></td></tr>
+<tr><td class="num">3</td><td>La credencial no está asociada a una empresa</td><td>403</td><td><code>SIN_EMPRESA</code></td></tr>
+<tr><td class="num">4</td><td>La credencial no tiene usuario de servicio</td><td>403</td><td><code>SIN_USUARIO_DE_SERVICIO</code></td></tr>
+<tr><td class="num">5</td><td>El pedido no es <code>multipart/form-data</code></td><td>415</td><td><code>ENVIO_NO_MULTIPART</code></td></tr>
+<tr><td class="num">6</td><td>El cuerpo está mal formado o cortado, o trae más de una parte <code>archivo</code></td><td>400</td><td><code>ENVIO_INVALIDO</code></td></tr>
+<tr><td class="num">7</td><td>Falta la parte <code>archivo</code>, o llegó vacía</td><td>400</td><td><code>FALTA_ARCHIVO</code></td></tr>
+<tr><td class="num">8</td><td>El archivo pesa más de 60 MB</td><td>413</td><td><code>ARCHIVO_DEMASIADO_GRANDE</code></td></tr>
+<tr><td class="num">9</td><td>La parte <code>cuenta</code> no es un JSON válido, no es un objeto o pasa de 64 KB</td><td>400</td><td><code>CUENTA_INVALIDA</code>, con <code>"campo": null</code></td></tr>
+<tr><td class="num">10</td><td>Un dato de la <code>cuenta</code> no tiene el tipo o el formato indicado</td><td>400</td><td><code>CUENTA_INVALIDA</code>, con <code>campo</code> igual a la clave</td></tr>
+</tbody>
+</table></div>
+
+<p>Un archivo de exactamente 60 MB se acepta. Si el <code>archivo</code> va sin
+<code>filename</code>, AgilBank lo toma como un campo de texto y el tope de 64 KB lo corta: envíen
+siempre el <code>filename</code>.</p>
+
+<h2><span class="nro">05</span> Consultar un extracto</h2>
+
+<h3><span class="verbo">GET</span> <code>/api/v1/extractos/{idExtracto}</code></h3>
+<h3><span class="verbo">GET</span> <code>/api/v1/extractos/por-huella/{huella}</code></h3>
+
+<p>Las dos rutas responden lo mismo. La segunda sirve cuando ProntoNet calculó la huella y no
+guardó el <code>idExtracto</code>. La huella son 64 caracteres hexadecimales; acepta mayúsculas.</p>
+
+<div class="desborde"><pre><code>{ "idExtracto": "…", "huella": "…", "estado": "leido", "lectura": { … } }</code></pre></div>
+
+<div class="desborde"><table>
+<thead><tr><th>Estado</th><th>Qué quiere decir</th><th>Claves además de las tres comunes</th></tr></thead>
+<tbody>
+<tr><td><code>en-proceso</code></td><td>Todavía se está leyendo. Incluye los reintentos internos: el extracto no pasa a <code>fallido</code> mientras se reintenta</td><td><code>reintentarEn</code>: los segundos que conviene esperar para preguntar de nuevo (5)</td></tr>
+<tr><td><code>leido</code></td><td>La lectura terminó, con cualquier veredicto, también <code>sin-lectura</code> y <code>no-disponible</code></td><td><code>lectura</code>, siempre (sección 06)</td></tr>
+<tr><td><code>fallido</code></td><td>AgilBank no pudo terminar la lectura por un error interno, y agotó los reintentos. No es una conclusión sobre el archivo</td><td>Ninguna. Enviar el mismo archivo otra vez lo lee de nuevo</td></tr>
+</tbody>
+</table></div>
+
+<p>Pregunten cada <code>reintentarEn</code> segundos hasta que el estado deje de ser
+<code>en-proceso</code>.</p>
+
+<h4>Los errores de la consulta</h4>
+
+<ul>
+<li><b>404</b> <code>NO_ENCONTRADO</code>: no hay un extracto con ese identificador o esa huella en la empresa de la credencial. Un extracto de otra empresa responde lo mismo que uno que no existe.</li>
+<li><b>400</b> <code>HUELLA_INVALIDA</code>: la huella no tiene 64 caracteres hexadecimales.</li>
+<li><b>400</b> <code>SIN_IDENTIFICADOR</code>: falta el identificador en la ruta.</li>
+</ul>
+
+<h2><span class="nro">06</span> La lectura</h2>
+
+<p>La lectura es el resumen bancario canónico del extracto.</p>
+
+<div class="desborde"><pre><code>{
+  "huella": "9f2c…",
+  "veredicto": "verificada",
+  "motivo": null,
+  "encabezado": {
+    "banco": { "codigo": "191", "nombre": "Banco Credicoop Cooperativo Limitado" },
+    "cuenta": "CTA CTE. PESOS $ 191-001-055555/5",
+    "cbu": "1910001800005555555555",
+    "moneda": "Pesos",
+    "periodoDesde": "2026-07-01",
+    "periodoHasta": "2026-07-31",
+    "saldoInicial": 1250432.15,
+    "saldoFinal": 980432.10
+  },
+  "renglones": [
+    {
+      "id": "r-818c556e8def0a8f574d",
+      "orden": 58,
+      "fecha": "2026-07-01",
+      "fechaValor": null,
+      "tipo": { "codigo": "transferencia-recibida", "segun": "tabla" },
+      "importe": 15000.50,
+      "saldo": 1265432.65,
+      "referencia": "100123",
+      "contraparte": {
+        "cuit": "30234567892", "nombre": "ACME", "cbu": null
+      },
+      "delBanco": {
+        "codigo": "974",
+        "texto": "Transf. Interbanking - Distinto Titular Ord.:30234567892-ACME",
+        "complementos": []
+      },
+      "encadena": null,
+      "procedencia": {
+        "origen": "celda", "hoja": "saldos_y_movimientos",
+        "filaDesde": 66, "filaHasta": 67
+      }
+    }
+  ],
+  "avisos": [],
+  "controles": {
+    "sentido": "inverso",
+    "saldoDeLaFila": "despues",
+    "renglonesConSaldo": 58,
+    "renglonesQueEncadenan": 57,
+    "cierraConSusSaldos": true,
+    "cierraConProntoNet": true
+  }
+}</code></pre></div>
+
+<h3>El veredicto</h3>
+
+<div class="desborde"><table>
+<thead><tr><th>Veredicto</th><th>Qué quiere decir</th></tr></thead>
+<tbody>
+<tr><td><code>verificada</code></td><td>Los saldos encadenan renglón a renglón, de punta a punta, y no hay ningún aviso que frene las propuestas. Es una regla aritmética: vale como la confirmación de un tercero</td></tr>
+<tr><td><code>a-revisar</code></td><td>Se leyó, pero algo no cierra: hay saltos de saldo, el archivo no trae saldos, o hay un aviso que frene las propuestas</td></tr>
+<tr><td><code>sin-lectura</code></td><td>No se pudo armar la tabla de movimientos. <code>motivo</code> dice por qué, en castellano</td></tr>
+<tr><td><code>no-disponible</code></td><td>No pudimos mirar el archivo por una falla nuestra. No dice nada del archivo. Enviarlo de nuevo lo lee de nuevo</td></tr>
+</tbody>
+</table></div>
+
+<p>Un aviso que no frena las propuestas, como <code>concepto-nuevo</code>, puede venir con
+<code>verificada</code>.</p>
+
+<h3>El encabezado</h3>
+
+<div class="desborde"><table>
+<thead><tr><th>Campo</th><th>Qué es</th></tr></thead>
+<tbody>
+<tr><td><code>banco.codigo</code>, <code>banco.nombre</code></td><td>El código de entidad (los tres primeros dígitos del CBU) y el nombre. Si el banco todavía no está en nuestra tabla, viene el código y <code>nombre</code> en <code>null</code></td></tr>
+<tr><td><code>cuenta</code>, <code>moneda</code></td><td>Los que mandaron</td></tr>
+<tr><td><code>cbu</code></td><td>El del archivo si lo trae; si no, el que mandaron</td></tr>
+<tr><td><code>periodoDesde</code>, <code>periodoHasta</code></td><td>La fecha del primer y del último renglón. <b>Describen el archivo, no el resumen del mes</b>: un extracto diario cubre unos días y uno mensual puede cruzar de mes</td></tr>
+<tr><td><code>saldoInicial</code>, <code>saldoFinal</code></td><td>Los leídos o, si el archivo no los imprime, los que salen del primer y del último saldo de renglón. <code>null</code> si no hay ninguno</td></tr>
+</tbody>
+</table></div>
+
+<h3>El renglón</h3>
+
+<div class="desborde"><table>
+<thead><tr><th>Campo</th><th>Qué es</th></tr></thead>
+<tbody>
+<tr><td><code>id</code></td><td>Identificador estable: el mismo movimiento tiene el mismo id en el extracto del día y en el del mes, aunque el texto del concepto cambie o un canal no traiga la referencia. Sale de la cuenta, la fecha y el importe, con un ordinal entre los renglones que comparten los tres (por su referencia si el archivo la trae; si no, por su orden). La cuenta es la que mandaron, su CBU o si no su número, y si no mandaron ninguno, el CBU del archivo: manden siempre la misma identificación de la cuenta. Descarten los repetidos por este id, dentro de la cuenta</td></tr>
+<tr><td><code>orden</code></td><td>La posición en el archivo, desde 1</td></tr>
+<tr><td><code>fecha</code>, <code>fechaValor</code></td><td>Con formato <code>AAAA-MM-DD</code>. <code>fechaValor</code> solo si el banco la informa</td></tr>
+<tr><td><code>tipo.codigo</code></td><td>El tipo canónico (anexo)</td></tr>
+<tr><td><code>tipo.segun</code></td><td>De dónde salió: <code>empresa</code> (una corrección de la empresa), <code>tabla</code> (la tabla común), <code>regla</code> (una regla general: viene con el aviso <code>concepto-nuevo</code>) o <code>ninguna</code> (quedó <code>sin-clasificar</code>)</td></tr>
+<tr><td><code>importe</code></td><td>Número con signo, desde el punto de vista del banco: positivo entra plata. Igual que en ProntoNet</td></tr>
+<tr><td><code>saldo</code></td><td>El saldo de la fila, si el archivo lo trae</td></tr>
+<tr><td><code>referencia</code></td><td>El número de comprobante, de cheque o de operación, tal como lo trae el banco</td></tr>
+<tr><td><code>contraparte</code></td><td>CUIT, nombre y CBU de la otra parte, cuando el extracto los trae. El nombre puede venir cortado por el banco</td></tr>
+<tr><td><code>delBanco</code></td><td>Lo que dice el banco, tal cual: su código de operación, su texto y las otras columnas de la fila</td></tr>
+<tr><td><code>encadena</code></td><td><code>true</code> si el saldo anterior más el importe da su saldo; <code>false</code> si no; <code>null</code> si no hay con qué controlarlo: los renglones sin saldo y el primer renglón con saldo cuando el archivo no imprime el saldo inicial (es el punto de partida)</td></tr>
+<tr><td><code>procedencia</code></td><td>De dónde salió el renglón: <code>celda</code> (una planilla, con su hoja) o <code>texto</code> (un CSV o TXT), y sus filas, numeradas desde 1 como en la planilla</td></tr>
+</tbody>
+</table></div>
+
+<h3>Los avisos</h3>
+
+<p>Cada aviso trae <code>codigo</code>, <code>detalle</code> (en castellano, para mostrar),
+<code>frenaPropuestas</code> y, si se refiere a renglones, <code>renglones</code> con sus órdenes.
+Si trae datos, vienen en <code>datos</code>.</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Código</th><th>Cuándo</th><th>¿Frena las propuestas?</th></tr></thead>
+<tbody>
+<tr><td><code>no-cierra</code></td><td>El saldo inicial más los renglones no da el saldo final, o los saldos del archivo no son los que mandaron (solo si mandaron el período y el archivo lo cubre). Puede venir más de una vez</td><td>Sí</td></tr>
+<tr><td><code>varias-cuentas</code></td><td>El archivo trae movimientos de más de una cuenta. <code>datos.cuentas</code> las identifica</td><td>Sí</td></tr>
+<tr><td><code>cuenta-distinta</code></td><td>El CBU del archivo no es el que mandaron. <code>datos.cbuDelArchivo</code> y <code>datos.cbuDeProntoNet</code> dicen cuáles son</td><td>Sí</td></tr>
+<tr><td><code>sin-saldos</code></td><td>Ningún renglón se pudo controlar contra el saldo anterior: el archivo no trae saldos, trae solo los saldos inicial y final, trae un solo saldo, tiene una columna de saldo que no encadena con los importes, o sus saldos no se controlan entre sí. <code>detalle</code> dice cuál</td><td>No</td></tr>
+<tr><td><code>no-encadena</code></td><td>Hay renglones cuyo saldo no encadena con el anterior</td><td>No</td></tr>
+<tr><td><code>concepto-nuevo</code></td><td>Un concepto que no está en la tabla. <code>datos.texto</code> trae el texto del banco, <code>datos.codigo</code> su código de operación (o <code>null</code>) y <code>datos.tipo</code> lo que se propuso</td><td>No</td></tr>
+<tr><td><code>lectura-parcial</code></td><td>La lectura se cortó a mitad (tiempo o páginas). Se usa desde la lectura de PDF</td><td>No</td></tr>
+</tbody>
+</table></div>
+
+<h3>Los controles</h3>
+
+<div class="desborde"><table>
+<thead><tr><th>Campo</th><th>Qué es</th></tr></thead>
+<tbody>
+<tr><td><code>sentido</code></td><td><code>cronologico</code> o <code>inverso</code>: si el más nuevo está arriba</td></tr>
+<tr><td><code>saldoDeLaFila</code></td><td><code>despues</code> o <code>antes</code>: si el saldo impreso es el que queda después del movimiento o el que había antes, como el saldo de apertura del día</td></tr>
+<tr><td><code>renglonesConSaldo</code>, <code>renglonesQueEncadenan</code></td><td>Cuántos renglones tienen saldo y cuántos encadenan</td></tr>
+<tr><td><code>cierraConSusSaldos</code>, <code>cierraConProntoNet</code></td><td>Si los saldos cierran con los del archivo y con los que mandaron. <code>null</code> si no hay con qué comparar</td></tr>
+</tbody>
+</table></div>
+
+<h3>Lo que puede venir en <code>null</code></h3>
+
+<ul>
+<li><code>encabezado</code> y <code>controles</code> son <code>null</code> cuando el veredicto es <code>sin-lectura</code> o <code>no-disponible</code>. En ese caso <code>renglones</code> viene vacío.</li>
+<li><code>controles.saldoDeLaFila</code> es <code>null</code> cuando el archivo no trae saldos.</li>
+<li><code>contraparte</code> es <code>null</code> cuando el renglón no trae ni CUIT ni CBU. Cuando viene, <code>nombre</code> puede ser <code>null</code>.</li>
+<li><code>motivo</code> es <code>null</code> salvo en <code>sin-lectura</code> y <code>no-disponible</code>.</li>
+</ul>
+
+<h2><span class="nro">07</span> Las correcciones</h2>
+
+<h3><span class="verbo">POST</span> <code>/api/v1/correcciones</code></h3>
+
+<p>Corrige el tipo canónico de un concepto del banco. El cuerpo es JSON, con
+<code>Content-Type: application/json</code>, en UTF-8 y sin comprimir.</p>
+
+<div class="desborde"><pre><code>{
+  "banco": "191",
+  "codigoDelBanco": "IVAA1",
+  "textoDelBanco": "IVA-Ali Adic RG 2408 s/Comis-Rec Gastos",
+  "tipo": "percepcion-iva"
+}</code></pre></div>
+
+<div class="desborde"><table>
+<thead><tr><th>Clave</th><th>Obligatoria</th><th>Límite</th></tr></thead>
+<tbody>
+<tr><td><code>textoDelBanco</code></td><td><span class="oblig">Sí</span></td><td>Texto no vacío, hasta 500 caracteres. Es el texto del concepto, tal como lo dice el banco</td></tr>
+<tr><td><code>tipo</code></td><td><span class="oblig">Sí</span></td><td>Un código del anexo</td></tr>
+<tr><td><code>banco</code></td><td>No</td><td>Texto de hasta 10 caracteres, o <code>null</code>. El código de entidad</td></tr>
+<tr><td><code>codigoDelBanco</code></td><td>No</td><td>Texto de hasta 50 caracteres, o <code>null</code>. El código de operación del banco</td></tr>
+<tr><td><code>alicuota</code></td><td>No</td><td>Número de 0 a 100, o <code>null</code>. Se guarda con la corrección y la usa la etapa de débitos y créditos</td></tr>
+</tbody>
+</table></div>
+
+<p><b>201</b></p>
+
+<div class="desborde"><pre><code>{ "idCorreccion": "…", "vigente": "empresa", "revision": "pendiente" }</code></pre></div>
+
+<p>La corrección vale desde la lectura siguiente, solo para su empresa. Nosotros la revisamos: lo
+confirmado pasa a la tabla común, con la versión siguiente, y les llega a todos.</p>
+
+<p>El cuerpo pesa hasta 64 KB. AgilBank valida las claves en este orden: <code>textoDelBanco</code>,
+<code>tipo</code>, <code>banco</code>, <code>codigoDelBanco</code>, <code>alicuota</code>. El primer
+error se informa en <code>campo</code>. Si el cuerpo no es un objeto JSON, <code>campo</code> viene
+en <code>null</code>.</p>
+
+<h2><span class="nro">08</span> Errores</h2>
+
+<p>Todo error trae el código HTTP y un cuerpo JSON:</p>
+
+<div class="desborde"><pre><code>{ "codigo": "CUENTA_INVALIDA", "error": "Un dato de la cuenta no tiene la forma del contrato.",
+  "campo": "periodoDesde" }</code></pre></div>
+
+<p><code>codigo</code> es estable: programen contra él. <code>error</code> es un mensaje en castellano,
+para mostrar o registrar, y puede cambiar. <code>campo</code> viene solo en <code>CUENTA_INVALIDA</code> y
+<code>CORRECCION_INVALIDA</code>: nombra la clave con el problema, o es <code>null</code> si el
+problema es del cuerpo entero.</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Código</th><th class="num">HTTP</th><th>Cuándo</th></tr></thead>
+<tbody>
+<tr><td><code>NO_AUTORIZADO</code></td><td class="num">401</td><td>La credencial falta, es inválida, venció o fue revocada, o su usuario de servicio está inactivo</td></tr>
+<tr><td><code>AMBITO_INSUFICIENTE</code></td><td class="num">403</td><td>La credencial no tiene el ámbito que pide la ruta</td></tr>
+<tr><td><code>SIN_EMPRESA</code></td><td class="num">403</td><td>La credencial no está asociada a una empresa</td></tr>
+<tr><td><code>SIN_USUARIO_DE_SERVICIO</code></td><td class="num">403</td><td>Enviar o corregir con una credencial sin usuario de servicio. Las consultas no lo piden</td></tr>
+<tr><td><code>ENVIO_NO_MULTIPART</code></td><td class="num">415</td><td>El envío del extracto no es <code>multipart/form-data</code></td></tr>
+<tr><td><code>ENVIO_INVALIDO</code></td><td class="num">400</td><td>El cuerpo del envío está mal formado o cortado, o trae más de una parte <code>archivo</code></td></tr>
+<tr><td><code>FALTA_ARCHIVO</code></td><td class="num">400</td><td>Falta la parte <code>archivo</code>, o llegó vacía</td></tr>
+<tr><td><code>ARCHIVO_DEMASIADO_GRANDE</code></td><td class="num">413</td><td>El archivo pesa más de 60 MB</td></tr>
+<tr><td><code>CUENTA_INVALIDA</code></td><td class="num">400</td><td>La parte <code>cuenta</code> no es un JSON válido o un dato no tiene la forma indicada. Trae <code>campo</code></td></tr>
+<tr><td><code>HUELLA_INVALIDA</code></td><td class="num">400</td><td>La huella de la ruta no son 64 caracteres hexadecimales</td></tr>
+<tr><td><code>SIN_IDENTIFICADOR</code></td><td class="num">400</td><td>Falta el identificador del extracto en la ruta</td></tr>
+<tr><td><code>NO_ENCONTRADO</code></td><td class="num">404</td><td>No hay un extracto con ese identificador o esa huella en la empresa de la credencial</td></tr>
+<tr><td><code>CORRECCION_INVALIDA</code></td><td class="num">400</td><td>La corrección no tiene la forma indicada, el cuerpo no es un JSON válido o llegó incompleto. Trae <code>campo</code></td></tr>
+<tr><td><code>CUERPO_DEMASIADO_GRANDE</code></td><td class="num">413</td><td>El cuerpo de la corrección pesa más de 64 KB</td></tr>
+<tr><td><code>CUERPO_NO_SOPORTADO</code></td><td class="num">415</td><td>El cuerpo de la corrección usa una codificación o un juego de caracteres que no se acepta: JSON en UTF-8, sin comprimir</td></tr>
+<tr><td><code>ERROR_INTERNO</code></td><td class="num">500</td><td>Una falla de AgilBank. Siempre trae el mensaje «No se pudo completar el pedido.» El pedido se puede repetir</td></tr>
+</tbody>
+</table></div>
+
+<p>La plataforma también puede responder <b>429</b> cuando llegan demasiados pedidos. Esa respuesta
+no trae <code>codigo</code> y sí el encabezado <code>Retry-After</code>, con los segundos que hay que
+esperar.</p>
+
+<h2><span class="nro">09</span> Límites</h2>
+
+<div class="desborde"><table>
+<thead><tr><th>Qué</th><th>Límite</th></tr></thead>
+<tbody>
+<tr><td>El archivo de un extracto</td><td>60 MB. Uno de exactamente 60 MB se acepta</td></tr>
+<tr><td>Una parte de texto del envío (<code>cuenta</code>, <code>nombre</code>)</td><td>64 KB</td></tr>
+<tr><td>Las partes <code>archivo</code> de un envío</td><td>Una</td></tr>
+<tr><td>Un dato de texto de la <code>cuenta</code></td><td>200 caracteres</td></tr>
+<tr><td>El cuerpo de una corrección</td><td>64 KB</td></tr>
+<tr><td><code>textoDelBanco</code>, <code>banco</code>, <code>codigoDelBanco</code></td><td>500, 10 y 50 caracteres</td></tr>
+<tr><td><code>alicuota</code></td><td>De 0 a 100</td></tr>
+<tr><td>Renglones por extracto</td><td>La meta de diseño es 1.500. No hay un tope en esa cantidad: se rechaza por tamaño, como se indica abajo</td></tr>
+</tbody>
+</table></div>
+
+<p>Un archivo más grande que lo que entra en un extracto vuelve con el veredicto
+<code>sin-lectura</code> y el motivo:</p>
+
+<ul>
+<li>una hoja con más de 50.000 filas o 256 columnas;</li>
+<li>un libro con más de 5.000.000 de celdas;</li>
+<li>un texto con más de 200.000 líneas;</li>
+<li>un «XLS» de HTML o XML 2003 con más de 20 MB, 100.000 celdas o 2.000 celdas combinadas.</li>
+</ul>
+
+<p>Un extracto diario se lee en menos de un minuto.</p>
+
+<h2><span class="nro">10</span> Anexo: los tipos canónicos</h2>
+
+<p>Hay 29 tipos, en tres familias: «Movimientos con terceros», «Gastos e impuestos del banco» y
+«Sin tipo». Estos son los valores de <code>tipo.codigo</code> en la lectura y de <code>tipo</code> en las
+correcciones.</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Código</th><th>Nombre</th><th>Familia</th></tr></thead>
+<tbody>
+<tr><td><code>transferencia-recibida</code></td><td>Transferencia recibida</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>transferencia-enviada</code></td><td>Transferencia enviada</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>transferencia-cuenta-propia</code></td><td>Entre cuentas del mismo titular</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>debin</code></td><td>Débito o crédito inmediato (DEBIN)</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>pago-masivo</code></td><td>Un lote de pagos en un solo renglón</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>cheque-pagado</code></td><td>Cheque propio pagado</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>echeq-pagado</code></td><td>ECHEQ propio pagado</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>deposito-cheques</code></td><td>Cheques de terceros depositados</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>debito-automatico</code></td><td>Débito automático o directo</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>pago-arca</code></td><td>Pago a ARCA (VEP)</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>pago-servicio</code></td><td>Pago de servicios o de tarjeta</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>fci-suscripcion</code></td><td>Suscripción a un fondo común de inversión</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>fci-rescate</code></td><td>Rescate de un fondo común de inversión</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>leasing</code></td><td>Cuota, seguro o compra de un leasing</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>prestamo</code></td><td>Cuota o acreditación de un préstamo</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>orden-judicial</code></td><td>Embargo o transferencia por orden judicial</td><td>Movimientos con terceros</td></tr>
+<tr><td><code>impuesto-debitos</code></td><td>Impuesto ley 25.413 sobre débitos</td><td>Gastos e impuestos del banco</td></tr>
+<tr><td><code>impuesto-creditos</code></td><td>Impuesto ley 25.413 sobre créditos</td><td>Gastos e impuestos del banco</td></tr>
+<tr><td><code>devolucion-impuesto</code></td><td>Devolución o reversión del impuesto 25.413</td><td>Gastos e impuestos del banco</td></tr>
+<tr><td><code>anulacion-debito</code></td><td>Anulación o reversión de un débito</td><td>Gastos e impuestos del banco</td></tr>
+<tr><td><code>sircreb</code></td><td>Recaudación de IIBB sobre acreditaciones</td><td>Gastos e impuestos del banco</td></tr>
+<tr><td><code>recaudacion-iibb</code></td><td>Recaudación de IIBB de una jurisdicción</td><td>Gastos e impuestos del banco</td></tr>
+<tr><td><code>percepcion-iibb</code></td><td>Percepción de IIBB</td><td>Gastos e impuestos del banco</td></tr>
+<tr><td><code>comision</code></td><td>Comisión del banco</td><td>Gastos e impuestos del banco</td></tr>
+<tr><td><code>iva</code></td><td>IVA sobre una comisión o un cargo</td><td>Gastos e impuestos del banco</td></tr>
+<tr><td><code>percepcion-iva</code></td><td>Percepción de IVA (RG 2408)</td><td>Gastos e impuestos del banco</td></tr>
+<tr><td><code>intereses</code></td><td>Intereses cobrados por el banco</td><td>Gastos e impuestos del banco</td></tr>
+<tr><td><code>sellos</code></td><td>Impuesto de sellos</td><td>Gastos e impuestos del banco</td></tr>
+<tr><td><code>sin-clasificar</code></td><td>Un concepto que todavía no está en la tabla</td><td>Sin tipo</td></tr>
+</tbody>
+</table></div>
+
+<p class="pie">API de AgilBank · 14-10-2026</p>
+
+</div>
