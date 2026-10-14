@@ -263,7 +263,7 @@ con él ProntoNet descarta lo que ya tenía.</p>
 <tbody>
 <tr><td><code>archivo</code></td><td><span class="oblig">Sí</span></td><td>El extracto, tal como lo entregó el banco. Una sola parte de archivo por pedido, siempre con su nombre de archivo (<code>filename</code>). Hasta 60 MB</td></tr>
 <tr><td><code>cuenta</code></td><td>No</td><td>JSON con lo que ProntoNet sabe de la cuenta, como campo de texto (no como archivo). Hasta 64 KB. Se describe abajo</td></tr>
-<tr><td><code>nombre</code></td><td>No</td><td>El nombre original del archivo, como campo de texto. Si falta, se usa el del <code>filename</code>. Se guarda solo el nombre base, sin carpetas ni caracteres de control y hasta 200 caracteres; si no queda nada, o queda «.» o «..», se guarda «extracto»</td></tr>
+<tr><td><code>nombre</code></td><td>No</td><td>El nombre original del archivo, como campo de texto. Si falta, se usa el del <code>filename</code>. Se guarda solo el nombre base, sin carpetas ni caracteres de control y hasta 200 bytes en UTF-8 (menos caracteres si lleva acentos o eñes); si no queda nada, o queda «.» o «..», se guarda «extracto»</td></tr>
 </tbody>
 </table></div>
 
@@ -395,7 +395,7 @@ guardó el <code>idExtracto</code>. La huella son 64 caracteres hexadecimales; a
 ejemplo, cada 30 segundos después de los primeros dos minutos. La instalación tiene un cupo de
 pedidos (sección 09): respeten el encabezado <code>Retry-After</code> de un 429.</p>
 
-<p>Si un extracto sigue <code>en-proceso</code> más de 30 minutos, envíenlo de nuevo: se vuelve a leer.</p>
+<p>Si un extracto sigue <code>en-proceso</code> más de 30 minutos, envíenlo de nuevo: si lleva 30 minutos sin cambios, se vuelve a leer. Si la respuesta es 200 con <code>en-proceso</code>, sigan consultando y vuelvan a enviarlo más tarde.</p>
 
 <h4>Los errores de la consulta</h4>
 
@@ -662,7 +662,7 @@ problema es del cuerpo entero.</p>
 <tr><td>El cuerpo de una corrección</td><td>64 KB</td></tr>
 <tr><td><code>textoDelBanco</code>, <code>codigoDelBanco</code></td><td>500 y 50 caracteres</td></tr>
 <tr><td><code>banco</code> de una corrección</td><td>Tres dígitos</td></tr>
-<tr><td>El nombre del archivo que se guarda</td><td>200 caracteres</td></tr>
+<tr><td>El nombre del archivo que se guarda</td><td>200 bytes en UTF-8</td></tr>
 <tr><td><code>alicuota</code></td><td>De 0 a 100</td></tr>
 <tr><td>Pedidos a la API</td><td>Un cupo por instalación, por dirección IP, en ventanas de 15 minutos. El valor lo informamos al dar de alta la credencial. Al pasarlo, la respuesta es 429 con <code>Retry-After</code></td></tr>
 <tr><td>Renglones por extracto</td><td>No hay un tope en la cantidad. Un archivo que pasa los topes de tamaño de abajo vuelve <code>leido</code> con el veredicto <code>sin-lectura</code> y su motivo; no hay un rechazo HTTP</td></tr>
@@ -679,7 +679,7 @@ problema es del cuerpo entero.</p>
 <li>un «XLS» de HTML o XML 2003 con más de 20 MB, 100.000 celdas o 2.000 celdas combinadas.</li>
 </ul>
 
-<p>Un extracto diario suele leerse en menos de un minuto. No es un plazo: consulten hasta que el estado deje de ser <code>en-proceso</code>. Si sigue <code>en-proceso</code> más de 30 minutos, envíenlo de nuevo: se vuelve a leer.</p>
+<p>Un extracto diario suele leerse en menos de un minuto. No es un plazo: consulten hasta que el estado deje de ser <code>en-proceso</code>. Si sigue <code>en-proceso</code> más de 30 minutos, envíenlo de nuevo; si la respuesta es 200 con <code>en-proceso</code>, sigan consultando y vuelvan a enviarlo más tarde.</p>
 
 <h2><span class="nro">10</span> Anexo: los tipos canónicos</h2>
 
