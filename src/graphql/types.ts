@@ -15,7 +15,7 @@ export type Scalars = {
   Boolean: { input: boolean; output: boolean; }
   Int: { input: number; output: number; }
   Float: { input: number; output: number; }
-  Date: { input: string; output: string; }
+  Date: { input: Date; output: Date | string; }
   DateTime: { input: string; output: string; }
   Decimal: { input: number; output: number; }
   Json: { input: any; output: any; }
@@ -37,6 +37,7 @@ export type AbConceptCorrection = {
   rate?: Maybe<Scalars['Decimal']['output']>;
   review: AbCorrectionReview;
   reviewedAt?: Maybe<Scalars['DateTime']['output']>;
+  tenant_id_?: Maybe<Scalars['String']['output']>;
   version_: Scalars['String']['output'];
 };
 
@@ -135,6 +136,12 @@ export type AbStatement = {
   status: AbStatementStatus;
   verdict?: Maybe<Scalars['String']['output']>;
   version_: Scalars['String']['output'];
+};
+
+export type AbStatementReadReturn = {
+  __typename?: 'AbStatementReadReturn';
+  result: Scalars['String']['output'];
+  status: Scalars['String']['output'];
 };
 
 export const AbStatementStatus = {
@@ -374,18 +381,15 @@ export type FilterBoolean = {
 };
 
 export type FilterDate = {
-  equals?: InputMaybe<Scalars['String']['input']>;
-  gt?: InputMaybe<Scalars['String']['input']>;
-  gte?: InputMaybe<Scalars['String']['input']>;
-  in?: InputMaybe<Array<Scalars['String']['input']>>;
+  equals?: InputMaybe<Scalars['Date']['input']>;
+  gt?: InputMaybe<Scalars['Date']['input']>;
+  gte?: InputMaybe<Scalars['Date']['input']>;
+  in?: InputMaybe<Array<Scalars['Date']['input']>>;
   isEmpty?: InputMaybe<Scalars['Boolean']['input']>;
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  lt?: InputMaybe<Scalars['String']['input']>;
-  lte?: InputMaybe<Scalars['String']['input']>;
-  not?: InputMaybe<Scalars['String']['input']>;
-  notIn?: InputMaybe<Array<Scalars['String']['input']>>;
-  range?: InputMaybe<Scalars['String']['input']>;
-  regex?: InputMaybe<Scalars['String']['input']>;
+  lt?: InputMaybe<Scalars['Date']['input']>;
+  lte?: InputMaybe<Scalars['Date']['input']>;
+  not?: InputMaybe<Scalars['Date']['input']>;
 };
 
 export type FilterDateTime = {
@@ -660,6 +664,7 @@ export type Mutation = {
   abConceptCorrectionDelete: AbConceptCorrection;
   abConceptCorrectionUpdate: AbConceptCorrection;
   abStatementDelete: AbStatement;
+  abStatementRead: AbStatementReadReturn;
   /** Archive a notification (soft delete) */
   archiveNotification: UserNotificationResult;
   botRunCancel: Scalars['String']['output'];
@@ -749,6 +754,11 @@ export type MutationAbConceptCorrectionUpdateArgs = {
 
 export type MutationAbStatementDeleteArgs = {
   id: Scalars['String']['input'];
+};
+
+
+export type MutationAbStatementReadArgs = {
+  statementId: Scalars['String']['input'];
 };
 
 
@@ -1208,6 +1218,7 @@ export type Query = {
 
 
 export type QueryAbConceptCorrectionListWithCursorArgs = {
+  allTenants?: InputMaybe<Scalars['Boolean']['input']>;
   cursorKey?: InputMaybe<Scalars['String']['input']>;
   orderBy: AbConceptCorrection_OrderByCursor;
   take: Scalars['Int']['input'];
@@ -1216,6 +1227,7 @@ export type QueryAbConceptCorrectionListWithCursorArgs = {
 
 
 export type QueryAbConceptCorrectionListWithOffsetArgs = {
+  allTenants?: InputMaybe<Scalars['Boolean']['input']>;
   offset: Scalars['Int']['input'];
   orderBy?: InputMaybe<Array<AbConceptCorrection_OrderBy>>;
   take: Scalars['Int']['input'];
@@ -1224,6 +1236,7 @@ export type QueryAbConceptCorrectionListWithOffsetArgs = {
 
 
 export type QueryAbConceptCorrectionOneArgs = {
+  allTenants?: InputMaybe<Scalars['Boolean']['input']>;
   id: Scalars['String']['input'];
 };
 
@@ -2174,6 +2187,7 @@ export type ResolversTypes = {
   AbConceptCorrection_UpdateInput: AbConceptCorrection_UpdateInput;
   AbCorrectionReview: AbCorrectionReview;
   AbStatement: ResolverTypeWrapper<AbStatement>;
+  AbStatementReadReturn: ResolverTypeWrapper<AbStatementReadReturn>;
   AbStatementStatus: AbStatementStatus;
   AbStatement_Filter: AbStatement_Filter;
   AbStatement_OrderBy: AbStatement_OrderBy;
@@ -2305,6 +2319,7 @@ export type ResolversParentTypes = {
   AbConceptCorrection_OrderByCursor: AbConceptCorrection_OrderByCursor;
   AbConceptCorrection_UpdateInput: AbConceptCorrection_UpdateInput;
   AbStatement: AbStatement;
+  AbStatementReadReturn: AbStatementReadReturn;
   AbStatement_Filter: AbStatement_Filter;
   AbStatement_OrderBy: AbStatement_OrderBy;
   AbStatement_OrderByCursor: AbStatement_OrderByCursor;
@@ -2433,6 +2448,7 @@ export type AbConceptCorrectionResolvers<ContextType = MyApolloContext, ParentTy
   rate?: Resolver<Maybe<ResolversTypes['Decimal']>, ParentType, ContextType>;
   review?: Resolver<ResolversTypes['AbCorrectionReview'], ParentType, ContextType>;
   reviewedAt?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  tenant_id_?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   version_?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
@@ -2462,6 +2478,12 @@ export type AbStatementResolvers<ContextType = MyApolloContext, ParentType exten
   status?: Resolver<ResolversTypes['AbStatementStatus'], ParentType, ContextType>;
   verdict?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   version_?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
+export type AbStatementReadReturnResolvers<ContextType = MyApolloContext, ParentType extends ResolversParentTypes['AbStatementReadReturn'] = ResolversParentTypes['AbStatementReadReturn']> = {
+  result?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  status?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
@@ -2614,6 +2636,7 @@ export type MutationResolvers<ContextType = MyApolloContext, ParentType extends 
   abConceptCorrectionDelete?: Resolver<ResolversTypes['AbConceptCorrection'], ParentType, ContextType, RequireFields<MutationAbConceptCorrectionDeleteArgs, 'id'>>;
   abConceptCorrectionUpdate?: Resolver<ResolversTypes['AbConceptCorrection'], ParentType, ContextType, RequireFields<MutationAbConceptCorrectionUpdateArgs, 'id' | 'version_'>>;
   abStatementDelete?: Resolver<ResolversTypes['AbStatement'], ParentType, ContextType, RequireFields<MutationAbStatementDeleteArgs, 'id'>>;
+  abStatementRead?: Resolver<ResolversTypes['AbStatementReadReturn'], ParentType, ContextType, RequireFields<MutationAbStatementReadArgs, 'statementId'>>;
   archiveNotification?: Resolver<ResolversTypes['UserNotificationResult'], ParentType, ContextType, RequireFields<MutationArchiveNotificationArgs, 'id'>>;
   botRunCancel?: Resolver<ResolversTypes['String'], ParentType, ContextType, RequireFields<MutationBotRunCancelArgs, 'botRunId'>>;
   broadcastMaintenance?: Resolver<ResolversTypes['Int'], ParentType, ContextType, RequireFields<MutationBroadcastMaintenanceArgs, 'active'>>;
@@ -2967,6 +2990,7 @@ export type WorkerEventRetryResultResolvers<ContextType = MyApolloContext, Paren
 export type Resolvers<ContextType = MyApolloContext> = {
   AbConceptCorrection?: AbConceptCorrectionResolvers<ContextType>;
   AbStatement?: AbStatementResolvers<ContextType>;
+  AbStatementReadReturn?: AbStatementReadReturnResolvers<ContextType>;
   AuthenticateResponse?: AuthenticateResponseResolvers<ContextType>;
   Company?: CompanyResolvers<ContextType>;
   Date?: GraphQLScalarType;
