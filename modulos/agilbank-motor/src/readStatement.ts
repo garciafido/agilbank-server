@@ -49,7 +49,7 @@ export const readStatement = async (file: Buffer, options: ReadOptions = {}): Pr
   const abstain = (reason: string): StatementReading => ({ fingerprint, verdict: "abstained", reason, header: null, lines: [], warnings: [], checks: null });
 
   const format = formatOf(file);
-  if (format === "pdf" || format === "image") return abstain("La lectura de PDF y de fotos llega en la próxima etapa de AgilBank.");
+  if (format === "pdf" || format === "image") return abstain("Este formato no se lee por esta vía: manden el extracto en Excel, CSV o texto.");
   let grids: Grid[];
   try {
     grids = format === "text" ? [gridFromText(file)] : format === "markup" ? gridsFromMarkup(file) : gridsFromSpreadsheet(file);

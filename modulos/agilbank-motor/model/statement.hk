@@ -104,6 +104,14 @@ AbStatement: entity
   processedAt: maybe(dateTime)
     .fillingOnServer
     .labels(es=["Leído el", "Fin de la lectura", "M"])
+
+  # Un archivo que tumba al worker no tira error: el evento vence y se vuelve a tomar sin contar el
+  # intento. El paso cuenta acá los arranques que no terminaron en error y, con tres, lo da por fallido.
+  # El reenvío de un extracto terminado lo vuelve a cero.
+  readStarts: integer
+    .default(0)
+    .fillingOnServer
+    .labels(es=["Arranques", "Lecturas empezadas que no terminaron en error", "M"])
 }
 
 AbCorrectionReview: enum

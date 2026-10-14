@@ -43,6 +43,35 @@ describe("statementFileKey", () => {
   });
 });
 
+describe("statementFileKey: el nombre acotado", () => {
+  const name = (original: string) => statementFileKey(original, new Date(2026, 0, 1), "u").fileName;
+
+  it.each([".", "..", "a/..", "a/.", "..\\", " .. ", "/"])("%j no es un nombre: se llama extracto", (original) => {
+    expect(name(original)).toBe("extracto");
+  });
+  it("los caracteres de control se quitan, también el NUL", () => {
+    expect(name("jul\u0000io\t.c\u001fsv\u007f\u0085")).toBe("julio.csv");
+    expect(name("\u0000..")).toBe("extracto");
+  });
+  it("se corta a 200 bytes en UTF-8, sin partir un carácter: el sistema de archivos cuenta bytes", () => {
+    expect(name("x".repeat(64 * 1024))).toBe("x".repeat(200));
+    expect(name("y".repeat(200))).toBe("y".repeat(200));
+    expect(name("ñ".repeat(300))).toBe("ñ".repeat(100));
+    expect(name("\u{1F600}".repeat(300))).toBe("\u{1F600}".repeat(50));
+    expect(name("a" + "ñ".repeat(150))).toBe("a" + "ñ".repeat(99));
+  });
+  it("lo que queda después de la carpeta se recorta", () => {
+    expect(name("carpeta/  julio.csv  ")).toBe("julio.csv");
+    expect(name("a/ . ")).toBe("extracto");
+  });
+  it("la clave usa el nombre acotado", () => {
+    expect(statementFileKey("..", new Date(2026, 0, 1), "u").key).toBe("AbStatement.file/2026/01/01/u/extracto");
+  });
+  it("puntos dentro del nombre se conservan", () => {
+    expect(name("..julio..csv")).toBe("..julio..csv");
+  });
+});
+
 describe("publicView", () => {
   const row = { id: "s1", contentHash: "h", verdict: null, reading: null };
   it("queued y processing son en-proceso, con reintentarEn", () => {
@@ -101,7 +130,7 @@ describe("receive", () => {
     const r = await s.api.receive({ headers: HEADERS, stream: multipart(FILE) });
     expect(r).toEqual({ status: 202, body: { idExtracto: "s1", huella: HASH, estado: "en-proceso" } });
     expect(s.rows.abStatement[0]).toMatchObject({ status: "queued", verdict: null, error: null });
-    expect(s.wheres[1]).toEqual({ id: "s1", tenant_id_: "T1", status, verdict });
+    expect(s.wheres[1]).toEqual({ id: "s1", tenant_id_: "T1", status, verdict, lastUpdatedAt_: null });
     expect(s.enqueued).toEqual([["s1", "u1", "T1"]]);
     expect(s.uploads).toEqual([]);
   });
@@ -283,6 +312,7 @@ describe("byId y byFingerprint", () => {
 
 describe("el contrato de los errores y de los ámbitos", () => {
   const sinArchivo = () => Readable.from([Buffer.from(`${accountPart("{}")}--${BOUNDARY}--\r\n`)]);
+  const sinFilename = () => Readable.from([Buffer.from(`--${BOUNDARY}\r\nContent-Disposition: form-data; name="archivo"\r\n\r\n${FILE}\r\n--${BOUNDARY}--\r\n`)]);
   const dosArchivos = () => Readable.from([Buffer.from(
     `--${BOUNDARY}\r\nContent-Disposition: form-data; name="archivo"; filename="a"\r\n\r\nA\r\n` +
     `--${BOUNDARY}\r\nContent-Disposition: form-data; name="archivo"; filename="b"\r\n\r\nB\r\n--${BOUNDARY}--\r\n`)]);
@@ -291,6 +321,7 @@ describe("el contrato de los errores y de los ámbitos", () => {
     ["no es multipart", { ...HEADERS, "content-type": "application/pdf" }, () => Readable.from([FILE]), 415, "ENVIO_NO_MULTIPART", "El extracto se envía como multipart/form-data, con la parte archivo."],
     ["está cortado o trae dos archivos", HEADERS, dosArchivos, 400, "ENVIO_INVALIDO", "El envío no se pudo leer: el cuerpo está cortado o trae más de un archivo."],
     ["no trae archivo", HEADERS, sinArchivo, 400, "FALTA_ARCHIVO", "Falta la parte archivo, o llegó vacía."],
+    ["trae el archivo sin filename", HEADERS, sinFilename, 400, "ENVIO_INVALIDO", "La parte archivo tiene que llevar el nombre del archivo (filename)."],
     ["trae una cuenta que no es JSON", HEADERS, () => multipart(FILE, accountPart("{no")), 400, "CUENTA_INVALIDA", "La parte cuenta no es un JSON válido."],
   ] as const)("un envío que %s: %i %s con su mensaje", async (_caso, headers, stream, status, codigo, error) => {
     const s = setup();
@@ -466,5 +497,113 @@ describe("receive: lo que se reenvía y las carreras", () => {
     s.db.abStatement.create = async (args: { select?: unknown }) => { selects.push(args.select); return create(args as never); };
     await s.api.receive({ headers: HEADERS, stream: multipart(FILE) });
     expect(selects).toEqual([{ id: true }]);
+  });
+});
+
+describe("receive: un extracto en proceso que quedó viejo, y las marcas de cada escritura", () => {
+  const MIN = 60 * 1000;
+  const ago = (ms: number) => new Date(Date.now() - ms);
+  const inProcess = (status: string, over: Record<string, unknown> = {}) =>
+    ({ id: "s1", tenant_id_: "T1", contentHash: HASH, status, verdict: null, reading: null, version_: "v0", createdAt_: ago(60 * MIN), readStarts: 2, ...over });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it.each(["queued", "processing"])("uno %s sin cambios hace 31 minutos se vuelve a leer: 202, una vez", async (status) => {
+    const before = ago(31 * MIN);
+    const s = setup({ abStatement: [inProcess(status, { lastUpdatedAt_: before })] });
+    const r = await s.api.receive({ headers: HEADERS, stream: multipart(FILE) });
+    expect(r).toEqual({ status: 202, body: { idExtracto: "s1", huella: HASH, estado: "en-proceso" } });
+    expect(s.wheres[1]).toEqual({ id: "s1", tenant_id_: "T1", status, verdict: null, lastUpdatedAt_: before });
+    const row = s.rows.abStatement[0];
+    expect(row).toMatchObject({ status: "queued", verdict: null, error: null, readStarts: 2 });
+    expect(row.lastUpdatedAt_.getTime()).toBeGreaterThan(before.getTime());
+    expect(row.version_).toMatch(/^[0-9a-f-]{36}$/);
+    expect(s.enqueued).toEqual([["s1", "u1", "T1"]]);
+    const again = await s.api.receive({ headers: HEADERS, stream: multipart(FILE) });
+    expect(again.status).toBe(200);
+    expect(s.enqueued).toHaveLength(1);
+  });
+
+  it.each(["queued", "processing"])("uno %s con cambios hace 10 minutos no: 200, sin encolar", async (status) => {
+    const s = setup({ abStatement: [inProcess(status, { lastUpdatedAt_: ago(10 * MIN) })] });
+    const r = await s.api.receive({ headers: HEADERS, stream: multipart(FILE) });
+    expect(r).toEqual({ status: 200, body: { idExtracto: "s1", huella: HASH, estado: "en-proceso", reintentarEn: 5 } });
+    expect(s.enqueued).toEqual([]);
+    expect(s.rows.abStatement[0].status).toBe(status);
+  });
+
+  it("el plazo es de más de 30 minutos: a los 30 justos todavía no", async () => {
+    const now = Date.now();
+    jest.spyOn(Date, "now").mockReturnValue(now);
+    const justo = setup({ abStatement: [inProcess("queued", { lastUpdatedAt_: new Date(now - 30 * MIN) })] });
+    expect((await justo.api.receive({ headers: HEADERS, stream: multipart(FILE) })).status).toBe(200);
+    const pasado = setup({ abStatement: [inProcess("queued", { lastUpdatedAt_: new Date(now - 30 * MIN - 1) })] });
+    expect((await pasado.api.receive({ headers: HEADERS, stream: multipart(FILE) })).status).toBe(202);
+  });
+
+  it("sin lastUpdatedAt_ cuenta el alta: uno creado hace 31 minutos se relee, uno de hace 10 no", async () => {
+    const viejo = setup({ abStatement: [inProcess("queued", { lastUpdatedAt_: null, createdAt_: ago(31 * MIN) })] });
+    expect((await viejo.api.receive({ headers: HEADERS, stream: multipart(FILE) })).status).toBe(202);
+    expect(viejo.wheres[1]).toMatchObject({ lastUpdatedAt_: null });
+    const nuevo = setup({ abStatement: [inProcess("queued", { lastUpdatedAt_: null, createdAt_: ago(10 * MIN) })] });
+    expect((await nuevo.api.receive({ headers: HEADERS, stream: multipart(FILE) })).status).toBe(200);
+  });
+
+  it("si otro pedido cambió el extracto después de leerlo, el reclamo no lo toma", async () => {
+    const s = setup({ abStatement: [inProcess("processing", { lastUpdatedAt_: ago(31 * MIN) })] });
+    const original = s.db.abStatement.updateMany;
+    s.db.abStatement.updateMany = async (args: never) => {
+      s.rows.abStatement[0].lastUpdatedAt_ = new Date();
+      return original(args);
+    };
+    const r = await s.api.receive({ headers: HEADERS, stream: multipart(FILE) });
+    expect(r.status).toBe(200);
+    expect(s.enqueued).toEqual([]);
+  });
+
+  it.each([
+    ["failed", null],
+    ["read", "unavailable"],
+  ])("el reenvío de uno %s/%s vuelve a contar los arranques desde cero", async (status, verdict) => {
+    const s = setup({ abStatement: [inProcess(status, { verdict, lastUpdatedAt_: ago(MIN), readStarts: 3 })] });
+    expect((await s.api.receive({ headers: HEADERS, stream: multipart(FILE) })).status).toBe(202);
+    expect(s.rows.abStatement[0]).toMatchObject({ status: "queued", readStarts: 0 });
+  });
+
+  it("un leído con otro veredicto no se relee aunque sea viejo", async () => {
+    const s = setup({ abStatement: [inProcess("read", { verdict: "weak", lastUpdatedAt_: ago(120 * MIN), reading: { fingerprint: HASH, verdict: "weak", reason: null, header: null, lines: [], warnings: [], checks: null } })] });
+    expect((await s.api.receive({ headers: HEADERS, stream: multipart(FILE) })).status).toBe(200);
+    expect(s.enqueued).toEqual([]);
+  });
+
+  it("el alta escribe lastUpdatedAt_ igual a createdAt_, y version_", async () => {
+    const s = setup();
+    await s.api.receive({ headers: HEADERS, stream: multipart(FILE) });
+    const row = s.rows.abStatement[0];
+    expect(row.lastUpdatedAt_).toBeInstanceOf(Date);
+    expect(row.lastUpdatedAt_).toEqual(row.createdAt_);
+    expect(row.version_).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("si encolar falla, el failed también deja lastUpdatedAt_ y una version_ nueva", async () => {
+    const before = ago(31 * MIN);
+    const s = setup({ abStatement: [inProcess("failed", { lastUpdatedAt_: before })] }, { enqueueReading: async () => { throw new Error("cola caída"); } });
+    const versions: string[] = [];
+    const original = s.db.abStatement.updateMany;
+    s.db.abStatement.updateMany = async (args: { data: { version_: string } }) => { versions.push(args.data.version_); return original(args as never); };
+    await expect(s.api.receive({ headers: HEADERS, stream: multipart(FILE) })).rejects.toThrow("cola caída");
+    const row = s.rows.abStatement[0];
+    expect(row.status).toBe("failed");
+    expect(row.lastUpdatedAt_.getTime()).toBeGreaterThan(before.getTime());
+    expect(versions).toHaveLength(2);
+    expect(new Set([...versions, "v0"]).size).toBe(3);
+    expect(versions.every((v) => /^[0-9a-f-]{36}$/.test(v))).toBe(true);
+  });
+
+  it("las consultas no cambian: un en-proceso viejo se sigue viendo en-proceso", async () => {
+    const s = setup({ abStatement: [inProcess("queued", { lastUpdatedAt_: ago(31 * MIN) })] });
+    expect(await s.api.byId({ headers: { authorization: "Bearer t" }, body: undefined, params: { idExtracto: "s1" } })).toEqual({
+      status: 200, body: { idExtracto: "s1", huella: HASH, estado: "en-proceso", reintentarEn: 5 },
+    });
   });
 });

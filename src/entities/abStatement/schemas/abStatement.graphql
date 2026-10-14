@@ -23,6 +23,7 @@ type AbStatement {
   reading: Json
   error: String
   processedAt: DateTime
+  readStarts: Int!
 }
 
 extend type Mutation {
@@ -69,6 +70,7 @@ input AbStatement_Filter {
   reading: FilterJson
   error: FilterString
   processedAt: FilterDateTime
+  readStarts: FilterInt
   AND: [AbStatement_Filter!]
   OR: [AbStatement_Filter!]
   NOT: [AbStatement_Filter!]
@@ -97,6 +99,7 @@ input AbStatement_OrderBy {
   reading: SortOrder
   error: SortOrder
   processedAt: SortOrder
+  readStarts: SortOrder
 }
 
 input AbStatement_OrderByCursor {

@@ -154,7 +154,7 @@ describe("los errores del parser de JSON", () => {
     expect(run({ type: "entity.parse.failed" })).toEqual({ status: 400, body: { codigo: "CORRECCION_INVALIDA", error: "El cuerpo no es un JSON válido.", campo: null } });
   });
   it.each(["encoding.unsupported", "charset.unsupported"])("%s: 415 CUERPO_NO_SOPORTADO", (type) => {
-    expect(run({ type })).toEqual({ status: 415, body: { codigo: "CUERPO_NO_SOPORTADO", error: "El cuerpo usa una codificación que no se acepta: JSON en UTF-8, sin comprimir." } });
+    expect(run({ type })).toEqual({ status: 415, body: { codigo: "CUERPO_NO_SOPORTADO", error: "El cuerpo usa una codificación de contenido o un juego de caracteres que no se acepta: manden JSON en UTF-8." } });
   });
   it.each(["request.aborted", "request.size.invalid"])("%s: 400 CORRECCION_INVALIDA, cuerpo incompleto", (type) => {
     expect(run({ type })).toEqual({ status: 400, body: { codigo: "CORRECCION_INVALIDA", error: "El cuerpo llegó incompleto.", campo: null } });

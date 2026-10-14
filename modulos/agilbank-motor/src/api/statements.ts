@@ -8,6 +8,8 @@ import { parseAccount, readUpload, type UploadProblem, type UploadRequest } from
 
 export const SCOPE_READ = "ab:leer";
 export const RETRY_AFTER_SECONDS = 5;
+/** Más que todos los reintentos del worker juntos: un extracto en proceso sin cambios desde hace tanto ya no lo lee nadie. */
+export const STALE_AFTER_MINUTES = 30;
 
 export interface StatementFileKey {
   baseName: string;
@@ -18,9 +20,29 @@ export interface StatementFileKey {
 
 const pad = (n: number): string => String(n).padStart(2, "0");
 
+/** En bytes de UTF-8: el límite de un nombre en el sistema de archivos (255 en Linux) se cuenta en bytes. */
+const MAX_FILE_NAME_BYTES = 200;
+
+const upToBytes = (text: string, max: number): string => {
+  let out = "";
+  let bytes = 0;
+  for (const char of text) {
+    bytes += Buffer.byteLength(char);
+    if (bytes > max) break;
+    out += char;
+  }
+  return out;
+};
+
+/** El nombre base, sin caracteres de control y acotado: con un NUL, «..» o 64 KB, la subida o el alta darían un 500 que se repite. */
+const safeFileName = (originalName: string): string => {
+  const base = path.posix.basename(originalName.replace(/\p{Cc}/gu, "").replace(/\\/g, "/")).trim();
+  return base === "" || base === "." || base === ".." ? "extracto" : upToBytes(base, MAX_FILE_NAME_BYTES);
+};
+
 /** La clave del archivo en el almacenamiento: solo el nombre base, para que nunca salga de su carpeta. */
 export const statementFileKey = (originalName: string, when: Date, uuid: string): StatementFileKey => {
-  const fileName = path.posix.basename(originalName.trim().replace(/\\/g, "/")) || "extracto";
+  const fileName = safeFileName(originalName);
   const baseName = `AbStatement.file/${when.getFullYear()}/${pad(when.getMonth() + 1)}/${pad(when.getDate())}/`;
   return { baseName, uuid, fileName, key: `${baseName}${uuid}/${fileName}` };
 };
@@ -31,9 +53,14 @@ export interface StatementRow {
   status: string;
   verdict: string | null;
   reading: unknown;
+  lastUpdatedAt_?: Date | null;
+  createdAt_?: Date | null;
 }
 
-const VIEW = { id: true, contentHash: true, status: true, verdict: true, reading: true } as const;
+const VIEW = { id: true, contentHash: true, status: true, verdict: true, reading: true, lastUpdatedAt_: true, createdAt_: true } as const;
+
+/** Lo que toda escritura del extracto deja: el panel y la caché ven el cambio, y el reenvío sabe desde cuándo está como está. */
+const touched = (): { lastUpdatedAt_: Date; version_: string } => ({ lastUpdatedAt_: new Date(), version_: randomUUID() });
 
 /** El estado público de un extracto (§4 del contrato). */
 export const publicView = (row: StatementRow): Record<string, unknown> => {
@@ -43,12 +70,22 @@ export const publicView = (row: StatementRow): Record<string, unknown> => {
   return { ...base, estado: "en-proceso", reintentarEn: RETRY_AFTER_SECONDS };
 };
 
-/** Un intento que no dice nada del archivo: un fallo nuestro o una lectura que no pudo mirar. */
-const rereadable = (row: StatementRow): boolean => row.status === "failed" || (row.status === "read" && row.verdict === "unavailable");
+const inProcess = (row: StatementRow): boolean => row.status === "queued" || row.status === "processing";
+
+/** En proceso sin cambios desde hace más del plazo: el trabajo se perdió (un reinicio, un mensaje descartado). */
+const stale = (row: StatementRow): boolean => {
+  const since = row.lastUpdatedAt_ ?? row.createdAt_;
+  return inProcess(row) && !!since && Date.now() - since.getTime() > STALE_AFTER_MINUTES * 60 * 1000;
+};
+
+/** Un intento que no dice nada del archivo: un fallo nuestro, una lectura que no pudo mirar, o un trabajo perdido. */
+const rereadable = (row: StatementRow): boolean =>
+  row.status === "failed" || (row.status === "read" && row.verdict === "unavailable") || stale(row);
 
 const UPLOAD_PROBLEMS: Record<UploadProblem, ApiResponse> = {
   "not-multipart": fail(415, "ENVIO_NO_MULTIPART", "El extracto se envía como multipart/form-data, con la parte archivo."),
   invalid: fail(400, "ENVIO_INVALIDO", "El envío no se pudo leer: el cuerpo está cortado o trae más de un archivo."),
+  "unnamed-file": fail(400, "ENVIO_INVALIDO", "La parte archivo tiene que llevar el nombre del archivo (filename)."),
   "missing-file": fail(400, "FALTA_ARCHIVO", "Falta la parte archivo, o llegó vacía."),
   "too-large": fail(413, "ARCHIVO_DEMASIADO_GRANDE", "El archivo pesa más de 60 MB."),
   "invalid-account-json": fail(400, "CUENTA_INVALIDA", "La parte cuenta no es un JSON válido.", { campo: null }),
@@ -69,7 +106,7 @@ export const statementsApi = (deps: StatementsDeps) => {
     try {
       await deps.enqueueReading(statementId, authorId, tenantId);
     } catch (e) {
-      await deps.db.abStatement.updateMany({ where: { id: statementId, tenant_id_: tenantId }, data: { status: "failed" } });
+      await deps.db.abStatement.updateMany({ where: { id: statementId, tenant_id_: tenantId }, data: { status: "failed", ...touched() } });
       throw e;
     }
   };
@@ -77,12 +114,16 @@ export const statementsApi = (deps: StatementsDeps) => {
   const accepted = (id: string, fingerprint: string | null): ApiResponse =>
     reply(202, { idExtracto: id, huella: fingerprint, estado: "en-proceso" });
 
-  /** El mismo archivo de la misma empresa: el existente, salvo que haya que leerlo de nuevo. */
+  /**
+   * El mismo archivo de la misma empresa: el existente, salvo que haya que leerlo de nuevo. Uno terminado
+   * vuelve a contar los arranques desde cero; uno en proceso perdido los conserva, para que un archivo que
+   * tumba al worker llegue igual a fallido.
+   */
   const resend = async (row: StatementRow, tenantId: string, authorId: string): Promise<ApiResponse> => {
     if (!rereadable(row)) return reply(200, publicView(row));
     const claimed = await deps.db.abStatement.updateMany({
-      where: { id: row.id, tenant_id_: tenantId, status: row.status, verdict: row.verdict },
-      data: { status: "queued", verdict: null, error: null },
+      where: { id: row.id, tenant_id_: tenantId, status: row.status, verdict: row.verdict, lastUpdatedAt_: row.lastUpdatedAt_ ?? null },
+      data: { status: "queued", verdict: null, error: null, ...(inProcess(row) ? {} : { readStarts: 0 }), ...touched() },
     });
     if (claimed.count === 1) {
       await enqueueOrFail(row.id, authorId, tenantId);
@@ -116,6 +157,7 @@ export const statementsApi = (deps: StatementsDeps) => {
         data: {
           version_: randomUUID(),
           createdAt_: now,
+          lastUpdatedAt_: now,
           createdBy_: { connect: { id: authorId } },
           tenant_: { connect: { id: tenantId } },
           file: key.fileName,

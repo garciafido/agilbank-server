@@ -219,6 +219,18 @@ export const generatedSchemaMetadata: SchemaMetadataMap = new Map([
             hasDefaultValue: true,
           },
         ],
+        [
+          "readStarts",
+          {
+            name: "readStarts",
+            type: "Int",
+            kind: "scalar",
+            isList: false,
+            isRequired: true,
+            isId: false,
+            hasDefaultValue: true,
+          },
+        ],
       ]),
     },
   ],

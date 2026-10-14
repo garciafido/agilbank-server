@@ -149,42 +149,42 @@ describe("classify: las correcciones, de la más específica a la más general",
   const company = (code: string) => ({ type: { code, source: "company" }, isNew: false });
 
   it("la del banco gana sobre la de todos los bancos, en cualquier orden de la lista", () => {
-    expect(c("Transferencia recibida de ACME SA", 100, "191", null, [broad, specific])).toEqual(company("sellos"));
-    expect(c("Transferencia recibida de ACME SA", 100, "191", null, [specific, broad])).toEqual(company("sellos"));
+    expect(c("Transferencia recibida de ACME SA", -100, "191", null, [broad, specific])).toEqual(company("sellos"));
+    expect(c("Transferencia recibida de ACME SA", -100, "191", null, [specific, broad])).toEqual(company("sellos"));
   });
 
   it("la de todos los bancos aplica a cualquier banco, y también sin banco", () => {
-    expect(c("Transferencia recibida de ACME SA", 100, "014", null, [broad, specific])).toEqual(company("intereses"));
-    expect(c("Transferencia recibida de ACME SA", 100, null, null, [broad, specific])).toEqual(company("intereses"));
+    expect(c("Transferencia recibida de ACME SA", -100, "014", null, [broad, specific])).toEqual(company("intereses"));
+    expect(c("Transferencia recibida de ACME SA", -100, null, null, [broad, specific])).toEqual(company("intereses"));
     expect(c("Suscripcion al Periodico Accion", -6990, "014", null, [{ bankCode: null, text: "Suscripcion al Periodico Accion", type: "comision" }])).toEqual(company("comision"));
   });
 
   it("el código de operación gana sobre el texto dentro del mismo alcance", () => {
     const byText: Correction = { bankCode: "191", text: "Transferencia recibida", type: "sellos" };
     const byCode: Correction = { bankCode: "191", operationCode: "974", type: "intereses" };
-    expect(c("Transferencia recibida de ACME", 100, "191", "974", [byText, byCode])).toEqual(company("intereses"));
-    expect(c("Transferencia recibida de ACME", 100, "191", "974", [byCode, byText])).toEqual(company("intereses"));
-    expect(c("Transferencia recibida de ACME", 100, "191", "975", [byCode, byText])).toEqual(company("sellos"));
-    expect(c("Transferencia recibida de ACME", 100, "191", null, [byCode, byText])).toEqual(company("sellos"));
+    expect(c("Transferencia recibida de ACME", -100, "191", "974", [byText, byCode])).toEqual(company("intereses"));
+    expect(c("Transferencia recibida de ACME", -100, "191", "974", [byCode, byText])).toEqual(company("intereses"));
+    expect(c("Transferencia recibida de ACME", -100, "191", "975", [byCode, byText])).toEqual(company("sellos"));
+    expect(c("Transferencia recibida de ACME", -100, "191", null, [byCode, byText])).toEqual(company("sellos"));
   });
 
   it("una corrección con código y texto aplica por el texto aunque el código no coincida", () => {
-    expect(c("Transferencia recibida de ACME", 100, "191", "975", [{ bankCode: "191", operationCode: "974", text: "Transferencia recibida", type: "sellos" }])).toEqual(company("sellos"));
+    expect(c("Transferencia recibida de ACME", -100, "191", "975", [{ bankCode: "191", operationCode: "974", text: "Transferencia recibida", type: "sellos" }])).toEqual(company("sellos"));
   });
 
   it("el alcance gana sobre el código: el texto de un banco gana al código de todos los bancos", () => {
     const anyBankCode: Correction = { bankCode: null, operationCode: "974", type: "intereses" };
-    expect(c("Transferencia recibida de ACME", 100, "191", "974", [anyBankCode, { bankCode: "191", text: "Transferencia", type: "sellos" }])).toEqual(company("sellos"));
+    expect(c("Transferencia recibida de ACME", -100, "191", "974", [anyBankCode, { bankCode: "191", text: "Transferencia", type: "sellos" }])).toEqual(company("sellos"));
   });
 
   it("entre textos, el más largo; con igual largo, el primero de la lista", () => {
     const short: Correction = { bankCode: "191", text: "Transferencia", type: "sellos" };
     const long: Correction = { bankCode: "191", text: "Transferencia recibida", type: "intereses" };
-    expect(c("Transferencia recibida de ACME", 100, "191", null, [short, long])).toEqual(company("intereses"));
-    expect(c("Transferencia recibida de ACME", 100, "191", null, [long, short])).toEqual(company("intereses"));
+    expect(c("Transferencia recibida de ACME", -100, "191", null, [short, long])).toEqual(company("intereses"));
+    expect(c("Transferencia recibida de ACME", -100, "191", null, [long, short])).toEqual(company("intereses"));
     const first: Correction = { bankCode: "191", text: "Transferencia", type: "sellos" };
     const second: Correction = { bankCode: "191", text: "TRANSFERENCIA", type: "intereses" };
-    expect(c("Transferencia recibida de ACME", 100, "191", null, [first, second])).toEqual(company("sellos"));
+    expect(c("Transferencia recibida de ACME", -100, "191", null, [first, second])).toEqual(company("sellos"));
   });
 
   it("una corrección sin código ni texto no aplica a nada", () => {
@@ -467,5 +467,35 @@ describe("classify: los bordes del catálogo y de la proporción", () => {
 
   it("un importe en cero no es un cargo proporcional, ni siquiera sobre una base chica", () => {
     expect(c("XYZ 123", 0, null, null, [], { previous: -100, next: null })).toEqual(unclassified);
+  });
+});
+
+describe("classify: la corrección de la empresa solo aplica si su tipo cabe en el signo del importe", () => {
+  const company = (code: string) => ({ type: { code, source: "company" }, isNew: false });
+  const byCode: Correction = { bankCode: "191", operationCode: "974", type: "transferencia-recibida" };
+
+  it("una corrección a un tipo de ingreso por un código de operación no cambia un renglón de ese código con importe negativo", () => {
+    expect(c("Transferencia enviada a ACME", -100, "191", "974", [byCode])).toEqual(c("Transferencia enviada a ACME", -100, "191", "974"));
+    expect(c("Transferencia enviada a ACME", -100, "191", "974", [byCode]).type.source).not.toBe("company");
+    expect(c("Transferencia recibida de ACME", 100, "191", "974", [byCode])).toEqual(company("transferencia-recibida"));
+  });
+
+  it("por texto, igual: un tipo de egreso no se aplica a un crédito", () => {
+    const comision: Correction = { bankCode: null, text: "Ajuste", type: "comision" };
+    expect(c("Ajuste a favor", 100, null, null, [comision]).type.source).not.toBe("company");
+    expect(c("Ajuste en contra", -100, null, null, [comision])).toEqual(company("comision"));
+  });
+
+  it("si la que pesa más no cabe, aplica la siguiente que sí", () => {
+    const byText: Correction = { bankCode: "191", text: "Transferencia", type: "transferencia-enviada" };
+    expect(c("Transferencia a ACME", -100, "191", "974", [byCode, byText])).toEqual(company("transferencia-enviada"));
+    expect(c("Transferencia de ACME", 100, "191", "974", [byText, byCode])).toEqual(company("transferencia-recibida"));
+  });
+
+  it("un tipo sin signo cabe en los dos signos, y un importe en cero cabe en cualquier tipo", () => {
+    const propia: Correction = { bankCode: null, text: "Mov", type: "transferencia-cuenta-propia" };
+    expect(c("Mov interno", 100, null, null, [propia])).toEqual(company("transferencia-cuenta-propia"));
+    expect(c("Mov interno", -100, null, null, [propia])).toEqual(company("transferencia-cuenta-propia"));
+    expect(c("Mov interno", 0, null, null, [{ bankCode: null, text: "Mov", type: "comision" }])).toEqual(company("comision"));
   });
 });

@@ -1,5 +1,8 @@
 # AgilBank: borrador del contrato
 
+> **Reemplazado** para la lectura (§1 a §6, §8 y el anexo) por la referencia de la API, `agilbank-server/docs/api-agilbank.html`.
+> El §7 (conciliación y decisiones) sigue siendo un boceto hasta los sub-proyectos 2 y 3.
+
 *Para BDL · borrador del 10-10-2026 · lo firme es la lectura; la conciliación es un boceto*
 
 Este borrador es para que puedan desarrollar en paralelo la carga del extracto en el Resumen de

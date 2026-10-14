@@ -114,7 +114,7 @@ const weigh = (k: Correction, code: string | null, normalized: string, bankCode:
 const lighter = (a: Weight, b: Weight): boolean => (a[0] - b[0] || a[1] - b[1] || a[2] - b[2]) < 0;
 
 /**
- * El tipo canónico de un renglón, de más firme a más débil: la corrección de la empresa, la tabla
+ * El tipo canónico de un renglón, de más firme a más débil: la corrección de la empresa (si su tipo cabe en el signo), la tabla
  * común (primero el código de operación, después el comienzo del texto o su final), las reglas generales, un CUIT
  * o un CBU en el concepto y la proporción con un vecino. Lo que no sale de la empresa ni de la tabla es
  * un concepto nuevo, y vuelve con su aviso aunque tenga tipo: todo renglón vuelve con algo.
@@ -128,7 +128,10 @@ export const classify = (
 ): { type: LineType; isNew: boolean } => {
   const normalized = normalizeConcept(input.text);
   let chosen: { weight: Weight; type: string } | null = null;
+  // La corrección se arma desde un renglón, pero su código o su texto también los llevan renglones
+  // del signo contrario: el tipo no puede cruzarlo, igual que en la tabla y las reglas.
   for (const k of corrections) {
+    if (!fits(k.type, input.amountCents, catalog)) continue;
     const weight = weigh(k, input.code, normalized, bankCode);
     if (weight && (chosen === null || lighter(weight, chosen.weight))) chosen = { weight, type: k.type };
   }

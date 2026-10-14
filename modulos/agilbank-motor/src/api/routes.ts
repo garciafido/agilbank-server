@@ -70,7 +70,7 @@ const jsonErrors = (err: unknown, _req: unknown, res: ExpressResponse, _next: (e
   if (type === "entity.too.large") return res.status(413).json({ codigo: "CUERPO_DEMASIADO_GRANDE", error: "El cuerpo pesa más de 64 KB." });
   if (type === "entity.parse.failed") return res.status(400).json({ codigo: "CORRECCION_INVALIDA", error: "El cuerpo no es un JSON válido.", campo: null });
   if (type === "encoding.unsupported" || type === "charset.unsupported") {
-    return res.status(415).json({ codigo: "CUERPO_NO_SOPORTADO", error: "El cuerpo usa una codificación que no se acepta: JSON en UTF-8, sin comprimir." });
+    return res.status(415).json({ codigo: "CUERPO_NO_SOPORTADO", error: "El cuerpo usa una codificación de contenido o un juego de caracteres que no se acepta: manden JSON en UTF-8." });
   }
   if (type === "request.aborted" || type === "request.size.invalid") {
     return res.status(400).json({ codigo: "CORRECCION_INVALIDA", error: "El cuerpo llegó incompleto.", campo: null });

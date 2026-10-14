@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import type { Db } from "./api/http";
 import { readStatement } from "./readStatement";
 import type { Correction, KnownAccount } from "./types";
@@ -35,12 +36,22 @@ export const latestCorrections = (rows: CorrectionRow[]): Correction[] => {
   return out;
 };
 
+/**
+ * Los arranques que el paso tolera sin terminar. Un archivo que tumba al worker (memoria) no tira
+ * error: el evento vence y se vuelve a tomar sin contar el intento. Al cuarto arranque queda fallido.
+ */
+export const MAX_READ_STARTS = 3;
+
+const touched = (): { lastUpdatedAt_: Date; version_: string } => ({ lastUpdatedAt_: new Date(), version_: randomUUID() });
+
 const pesos = (cents: number | null | undefined): string | null => (cents === null || cents === undefined ? null : (cents / 100).toFixed(2));
 const day = (iso: string | null | undefined): Date | null => (iso ? new Date(`${iso}T00:00:00.000Z`) : null);
 
 /**
  * El paso `read` del pipeline AbStatementRead (`.implementedBy`). Escribe con `context.prisma` y no con la
  * transacción del paso: si escribiera adentro, el rollback al relanzar se llevaría el estado y la causa.
+ * Nunca baja un extracto leído: un trabajo tardío sobre él (un reintento manual) devuelve `read` sin leer.
+ * `readStarts` cuenta los arranques que no terminaron en error: los interrumpidos y el que lee.
  */
 export const readStatementStage = async (context: StageContextLike, statementId: string, _workerEventId?: string): Promise<{ status: string }> => {
   if (!configured) throw new Error("La lectura de extractos no está configurada: falta configureBackgroundReading en el arranque del worker.");
@@ -48,9 +59,15 @@ export const readStatementStage = async (context: StageContextLike, statementId:
   if (!tenantId) throw new Error("El trabajo de lectura no trae empresa.");
   const db = context.prisma;
   const where = { id: statementId, tenant_id_: tenantId };
-  const statement = await db.abStatement.findFirst({ where, select: { id: true, originalName: true, file_server_data: true, declaredAccount: true } });
+  const statement = await db.abStatement.findFirst({ where, select: { id: true, originalName: true, file_server_data: true, declaredAccount: true, readStarts: true } });
   if (!statement) return { status: "not-found" };
-  await db.abStatement.updateMany({ where, data: { status: "processing" } });
+  const notRead = { ...where, status: { not: "read" } };
+  if ((statement.readStarts ?? 0) >= MAX_READ_STARTS) {
+    const gaveUp = await db.abStatement.updateMany({ where: notRead, data: { status: "failed", error: "La lectura se interrumpió tres veces.", ...touched() } });
+    return { status: gaveUp.count === 1 ? "failed" : "read" };
+  }
+  const started = await db.abStatement.updateMany({ where: notRead, data: { status: "processing", readStarts: { increment: 1 }, ...touched() } });
+  if (started.count === 0) return { status: "read" };
   try {
     const file = statement.file_server_data as { baseName: string; uuid: string; filename: string };
     const bytes = await configured.storage().downloadBuffer(`${file.baseName}${file.uuid}/${file.filename}`);
@@ -82,12 +99,16 @@ export const readStatementStage = async (context: StageContextLike, statementId:
         lineCount: reading.lines.length,
         error: null,
         processedAt: new Date(),
+        ...touched(),
       },
     });
     return { status: "read" };
   } catch (e) {
     // Queda en `queued` mientras el worker reintenta: `failed` lo pone markStatementFailed al agotarse.
-    await db.abStatement.updateMany({ where, data: { status: "queued", error: e instanceof Error ? e.message : String(e) } });
+    await db.abStatement.updateMany({
+      where: notRead,
+      data: { status: "queued", error: e instanceof Error ? e.message : String(e), readStarts: { decrement: 1 }, ...touched() },
+    });
     throw e;
   }
 };
@@ -102,5 +123,5 @@ export const markStatementFailed = async ({ payload, prisma }: { payload: any; p
   if (typeof id !== "string" || id === "" || typeof workerEventId !== "string" || workerEventId === "") return;
   const event = await prisma.workerEvent.findFirst({ where: { id: workerEventId }, select: { tenant_id_: true } });
   if (!event?.tenant_id_) return;
-  await prisma.abStatement.updateMany({ where: { id, tenant_id_: event.tenant_id_, status: { not: "read" } }, data: { status: "failed" } });
+  await prisma.abStatement.updateMany({ where: { id, tenant_id_: event.tenant_id_, status: { not: "read" } }, data: { status: "failed", ...touched() } });
 };

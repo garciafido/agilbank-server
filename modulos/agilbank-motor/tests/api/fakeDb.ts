@@ -3,17 +3,34 @@ import { randomUUID } from "crypto";
 type Row = Record<string, any>;
 type Where = Record<string, unknown>;
 
+/** Igualdad de columna como en la base: `null` es la columna vacía (en el fake, también ausente) y una fecha vale por su instante. */
+const same = (value: unknown, condition: unknown): boolean => {
+  if (condition === null) return value === null || value === undefined;
+  if (condition instanceof Date) return value instanceof Date && value.getTime() === condition.getTime();
+  return value === condition;
+};
+
 /** Un valor del `where` como lo entiende Prisma, en lo que usa el motor: igualdad, `not`, `in`; `undefined` omite. */
 const matches = (row: Row, where: Where): boolean =>
   Object.entries(where).every(([key, condition]) => {
     if (condition === undefined) return true;
     if (condition !== null && typeof condition === "object" && !Array.isArray(condition) && !(condition instanceof Date)) {
       const c = condition as { not?: unknown; in?: unknown[] };
-      if ("not" in c) return row[key] !== c.not;
+      if ("not" in c) return !same(row[key], c.not);
       if ("in" in c) return (c.in ?? []).includes(row[key]);
     }
-    return row[key] === condition;
+    return same(row[key], condition);
   });
+
+/** El `data` de un update, con `increment` y `decrement` de Prisma sobre una columna numérica (ausente cuenta como 0, el default). */
+const apply = (row: Row, data: Row): void => {
+  for (const [key, value] of Object.entries(data)) {
+    const op = value as { increment?: number; decrement?: number } | null;
+    if (op && typeof op === "object" && "increment" in op) row[key] = (row[key] ?? 0) + (op.increment as number);
+    else if (op && typeof op === "object" && "decrement" in op) row[key] = (row[key] ?? 0) - (op.decrement as number);
+    else row[key] = value;
+  }
+};
 
 /** `connect` de Prisma a columna: `tenant_: { connect: { id } }` → `tenant_id_`. */
 const flatten = (data: Row): Row => {
@@ -59,7 +76,7 @@ const model = (rows: Row[], wheres: Where[], unique?: (a: Row, b: Row) => boolea
   updateMany: async ({ where, data }: any): Promise<{ count: number }> => {
     wheres.push(where);
     const hit = rows.filter((r) => matches(r, where));
-    for (const r of hit) Object.assign(r, data);
+    for (const r of hit) apply(r, data);
     return { count: hit.length };
   },
 });

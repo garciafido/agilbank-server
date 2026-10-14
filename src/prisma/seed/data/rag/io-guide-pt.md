@@ -26,7 +26,7 @@ iO é o motor de consultas deste sistema. Permite consultar dados internos e doc
 #### AbStatement
 
 
-**Campos consultáveis:** file, originalName, contentHash, status, verdict, bankCode, cbu, periodFrom, periodTo, openingBalance, closingBalance, lineCount, declaredAccount, reading, error, processedAt
+**Campos consultáveis:** file, originalName, contentHash, status, verdict, bankCode, cbu, periodFrom, periodTo, openingBalance, closingBalance, lineCount, declaredAccount, reading, error, processedAt, readStarts
 
 **Relações:** N/A
 
