@@ -82,6 +82,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+# Paquetes de sistema que exigen los módulos (haiku-module.json → systemDeps.apt)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    poppler-utils \
+    tesseract-ocr \
+    tesseract-ocr-spa \
+    && rm -rf /var/lib/apt/lists/*
+
+# @agilmind/lectura en la imagen (haiku-module.json → imagen)
+COPY modulos/agilmind-lectura/modelos /app/modulos/agilmind-lectura/modelos
+ENV AP_PADDLE_MODELS_DIR=/app/modulos/agilmind-lectura/modelos/paddle-latin-v5
 
 # Fuentes para el rendering (los browsers las necesitan para PDFs/screenshots)
 RUN apt-get update && apt-get install -y --no-install-recommends \

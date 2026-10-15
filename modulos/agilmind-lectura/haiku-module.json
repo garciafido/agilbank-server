@@ -1,0 +1,14 @@
+{
+  "description": "Lo que lee un documento sin saber qué documento es: el PDF, su render, el PP-OCR con sus modelos y la geometría de las palabras.",
+  "sources": [],
+  "systemDeps": {
+    "apt": ["poppler-utils", "tesseract-ocr", "tesseract-ocr-spa"]
+  },
+  "bundleExternals": ["@gutenye/ocr-node", "sharp"],
+  "imagen": {
+    "archivos": ["modelos"],
+    "entorno": {
+      "AP_PADDLE_MODELS_DIR": "modelos/paddle-latin-v5"
+    }
+  }
+}

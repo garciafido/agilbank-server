@@ -2,6 +2,10 @@
   "description": "Lee un extracto bancario tal como lo entrega el banco y lo lleva al resumen bancario canónico, con sus controles.",
   "sources": ["model/statement.hk"],
   "requires": {
-    "entities": ["Tenant", "User"]
+    "entities": ["Tenant", "User"],
+    "modules": ["../agilmind-lectura"]
+  },
+  "systemDeps": {
+    "apt": ["poppler-utils"]
   }
 }

@@ -288,6 +288,20 @@ describe("buildRows: los bordes", () => {
       expect(r.movements[0].toRow).toBe(1);
     });
 
+    it("una fila con dos rótulos de encabezado no completa el concepto: es el encabezado repetido de otra página", () => {
+      expect(first(base([null, "Concepto", "Importe", null])).movements[0].concept).toBe("Transf. recibida");
+      expect(first(base([null, "Concepto", "Importe", "Saldo"])).movements[0].toRow).toBe(1);
+    });
+
+    it("en una fuente visual, una fila de otra página no completa el concepto; una de la misma, sí", () => {
+      const onPages = (pages: number[]): Grid => {
+        const g = base([null, "TERMINOS Y CONDICIONES", null, null]);
+        return { ...g, origin: "pdf", places: pages.map((page, k) => ({ page, line: k + 1, origin: "pdf" as const })) };
+      };
+      expect(first(onPages([1, 1, 2, 2])).movements[0].concept).toBe("Transf. recibida");
+      expect(first(onPages([1, 1, 1, 2])).movements[0].concept).toBe("Transf. recibida TERMINOS Y CONDICIONES");
+    });
+
     it("la continuación de un movimiento sin concepto no deja un espacio de más", () => {
       const g = grid([
         ["Fecha", "Concepto", "Importe", "Saldo"],
@@ -332,6 +346,35 @@ describe("directionsFromDates y chain", () => {
     expect(chain([m(-100, 900), m(50, 950)], "chronological", "after", 1000)).toEqual({ checked: 2, chained: 2, chains: [true, true] });
     expect(chain([m(-100, 1000), m(50, 900)], "chronological", "before", 1000)).toEqual({ checked: 2, chained: 2, chains: [true, true] });
     expect(chain([m(-100, 900), m(50, 999)], "chronological", "after", null)).toEqual({ checked: 1, chained: 0, chains: [null, false] });
+  });
+
+  it("entre dos saldos impresos con renglones sin saldo, controla el tramo entero en el renglón que trae el saldo", () => {
+    const m = (amountCents: number, balanceCents: number | null) => ({ fromRow: 0, toRow: 0, date: "2026-07-01", valueDate: null, amountCents, balanceCents, concept: "", reference: null, code: null, account: null, extras: [] });
+    // Saldo después: 1000 − 10 + 200 − 2 = 1188 en el tercero; + 5 − 30 + 50 = 1213 en el sexto.
+    expect(chain([m(-10, null), m(200, null), m(-2, 1188), m(5, null), m(-30, null), m(50, 1213)], "chronological", "after", 1000)).toEqual({
+      checked: 2,
+      chained: 2,
+      chains: [null, null, true, null, null, true],
+    });
+    // Un importe mal rompe solo el tramo que lo tiene.
+    expect(chain([m(-10, null), m(200, null), m(-2, 1188), m(5, null), m(-300, null), m(50, 943), m(1, 944)], "chronological", "after", 1000).chains).toEqual([
+      null, null, true, null, null, true, true,
+    ]);
+    expect(chain([m(-10, null), m(200, null), m(-2, 1188), m(5, null), m(-300, null), m(50, 1213)], "chronological", "after", 1000).chains).toEqual([
+      null, null, true, null, null, false,
+    ]);
+    // Más nuevo arriba: el tramo se recorre de abajo hacia arriba.
+    expect(chain([m(50, 1213), m(-30, null), m(5, null), m(-2, 1188), m(200, null), m(-10, null)], "reverse", "after", 1000)).toEqual({
+      checked: 2,
+      chained: 2,
+      chains: [true, null, null, true, null, null],
+    });
+    // Saldo de antes: el del renglón es el que había antes de su movimiento.
+    expect(chain([m(-10, 1000), m(200, null), m(-2, null), m(5, 1188), m(-30, null)], "chronological", "before", 1000)).toEqual({
+      checked: 2,
+      chained: 2,
+      chains: [true, null, null, true, null],
+    });
   });
 });
 

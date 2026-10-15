@@ -7,12 +7,15 @@
   "types": "src/index.ts",
   "scripts": {
     "test": "jest",
+    "test:integration": "jest -c jest.integration.config.js",
     "test:mutation": "stryker run",
     "typecheck": "tsc --noEmit",
     "bench": "ts-node --transpile-only bench/measure.ts",
+    "bench:visual": "ts-node --transpile-only bench/visualSpeed.ts",
     "inventory": "ts-node --transpile-only bench/inventory.ts"
   },
   "dependencies": {
+    "@agilmind/lectura": "file:../agilmind-lectura",
     "busboy": "^1.6.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
@@ -23,6 +26,7 @@
     "@types/jest": "^29.5.14",
     "@types/node": "^22.15.3",
     "jest": "^29.7.0",
+    "pdf-lib": "^1.17.1",
     "ts-jest": "^29.3.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"

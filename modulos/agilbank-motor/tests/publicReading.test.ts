@@ -13,7 +13,7 @@ const line: StatementLine = {
   counterparty: null,
   bank: { code: "500", text: "Com. mantenimiento cuenta", extras: [] },
   chains: true,
-  provenance: { origin: "cell", sheet: "H", fromRow: 3, toRow: 3 },
+  provenance: { origin: "cell", sheet: "H", page: null, pageTo: null, fromRow: 3, toRow: 3 },
 };
 
 const reading: StatementReading = {
@@ -65,7 +65,7 @@ describe("toPublicReading", () => {
       contraparte: null,
       delBanco: { codigo: "500", texto: "Com. mantenimiento cuenta", complementos: [] },
       encadena: true,
-      procedencia: { origen: "celda", hoja: "H", filaDesde: 3, filaHasta: 3 },
+      procedencia: { origen: "celda", hoja: "H", pagina: null, paginaHasta: null, filaDesde: 3, filaHasta: 3 },
     });
     expect(p.avisos[0]).toEqual({ codigo: "sin-saldos", detalle: "x", frenaPropuestas: false });
     expect(p.controles).toEqual({
@@ -87,9 +87,21 @@ describe("toPublicReading", () => {
   it("traduce el origen, de dónde salió el tipo y el sentido", () => {
     const source = (s: StatementLine["type"]["source"]) => toPublicReading({ ...reading, lines: [{ ...line, type: { code: "x", source: s } }] }).renglones[0].tipo.segun;
     expect([source("company"), source("table"), source("rule"), source("none")]).toEqual(["empresa", "tabla", "regla", "ninguna"]);
-    const text = toPublicReading({ ...reading, lines: [{ ...line, provenance: { origin: "text", sheet: null, fromRow: 2, toRow: 3 } }] }).renglones[0];
-    expect(text.procedencia).toEqual({ origen: "texto", hoja: null, filaDesde: 2, filaHasta: 3 });
+    const text = toPublicReading({ ...reading, lines: [{ ...line, provenance: { origin: "text", sheet: null, page: null, pageTo: null, fromRow: 2, toRow: 3 } }] }).renglones[0];
+    expect(text.procedencia).toEqual({ origen: "texto", hoja: null, pagina: null, paginaHasta: null, filaDesde: 2, filaHasta: 3 });
     expect(toPublicReading(withChecks({ direction: "chronological", balanceIs: "before" })).controles).toMatchObject({ sentido: "cronologico", saldoDeLaFila: "antes" });
+  });
+
+  const lecturaCon = (over: Partial<StatementLine>): StatementReading => ({ ...reading, lines: [{ ...line, ...over }] });
+
+  it("la procedencia de un renglón leído de un PDF dice el origen, la página y las líneas", () => {
+    const r = lecturaCon({ provenance: { origin: "pdf", sheet: null, page: 3, pageTo: 4, fromRow: 41, toRow: 2 } });
+    expect(toPublicReading(r).renglones[0].procedencia).toEqual({ origen: "pdf", hoja: null, pagina: 3, paginaHasta: 4, filaDesde: 41, filaHasta: 2 });
+  });
+
+  it("la de un renglón leído por OCR dice ocr", () => {
+    const r = lecturaCon({ provenance: { origin: "ocr", sheet: null, page: 1, pageTo: 1, fromRow: 7, toRow: 8 } });
+    expect(toPublicReading(r).renglones[0].procedencia.origen).toBe("ocr");
   });
 
   it("los saldos null siguen null, y el cero es cero", () => {
@@ -222,7 +234,7 @@ describe("toPublicReading", () => {
       ]);
       expect(Object.keys(p.renglones[0].tipo)).toEqual(["codigo", "segun"]);
       expect(Object.keys(p.renglones[0].delBanco)).toEqual(["codigo", "texto", "complementos"]);
-      expect(Object.keys(p.renglones[0].procedencia)).toEqual(["origen", "hoja", "filaDesde", "filaHasta"]);
+      expect(Object.keys(p.renglones[0].procedencia)).toEqual(["origen", "hoja", "pagina", "paginaHasta", "filaDesde", "filaHasta"]);
       expect(Object.keys(p.avisos[0])).toEqual(["codigo", "detalle", "frenaPropuestas"]);
       expect(Object.keys(p.controles!)).toEqual([
         "sentido", "saldoDeLaFila", "renglonesConSaldo", "renglonesQueEncadenan", "cierraConSusSaldos", "cierraConProntoNet",

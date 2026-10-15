@@ -1,9 +1,9 @@
 import * as XLSX from "xlsx";
 import * as spreadsheet from "../src/sources/spreadsheet";
-import { readStatement } from "../src/readStatement";
+import { provenanceOf, readStatement } from "../src/readStatement";
 import { assignIds } from "../src/identity";
 import type { KnownAccount } from "../src/types";
-import { sparseBook, xlsx } from "./helpers";
+import { pdfCifrado, pdfConTexto, sparseBook, statementPdf, xlsx } from "./helpers";
 
 const CBU_CREDICOOP = "1910018600001234567891";
 const CBU_PROVINCIA = "0140007600009876543219";
@@ -41,7 +41,7 @@ describe("readStatement", () => {
     expect(r.lines.map((l) => l.order)).toEqual([1, 2, 3, 4]);
     expect(r.lines.map((l) => l.type.code)).toEqual(["iva", "comision", "transferencia-recibida", "sin-clasificar"]);
     expect(r.lines[2].counterparty).toEqual({ cuit: CUIT, name: "ACME", cbu: null });
-    expect(r.lines[2].provenance).toEqual({ origin: "cell", sheet: "saldos_y_movimientos", fromRow: 4, toRow: 4 });
+    expect(r.lines[2].provenance).toEqual({ origin: "cell", sheet: "saldos_y_movimientos", page: null, pageTo: null, fromRow: 4, toRow: 4 });
     expect(r.checks).toMatchObject({ direction: "reverse", balanceIs: "after", closesWithOwnBalances: true, closesWithProntoNet: true });
     expect(r.warnings.map((w) => w.code)).toEqual(["concepto-nuevo"]);
     expect(r.lines.every((l) => /^r-[0-9a-f]{20}$/.test(l.id))).toBe(true);
@@ -183,9 +183,16 @@ describe("readStatement", () => {
       expect(r.verdict).toBe("weak");
     });
 
-    it("con el saldo inicial impreso, un solo movimiento con saldo sí se controla: no avisa", async () => {
+    it("con el saldo inicial impreso, un solo movimiento con saldo se controla, pero uno solo: avisa que se controla el total", async () => {
       const r = await readStatement(csv("Fecha;Concepto;Importe;Saldo", "Saldo anterior;;;1.000,00", "01/07/2026;Transf recibida;100,00;1.100,00"));
       expect(r.checks).toMatchObject({ linesWithBalance: 1, linesThatChain: 1 });
+      expect(r.warnings.find((w) => w.code === "sin-saldos")?.detail).toBe("El archivo trae un solo saldo con qué controlar: se controla el total, no cada renglón.");
+      expect(r.verdict).toBe("weak");
+    });
+
+    it("con dos movimientos controlados no avisa", async () => {
+      const r = await readStatement(csv("Fecha;Concepto;Importe;Saldo", "Saldo anterior;;;1.000,00", "01/07/2026;Transf recibida;100,00;1.100,00", "02/07/2026;Comision;-10,00;1.090,00"));
+      expect(r.checks).toMatchObject({ linesWithBalance: 2, linesThatChain: 2 });
       expect(r.warnings.map((w) => w.code)).not.toContain("sin-saldos");
     });
 
@@ -240,14 +247,20 @@ describe("readStatement", () => {
   });
 
   it.each([
-    ["un PDF", Buffer.from("%PDF-1.7\n...")],
     ["una foto JPG", Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0])],
     ["una foto PNG", Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0])],
-  ])("%s no se lee por esta vía: sin lectura, con el motivo", async (_name, file) => {
-    const r = await readStatement(file);
-    expect(r).toMatchObject({ verdict: "abstained", lines: [], header: null, checks: null });
-    expect(r.reason).toBe("Este formato no se lee por esta vía: manden el extracto en Excel, CSV o texto.");
-    expect(r.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+  ])("%s, sin el OCR en el servidor: no disponible, sin lectura", async (_name, file) => {
+    const off = process.env.AP_PADDLE_OCR;
+    process.env.AP_PADDLE_OCR = "off";
+    try {
+      const r = await readStatement(file);
+      expect(r).toMatchObject({ verdict: "unavailable", lines: [], header: null, checks: null, warnings: [] });
+      expect(r.reason).toBe("No se pudo leer el archivo: el servidor no tiene el lector de imágenes. Avísennos; mientras tanto, manden el extracto en Excel, CSV o texto.");
+      expect(r.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    } finally {
+      if (off === undefined) delete process.env.AP_PADDLE_OCR;
+      else process.env.AP_PADDLE_OCR = off;
+    }
   });
 
   describe("un «XLS» que en realidad es HTML o XML 2003", () => {
@@ -256,12 +269,15 @@ describe("readStatement", () => {
         <tr><td>Fecha</td><td>Concepto</td><td>Débito</td><td>Crédito</td><td>Saldo</td></tr>
         <tr><td>01/07/2026</td><td>Transf recibida</td><td></td><td>100,00</td><td>1.100,00</td></tr>
         <tr><td>02/07/2026</td><td>Comision</td><td>10,00</td><td></td><td>1.090,00</td></tr>
+        <tr><td>03/07/2026</td><td>IVA</td><td>2,10</td><td></td><td>1.087,90</td></tr>
       </table></body></html>`;
       const r = await readStatement(Buffer.from(html));
+      // El primer saldo es el ancla: con tres renglones se controlan dos, lo que pide un verificado.
       expect(r.verdict).toBe("verified");
       expect(r.lines.map((l) => [l.date, l.amountCents, l.balanceCents])).toEqual([
         ["2026-07-01", 10000, 110000],
         ["2026-07-02", -1000, 109000],
+        ["2026-07-03", -210, 108790],
       ]);
       expect(r.lines[0].provenance.origin).toBe("cell");
     });
@@ -273,12 +289,14 @@ describe("readStatement", () => {
 <Row><Cell><Data ss:Type="String">Fecha</Data></Cell><Cell><Data ss:Type="String">Concepto</Data></Cell><Cell><Data ss:Type="String">Importe</Data></Cell><Cell><Data ss:Type="String">Saldo</Data></Cell></Row>
 <Row><Cell><Data ss:Type="String">01/07/2026</Data></Cell><Cell><Data ss:Type="String">Transf recibida</Data></Cell><Cell><Data ss:Type="Number">100</Data></Cell><Cell><Data ss:Type="Number">1100</Data></Cell></Row>
 <Row><Cell><Data ss:Type="DateTime">2026-07-02T00:00:00.000</Data></Cell><Cell><Data ss:Type="String">Comision</Data></Cell><Cell><Data ss:Type="Number">-10</Data></Cell><Cell><Data ss:Type="Number">1090</Data></Cell></Row>
+<Row><Cell><Data ss:Type="String">03/07/2026</Data></Cell><Cell><Data ss:Type="String">IVA</Data></Cell><Cell><Data ss:Type="Number">-2.1</Data></Cell><Cell><Data ss:Type="Number">1087.9</Data></Cell></Row>
 </Table></Worksheet></Workbook>`;
       const r = await readStatement(Buffer.from(xml));
       expect(r.verdict).toBe("verified");
       expect(r.lines.map((l) => [l.date, l.amountCents])).toEqual([
         ["2026-07-01", 10000],
         ["2026-07-02", -1000],
+        ["2026-07-03", -210],
       ]);
       expect(r.lines[0].provenance).toMatchObject({ origin: "cell", sheet: "Movimientos", fromRow: 2 });
     });
@@ -632,11 +650,16 @@ describe("readStatement", () => {
     });
   });
 
+  it("un renglón de un texto no tiene página", async () => {
+    const r = await readStatement(Buffer.from("Fecha;Concepto;Importe;Saldo\n01/07/2026;COMISION;-1,00;9,00\n02/07/2026;IVA;-1,00;8,00\n"));
+    expect(r.lines[0].provenance).toMatchObject({ origin: "text", page: null, pageTo: null, fromRow: 2, toRow: 2 });
+  });
+
   it("el CSV numera la procedencia desde la fila 1 del texto, sin hoja", async () => {
     const r = await readStatement(csv("Fecha;Concepto;Importe;Saldo", "01/07/2026;Transf recibida;100,00;1.100,00", "02/07/2026;Comision;-10,00;1.090,00"));
     expect(r.lines.map((l) => l.provenance)).toEqual([
-      { origin: "text", sheet: null, fromRow: 2, toRow: 2 },
-      { origin: "text", sheet: null, fromRow: 3, toRow: 3 },
+      { origin: "text", sheet: null, page: null, pageTo: null, fromRow: 2, toRow: 2 },
+      { origin: "text", sheet: null, page: null, pageTo: null, fromRow: 3, toRow: 3 },
     ]);
   });
 
@@ -1130,5 +1153,187 @@ describe("readStatement", () => {
     const file = credicoop();
     expect(await readStatement(file)).toEqual(await readStatement(file));
     expect((await readStatement(file)).fingerprint).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("un texto con fechas sin año se lee con el año del período de ProntoNet", async () => {
+    const csv = Buffer.from("Fecha;Concepto;Importe;Saldo\n;Saldo anterior;;1.000,00\n02/07;COMISION;-10,00;990,00\n03/07;TRANSFERENCIA;100,00;1.090,00\n");
+    const r = await readStatement(csv, { account: { periodFrom: "2026-07-01", periodTo: "2026-07-31" } });
+    expect(r.lines.map((l) => l.date)).toEqual(["2026-07-02", "2026-07-03"]);
+    expect(r.verdict).toBe("verified");
+  });
+});
+
+describe("provenanceOf", () => {
+  const rows = [[], [], [], []];
+
+  it("en una fuente tabular numera las filas desde 1 y no tiene página", () => {
+    expect(provenanceOf({ origin: "cell", sheet: "H", rows }, 1, 3)).toEqual({ origin: "cell", sheet: "H", page: null, pageTo: null, fromRow: 2, toRow: 4 });
+  });
+
+  it("en una visual da la página y la línea dentro de ella, la de cada punta", () => {
+    const places = [
+      { page: 1, line: 1, origin: "pdf" as const },
+      { page: 1, line: 2, origin: "pdf" as const },
+      { page: 2, line: 1, origin: "ocr" as const },
+      { page: 3, line: 5, origin: "ocr" as const },
+    ];
+    expect(provenanceOf({ origin: "ocr", sheet: null, rows, places }, 1, 3)).toEqual({ origin: "pdf", sheet: null, page: 1, pageTo: 3, fromRow: 2, toRow: 5 });
+    expect(provenanceOf({ origin: "ocr", sheet: null, rows, places }, 2, 2)).toEqual({ origin: "ocr", sheet: null, page: 2, pageTo: 2, fromRow: 1, toRow: 1 });
+  });
+});
+
+describe("readStatement: anexos", () => {
+  it("un anexo no da renglones y completa el CUIT del movimiento que nombra (AC-06, AC-07)", async () => {
+    const file = Buffer.from(
+      [
+        "Fecha;Concepto;Debito;Credito;Saldo",
+        ";SALDO ANTERIOR;;;1.000,00",
+        "01/07/2026;COMISION;-10,00;;990,00",
+        "02/07/2026;TRANSFERENCIA;;40,00;1.030,00",
+        ";;;;",
+        "Fecha;Empresa;Referencia;Importe",
+        "02/07/2026;30712345671 ACME SA;VARIOS;40,00",
+        "05/08/2026;30712345671 ACME SA;VARIOS;50,00",
+      ].join("\n"),
+    );
+    const r = await readStatement(file);
+    expect(r.lines).toHaveLength(2);
+    expect(r.lines[1].counterparty).toEqual({ cuit: "30712345671", name: "ACME SA", cbu: null });
+    expect(r.verdict).toBe("verified");
+  });
+});
+
+describe("un PDF con texto", () => {
+  it("se lee por su texto, con la página y la línea de cada renglón", async () => {
+    const r = await readStatement(statementPdf());
+    expect(r.verdict).toBe("verified");
+    expect(r.lines.map((l) => [l.date, l.amountCents, l.balanceCents])).toEqual([
+      ["2026-07-01", -1000, 99000], ["2026-07-02", 4000, 103000], ["2026-07-03", -210, 102790], ["2026-07-04", 210, 103000],
+    ]);
+    expect(r.lines.map((l) => [l.provenance.origin, l.provenance.page])).toEqual([["pdf", 1], ["pdf", 1], ["pdf", 2], ["pdf", 2]]);
+    expect(r.lines.some((l) => /Pagina/.test(l.bank.text))).toBe(false);
+  });
+
+  it("con más páginas que el tope, lee las primeras y avisa la lectura parcial", async () => {
+    const r = await readStatement(statementPdf(), { visual: { maxPages: 1 } });
+    expect(r.lines).toHaveLength(2);
+    const w = r.warnings.find((x) => x.code === "lectura-parcial");
+    expect(w).toMatchObject({ blocksProposals: true, data: { paginas: 2, paginasLeidas: 1 } });
+    expect(w?.detail).toBe(
+      "Se leyeron 1 de 2 páginas: la lectura se cortó por tiempo o por la cantidad de páginas. Los renglones de las otras páginas no están en esta lectura.",
+    );
+    expect(r.verdict).toBe("weak");
+  });
+});
+
+describe("los techos de la lectura visual", () => {
+  const whole = async () => readStatement(statementPdf());
+
+  it.each([
+    ["maxPages sin valor", { maxPages: undefined }],
+    ["maxPages en 0", { maxPages: 0 }],
+  ])("%s vale como el techo de siempre: lee el PDF entero, sin aviso", async (_name, visual) => {
+    const r = await readStatement(statementPdf(), { visual });
+    expect(r.lines).toHaveLength(4);
+    expect(r.warnings.some((w) => w.code === "lectura-parcial")).toBe(false);
+    expect(r.verdict).toBe("verified");
+  });
+
+  it.each([
+    ["budgetMs sin valor", { budgetMs: undefined }],
+    ["dpi negativo", { dpi: -1 }],
+    ["maxPages fraccionario", { maxPages: 1.5 }],
+  ])("%s no cambia la lectura", async (_name, visual) => {
+    expect(await readStatement(statementPdf(), { visual })).toEqual(await whole());
+  });
+});
+
+describe("un PDF que hay que leer por OCR", () => {
+  const off = process.env.AP_PADDLE_OCR;
+  beforeEach(() => (process.env.AP_PADDLE_OCR = "off"));
+  afterEach(() => (off === undefined ? delete process.env.AP_PADDLE_OCR : (process.env.AP_PADDLE_OCR = off)));
+
+  it("sin el OCR en el servidor, no disponible y no una lectura a medias", async () => {
+    const mixed = pdfConTexto([[{ x: 40, y: 780, texto: "01/07/2026 COMISION -10,00 990,00 02/07/2026 IVA -1,00 989,00" }], []]);
+    const r = await readStatement(mixed);
+    expect(r.verdict).toBe("unavailable");
+    expect(r.reason).toBe("No se pudo leer el archivo: el servidor no tiene el lector de imágenes. Avísennos; mientras tanto, manden el extracto en Excel, CSV o texto.");
+    expect(r.lines).toEqual([]);
+  });
+});
+
+describe("un PDF que no se abre", () => {
+  // Sin OCR: si poppler abriera el cifrado como una página en blanco, no hace falta leerla para el test.
+  const off = process.env.AP_PADDLE_OCR;
+  beforeEach(() => (process.env.AP_PADDLE_OCR = "off"));
+  afterEach(() => (off === undefined ? delete process.env.AP_PADDLE_OCR : (process.env.AP_PADDLE_OCR = off)));
+
+  it("roto: sin lectura, con el motivo", async () => {
+    const r = await readStatement(Buffer.from("%PDF-1.4\nesto no sigue"));
+    expect(r).toMatchObject({ verdict: "abstained", reason: "No se pudo abrir el PDF: está dañado o protegido con contraseña." });
+  });
+
+  it("cifrado: vuelve con un motivo, sin lanzar", async () => {
+    const r = await readStatement(pdfCifrado());
+    expect(["abstained", "unavailable"]).toContain(r.verdict);
+    expect(r.reason).not.toBeNull();
+  });
+});
+
+it("una foto HEIC no se lee, con el motivo", async () => {
+  const heic = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypheic"), Buffer.alloc(16)]);
+  expect(await readStatement(heic)).toMatchObject({ verdict: "abstained", reason: "Las fotos HEIC no se leen: manden la foto en JPG o PNG, o el extracto en PDF." });
+});
+
+describe("readStatement: el saldo solo al cierre del día", () => {
+  // Como el Credicoop en PDF: el saldo anterior arriba y el saldo impreso en el último movimiento de cada día.
+  const daily = (wrong = false) =>
+    csv(
+      "Fecha;Concepto;Débito;Crédito;Saldo",
+      "Saldo anterior;;;;1.000,00",
+      "01/07/2026;Comision;10,00;;",
+      "01/07/2026;Transf recibida;;200,00;",
+      "01/07/2026;IVA;2,10;;1.187,90",
+      "02/07/2026;Sellos;5,00;;",
+      `02/07/2026;Transf emitida;${wrong ? "300,00" : "30,00"};;`,
+      "02/07/2026;Deposito;;50,00;1.202,90",
+      "03/07/2026;Comision;10,00;;",
+      "03/07/2026;Transf recibida;;7,10;",
+      "03/07/2026;IVA;2,10;;1.197,90",
+    );
+
+  it("encadena por tramos entre los saldos impresos: verificado, y los renglones del medio sin control", async () => {
+    const r = await readStatement(daily());
+    expect(r.verdict).toBe("verified");
+    expect(r.lines.map((l) => l.chains)).toEqual([null, null, true, null, null, true, null, null, true]);
+    expect(r.checks).toMatchObject({ linesWithBalance: 3, linesThatChain: 3 });
+    expect(r.warnings.map((w) => w.code)).not.toContain("sin-saldos");
+  });
+
+  it("un importe mal en un tramo: débil, y no encadena el renglón que cierra ese tramo", async () => {
+    const r = await readStatement(daily(true));
+    expect(r.verdict).toBe("weak");
+    expect(r.lines.map((l) => l.chains)).toEqual([null, null, true, null, null, false, null, null, true]);
+    expect(r.warnings.find((w) => w.code === "no-encadena")?.lines).toEqual([6]);
+  });
+});
+
+describe("readStatement: un solo control no verifica", () => {
+  // El saldo anterior y un único saldo al final: se controla el total, no cada renglón.
+  const rows = ["Fecha;Concepto;Débito;Crédito;Saldo", "Saldo anterior;;;;1.000,00"];
+  [10, 20, 30, 40, 50, 60, 70, 80, 90].forEach((a, k) => rows.push(`0${1 + Math.floor(k / 3)}/07/2026;Comision ${k};${a},00;;`));
+
+  it("con un solo renglón controlado, aunque encadene, es débil", async () => {
+    const r = await readStatement(csv(...rows, "04/07/2026;IVA;1,00;;549,00"));
+    expect(r.checks).toMatchObject({ linesWithBalance: 1, linesThatChain: 1 });
+    expect(r.verdict).toBe("weak");
+    // El débil dice por qué: el mismo aviso que un saldo final rotulado.
+    expect(r.warnings.find((w) => w.code === "sin-saldos")?.detail).toBe("El archivo trae un solo saldo con qué controlar: se controla el total, no cada renglón.");
+  });
+
+  it("con dos renglones controlados que encadenan, verificado", async () => {
+    const r = await readStatement(csv(...rows.slice(0, -1), "03/07/2026;Comision 8;90,00;;550,00", "04/07/2026;IVA;1,00;;549,00"));
+    expect(r.checks).toMatchObject({ linesWithBalance: 2, linesThatChain: 2 });
+    expect(r.verdict).toBe("verified");
   });
 });

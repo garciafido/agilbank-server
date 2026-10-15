@@ -125,6 +125,40 @@ describe("cbusOutsideMovements", () => {
     ]);
     expect(cbusOutsideMovements(g, rows)).toEqual([]);
   });
+
+  it("encuentra el CBU impreso en dos bloques, separados por un espacio o un guion", () => {
+    const g = { origin: "text" as const, sheet: null, rows: [["CBU 01700015 00000123456784"], ["CBU: 01700015-00000123456784"]] };
+    expect(cbusOutsideMovements(g, { movements: [], checkpoints: [], excludedRows: 0 })).toEqual(["0170001500000123456784"]);
+  });
+
+  it("un número que parte un CBU entre dos celdas de la misma fila también cuenta", () => {
+    const g = { origin: "text" as const, sheet: null, rows: [["CBU", "01700015", "00000123456784"]] };
+    expect(cbusOutsideMovements(g, { movements: [], checkpoints: [], excludedRows: 0 })).toEqual(["0170001500000123456784"]);
+  });
+
+  it("dos bloques que no forman un CBU válido no cuentan", () => {
+    const g = { origin: "text" as const, sheet: null, rows: [["01700015 00000123456785"]] };
+    expect(cbusOutsideMovements(g, { movements: [], checkpoints: [], excludedRows: 0 })).toEqual([]);
+  });
+
+  it("los dos bloques pegados a otras cifras no forman un CBU", () => {
+    const g = { origin: "text" as const, sheet: null, rows: [["901700015 00000123456784"], ["01700015 000001234567849"], ["101700015-00000123456784"]] };
+    expect(cbusOutsideMovements(g, { movements: [], checkpoints: [], excludedRows: 0 })).toEqual([]);
+  });
+
+  it("un CBU en dos bloques dentro de un movimiento no cuenta", () => {
+    const { g, rows } = read([
+      ["Fecha", "Concepto", "Importe", "Saldo"],
+      ["01/07/2026", "Transf recibida 01700015 00000123456784", "100,00", "1.100,00"],
+      ["02/07/2026", "Comision", "-10,00", "1.090,00"],
+    ]);
+    expect(cbusOutsideMovements(g, rows)).toEqual([]);
+  });
+
+  it("un CBU entero y el mismo en dos bloques se cuentan una vez", () => {
+    const g = { origin: "text" as const, sheet: null, rows: [["CBU 0170001500000123456784"], ["CBU 01700015 00000123456784"]] };
+    expect(cbusOutsideMovements(g, { movements: [], checkpoints: [], excludedRows: 0 })).toEqual(["0170001500000123456784"]);
+  });
 });
 
 describe("hasLabeledBalanceColumn", () => {

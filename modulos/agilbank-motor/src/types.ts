@@ -3,11 +3,23 @@ import type { Verdict } from "./verdict";
 /** Una celda como sale de la fuente. Las fechas de una planilla ya vienen como "AAAA-MM-DD". */
 export type Cell = string | number | null;
 
+/** De dónde salió una fila: una celda de planilla, un texto, el texto de un PDF o el OCR. */
+export type Origin = "cell" | "text" | "pdf" | "ocr";
+
+/** Dónde está una fila de una fuente visual: la página, la línea dentro de ella y cómo se leyó. */
+export interface Place {
+  page: number;
+  line: number;
+  origin: "pdf" | "ocr";
+}
+
 /** Cualquier formato llevado a filas y celdas. La fila 0 es la fila 1 del archivo. */
 export interface Grid {
-  origin: "cell" | "text";
+  origin: Origin;
   sheet: string | null;
   rows: Cell[][];
+  /** Solo en las fuentes visuales: la página y la línea de cada fila. */
+  places?: Place[];
 }
 
 /** Lo que ProntoNet sabe de la cuenta. Todo es opcional: el extracto se lee igual sin nada. */
@@ -52,7 +64,8 @@ export interface StatementLine {
   bank: { code: string | null; text: string; extras: string[] };
   /** Si el saldo anterior más el importe da el saldo; null si no hay con qué controlarlo. */
   chains: boolean | null;
-  provenance: { origin: "cell" | "text"; sheet: string | null; fromRow: number; toRow: number };
+  /** En una fuente visual, las filas son líneas de su página; en una tabular, filas del archivo y sin página. */
+  provenance: { origin: Origin; sheet: string | null; page: number | null; pageTo: number | null; fromRow: number; toRow: number };
 }
 
 export interface StatementHeader {
@@ -128,4 +141,6 @@ export interface ReadOptions {
   fileName?: string;
   account?: KnownAccount;
   corrections?: Correction[];
+  /** Los techos de la lectura visual; sin ellos, los de VISUAL_LIMITS. */
+  visual?: Partial<{ budgetMs: number; maxPages: number; dpi: number }>;
 }

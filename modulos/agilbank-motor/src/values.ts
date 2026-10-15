@@ -90,7 +90,8 @@ export const parseCents = (v: Cell, format: NumberFormat): number | null => {
     const cents = Math.sign(v) * Math.round(Math.abs(v) * 100);
     return cents === 0 ? 0 : cents;
   }
-  let t = v.replace(/\s|\$|ARS|U\$S|USD/gi, "");
+  // El menos tipográfico (U+2212) es un menos: el OCR y algunos sistemas lo escriben así.
+  let t = v.replace(/\s|\$|ARS|U\$S|USD/gi, "").replace(/\u2212/g, "-");
   let marks = 0;
   if (t.startsWith("(") && t.endsWith(")")) {
     marks++;

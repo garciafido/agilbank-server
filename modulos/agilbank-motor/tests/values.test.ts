@@ -204,3 +204,15 @@ describe("textOf", () => {
     expect(textOf("Transf   de\t\tACME")).toBe("Transf de ACME");
   });
 });
+
+describe("parseCents: el menos tipográfico", () => {
+  it.each([
+    ["−1.234,56", "ar", -123456],
+    ["1.234,56−", "ar", -123456],
+    ["−1,234.56", "us", -123456],
+  ] as const)("%s con formato %s es %d", (v, f, cents) => expect(parseCents(v, f)).toBe(cents));
+
+  it("dos marcas de signo, una de ellas tipográfica, no son un importe", () => {
+    expect(parseCents("−1.234,56-", "ar")).toBeNull();
+  });
+});

@@ -4,7 +4,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fingerprintOf } from "../src/identity";
-import type { KnownAccount, WarningCode } from "../src/types";
+import type { KnownAccount, StatementLine, WarningCode } from "../src/types";
 
 export interface BenchFile {
   /** La huella del archivo (el SHA-256 de sus bytes), en «Ejemplos Extractos». */
@@ -13,11 +13,24 @@ export interface BenchFile {
   caseNumber?: string;
   /** Sin caso, el banco por su nombre, para que se usen sus sinónimos. */
   bank?: string;
+  /** El nombre que se muestra en la salida; sin él, el número de consulta de BDL. */
+  label?: string;
   expectedLines?: number;
-  expectedVerdict: "verified" | "weak" | "abstained";
+  expectedVerdict: "verified" | "weak" | "abstained" | "unavailable";
   expectedWarnings?: WarningCode[];
   /** Los archivos con la misma marca traen los mismos movimientos por dos canales: tienen que dar los mismos ids. */
   sameMovements?: string;
+  /** Cuántos renglones, como mínimo, tienen que salir: un retroceso a la mitad de la lectura no pasa en verde en un archivo que ya es weak. */
+  minLines?: number;
+  /** Cuántos renglones, como mínimo, tienen que salir con el CUIT de la contraparte (los que completan los anexos). */
+  minLinesWithCuit?: number;
+  /**
+   * Cuántos renglones, como mínimo, tienen que encadenar. Es para un archivo que no llega a verified:
+   * su veredicto ya es weak y no cambia si la lectura retrocede, pero lo que encadena sí baja.
+   */
+  minLinesThatChain?: number;
+  /** El techo de la lectura en segundos, contada de punta a punta. */
+  maxSeconds?: number;
 }
 
 export const STAGE2: BenchFile[] = [
@@ -33,6 +46,77 @@ export const STAGE2: BenchFile[] = [
   { fingerprint: "6c0b1c7623c0bc60ac6314455c362cdbda6682b159a48c38b568be5d01d8e119", bank: "Credicoop", expectedVerdict: "weak", expectedWarnings: ["sin-saldos"] },
   { fingerprint: "0544cb82a0885475c1820c0e4e8bf9067ab201094a42f6650dfb4ba56c89629b", expectedVerdict: "abstained" },
 ];
+
+// Lectura visual: los PDF de junio a septiembre. Sin caso, se miden por encadenamiento y por los
+// saldos impresos; el caso 01 es el Credicoop de junio. BBVA 07 a 09 traen el texto en el PDF; los
+// demás se leen por OCR, a 150 dpi, y el OCR pierde el signo o la puntuación de algunos importes: no
+// se reparan, y por eso esos archivos esperan weak. Lo que encadena es determinístico (dos pasadas
+// dan lo mismo), y donde hay saldos que encadenan, el piso es lo medido.
+export const STAGE3: BenchFile[] = [
+  { fingerprint: "cc39880332fa5ff8dda3f2523f1eadae95ddf01c7149be11df8bc7118b83a265", label: "BBVA 07", bank: "BBVA Argentina", expectedVerdict: "verified", minLinesWithCuit: 4 },
+  { fingerprint: "e4b5b717f7eb70cb500a294f94b82c7fc15db02cc53f54fdc97c88bc44c4a710", label: "BBVA 08", bank: "BBVA Argentina", expectedVerdict: "verified" },
+  { fingerprint: "442122a1b908ced4b6f8d6f2de15a341fc4f1aa1b1af60e634d4a0aecb9ef169", label: "BBVA 09", bank: "BBVA Argentina", expectedVerdict: "verified" },
+  // La fuente del PDF está rota y se lee por OCR. El OCR pierde el signo de algunos saldos: de los 7
+  // renglones que no encadenan, 6 encadenan cambiándole el signo a un saldo.
+  { fingerprint: "8a0ef3cf74ac6dec79b140d5528b2d6c97adcdfdb509b7d583cf7326a62cf9d9", label: "BBVA 06 (fuente rota)", bank: "BBVA Argentina", expectedVerdict: "weak", expectedWarnings: ["no-encadena", "no-cierra"], minLinesThatChain: 102, maxSeconds: 60 },
+  // El OCR pierde el signo o la puntuación de algunos importes: lee saldos sin el «-» y escribe otros
+  // como «9.999,999,99» o «99, 99», que no son importes. Los saldos de cierre del día encadenan menos
+  // de la mitad, y el juez lee sin saldo. Contra cuenta.json, no cierra.
+  { fingerprint: "7dd15e8c71142b47f2b22feb74e5d300d85f2f0cf57c94c4e7652a166765944c", label: "Credicoop 06 (caso 01)", caseNumber: "01", expectedVerdict: "weak", expectedWarnings: ["sin-saldos", "no-cierra"], minLines: 962, minLinesWithCuit: 332, maxSeconds: 300 },
+  // Lo mismo que el de junio: el OCR pierde el signo o la puntuación de algunos saldos, y se controla
+  // solo el total.
+  { fingerprint: "932055352cd6cfe8ac89bba086ab129ef0a076341488f078d85b28570e718639", label: "Credicoop 07", bank: "Credicoop", expectedVerdict: "weak", expectedWarnings: ["sin-saldos"], minLines: 1014, minLinesWithCuit: 395, maxSeconds: 300 },
+  // Lo mismo que el de junio: el OCR pierde el signo o la puntuación de algunos saldos, y los saldos
+  // que quedan no encadenan con los importes.
+  { fingerprint: "f035e25bf605db14b4c4e07607556976b75a6b2cbb2c7fb530546a191f1b2055", label: "Credicoop 08", bank: "Credicoop", expectedVerdict: "weak", expectedWarnings: ["sin-saldos"], minLines: 971, minLinesWithCuit: 369, maxSeconds: 300 },
+  // El OCR pierde el signo de algunos importes y pega dos importes sin espacio en unas 10 filas por
+  // página. A 150 dpi no queda ningún saldo por renglón: un solo saldo, nada que encadenar.
+  { fingerprint: "95017b694f5ebe7161e756a2469a9e16a8d8b37a7e698ec74f79603e6299ac5a", label: "BPN 06", bank: "Banco Provincia del Neuquén", expectedVerdict: "weak", expectedWarnings: ["sin-saldos"], minLines: 378 },
+  // El OCR pierde el «-» de algunos saldos: la mayoría de los renglones que no encadenan encadenan
+  // cambiándole el signo a un saldo.
+  { fingerprint: "0f4718f560bd8a8a2db79a3c7b9b9a02a4f02ae2cfd81b0c0cf0142be5c4bba3", label: "BPN 07", bank: "Banco Provincia del Neuquén", expectedVerdict: "weak", expectedWarnings: ["no-encadena", "no-cierra"], minLinesThatChain: 170 },
+  // El OCR da cada renglón como una sola caja, de la fecha al saldo: el débito y el crédito no se
+  // separan, los saldos no se leen y el signo de los importes queda sin control. Un solo saldo.
+  { fingerprint: "7ec52140f9b394c60fea05c401772207660e7bceee881d0c74b4b261bab3aabd", label: "BPN 08", bank: "Banco Provincia del Neuquén", expectedVerdict: "weak", expectedWarnings: ["sin-saldos"], minLines: 193 },
+  // El formato del BPN 06. El OCR pierde el signo de algunos importes y pega otros entre sí, y esos
+  // renglones no encadenan.
+  { fingerprint: "6651049a1eb0ce00dae977cfa2000edec1a24cb23d519db7d296e58e6a07c86d", label: "BPN 09", bank: "Banco Provincia del Neuquén", expectedVerdict: "weak", expectedWarnings: ["no-encadena", "no-cierra"], minLinesThatChain: 150 },
+];
+
+/**
+ * Si los renglones salieron todos del OCR. Un concepto que viene solo de ahí puede ser una mala
+ * lectura del texto: la tabla no lo tiene que cubrir, y el banco y el inventario lo informan aparte.
+ */
+export const fromOcr = (lines: StatementLine[]): boolean => lines.length > 0 && lines.every((l) => l.provenance.origin === "ocr");
+
+export interface PendingConcept {
+  /** El código de entidad del banco. */
+  bank: string;
+  /** El texto del banco normalizado, entero: un concepto que solo empieza igual sigue siendo nuevo. */
+  text: string;
+  reason: string;
+}
+
+/**
+ * Los conceptos de los PDF con texto que no tienen un tipo claro y esperan una decisión contable. El
+ * banco los informa y no falla por ellos; cuando se decida su tipo, salen de acá y entran a la tabla.
+ */
+export const PENDING_CONCEPTS: PendingConcept[] = [
+  {
+    bank: "017",
+    text: "imp ley",
+    reason:
+      "El impuesto 25.413 del día, sin decir si es sobre débitos o sobre créditos. En las cuentas medidas es el 0,6 % de los débitos del día, pero en una cuenta con créditos gravados la misma línea puede traer los dos.",
+  },
+  {
+    bank: "017",
+    text: "honorarios",
+    reason: "Es el texto que escribió quien transfirió, no la fórmula del banco: por el texto no hay tipo.",
+  },
+];
+
+export const pendingConcept = (bank: string | null, normalizedText: string): PendingConcept | undefined =>
+  PENDING_CONCEPTS.find((p) => p.bank === bank && p.text === normalizedText);
 
 export const accountOfCase = (json: Record<string, unknown>): KnownAccount => ({
   bank: json.banco as string,
@@ -57,11 +141,11 @@ const consultationOf = (file: string): string => /^\d+/.exec(path.basename(file)
 const short = (fingerprint: string): string => `${fingerprint.slice(0, 12)}…`;
 
 /**
- * Los archivos de la etapa en la carpeta de BDL, con su cuenta. Lo que no se encuentra de una sola
+ * Los archivos de la lista en la carpeta de BDL, con su cuenta. Lo que no se encuentra de una sola
  * manera (una huella que no está o que está en dos archivos, un caso sin carpeta o con dos) vuelve como
  * problema, sin nombres: los mensajes se ven en la terminal y se copian.
  */
-export const locateStage2 = (root: string): { files: StageFile[]; problems: string[] } => {
+export const locate = (root: string, list: BenchFile[]): { files: StageFile[]; problems: string[] } => {
   const examples = path.join(root, "Ejemplos Extractos");
   const cases = path.join(root, "Casos de prueba");
   const missing = [examples, cases].filter((dir) => !fs.existsSync(dir));
@@ -77,7 +161,7 @@ export const locateStage2 = (root: string): { files: StageFile[]; problems: stri
 
   const problems: string[] = [];
   const found: { bench: BenchFile; path: string; account: KnownAccount | undefined }[] = [];
-  STAGE2.forEach((bench, k) => {
+  list.forEach((bench, k) => {
     const paths = byFingerprint.get(bench.fingerprint) ?? [];
     if (paths.length === 0) {
       problems.push(`El archivo ${k + 1} de la etapa (huella ${short(bench.fingerprint)}) no está en ${examples}.`);
@@ -114,7 +198,7 @@ export const locateStage2 = (root: string): { files: StageFile[]; problems: stri
   const files = found.map(({ bench, path: file, account }) => {
     const number = consultationOf(file);
     seen.set(number, (seen.get(number) ?? 0) + 1);
-    return { ...bench, path: file, account, label: total.get(number)! > 1 ? `${number} #${seen.get(number)}` : number };
+    return { ...bench, path: file, account, label: bench.label ?? (total.get(number)! > 1 ? `${number} #${seen.get(number)}` : number) };
   });
   return { files, problems };
 };
