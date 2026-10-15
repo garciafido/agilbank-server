@@ -351,8 +351,8 @@ queda <code>fallido</code>: enviar el mismo archivo otra vez lo lee de nuevo.</p
 </table></div>
 
 <p>Un PDF se lee página por página. Una página con texto se lee por su texto. Una página escaneada
-se lee como imagen, y esa lectura puede equivocar una cifra. Si el archivo trae saldos,
-los controles lo muestran: un renglón que no encadena sale marcado (<code>encadena</code> en
+se lee como imagen, y esa lectura puede equivocar una cifra. Si el archivo trae saldos
+con qué controlar, los controles lo muestran: un renglón que no encadena sale marcado (<code>encadena</code> en
 <code>false</code>). Si no trae saldos, la única señal es el aviso <code>sin-saldos</code>.
 Un PDF puede mezclar los dos tipos de página.</p>
 
@@ -376,8 +376,8 @@ página y no tiene techo de tiempo. Lo leído hasta ahí vuelve con el aviso
 <code>lectura-parcial</code> frena las propuestas: para tener el resto, manden el extracto partido
 en archivos más cortos.</p>
 
-<p>Si el techo llega antes de leer la primera página, si esa página no se puede preparar, o si el
-servidor no tiene el lector, la lectura vuelve con el veredicto <code>no-disponible</code>. Es una
+<p>Si el techo llega antes de leer la primera página, si esa página no se puede preparar, o si al
+servidor le falta un lector, la lectura vuelve con el veredicto <code>no-disponible</code>. Es una
 falla nuestra, no del archivo: enviarlo de nuevo lo lee de nuevo (ver «El reenvío de un archivo»).
 El <code>motivo</code> dice cuál fue.</p>
 
@@ -513,8 +513,12 @@ pedidos (sección 09): respeten el encabezado <code>Retry-After</code> de un 429
 <p>Un aviso que no frena las propuestas, como <code>concepto-nuevo</code>, puede venir con
 <code>verificada</code>.</p>
 
-<p>Estos son los motivos de <code>no-disponible</code>. El primero también sale con un PDF con
-texto:</p>
+<p>Estos son los motivos de <code>no-disponible</code>. El primero sale en dos casos: al servidor
+le falta el lector de PDF, sea cual sea el PDF; o le falta el lector de imágenes y alguna página
+no tiene texto que sirva, o el archivo es una foto. Un PDF con texto en todas sus páginas se lee
+aunque falte el lector de imágenes.</p>
+
+<p>Los tres motivos:</p>
 
 <ul>
 <li>«No se pudo leer el archivo: el servidor no tiene el lector de imágenes. Avísennos; mientras tanto, manden el extracto en Excel, CSV o texto.»</li>
@@ -542,7 +546,7 @@ texto:</p>
 <tbody>
 <tr><td><code>id</code></td><td>Identificador estable: el mismo movimiento tiene el mismo id en el extracto del día y en el del mes, aunque el texto del concepto cambie o un canal no traiga la referencia. Sale de la cuenta, la fecha y el importe, con un ordinal entre los renglones que comparten los tres (por su referencia si el archivo la trae; si no, por su orden). La cuenta es la que mandaron, su CBU o si no su número, y si no mandaron ninguno, el CBU del archivo: manden siempre la misma identificación de la cuenta. Descarten los repetidos por este id, dentro de la cuenta</td></tr>
 <tr><td><code>orden</code></td><td>La posición en el archivo, desde 1</td></tr>
-<tr><td><code>fecha</code>, <code>fechaValor</code></td><td>Con formato <code>AAAA-MM-DD</code>. <code>fechaValor</code> solo si el banco la informa. Si el archivo imprime fechas sin año, con dos cifras de día y dos de mes (<code>03/07</code>), toman el año que deja la fecha más cerca del medio del período que mandaron en la <code>cuenta</code>: con un período que cruza el fin de año, un <code>05/01</code> va al año siguiente. Con un solo extremo del período, se usa ese. Sin período, se usa el medio de las fechas completas del archivo. Si ningún año deja la fecha a menos de unos 200 días, queda sin completar. Otras fechas sin año tampoco se completan</td></tr>
+<tr><td><code>fecha</code>, <code>fechaValor</code></td><td>Con formato <code>AAAA-MM-DD</code>. <code>fechaValor</code> solo si el banco la informa. Si el archivo imprime fechas sin año, con dos cifras de día y dos de mes (<code>03/07</code>), toman el año que deja la fecha más cerca del medio del período que mandaron en la <code>cuenta</code>: con un período que cruza el fin de año, un <code>05/01</code> va al año siguiente. Con un solo extremo del período, se usa ese. Sin período, se usa la mediana de las fechas completas del archivo. Si ningún año deja la fecha a menos de unos 200 días, queda sin completar. Otras fechas sin año tampoco se completan</td></tr>
 <tr><td><code>tipo.codigo</code></td><td>El tipo canónico (anexo)</td></tr>
 <tr><td><code>tipo.segun</code></td><td>De dónde salió: <code>empresa</code> (una corrección de la empresa), <code>tabla</code> (la tabla común), <code>regla</code> (una regla general: viene con el aviso <code>concepto-nuevo</code>) o <code>ninguna</code> (quedó <code>sin-clasificar</code>)</td></tr>
 <tr><td><code>importe</code></td><td>Número con signo: positivo es dinero que entra a la cuenta, negativo es dinero que sale, como en ProntoNet</td></tr>
