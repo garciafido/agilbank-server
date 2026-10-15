@@ -19,6 +19,12 @@ const coversPeriod = (lines: StatementLine[], periodFrom: string, periodTo: stri
 };
 
 /** Por qué ningún renglón se pudo controlar contra el saldo anterior: qué saldos trae el archivo y cuáles no sirvieron. */
+/**
+ * Con un solo renglón controlado se controla el total, no cada renglón: dos errores que se compensan
+ * pasarían. Es lo mismo que un saldo final rotulado, que da débil.
+ */
+const MIN_CHECKED = 2;
+
 const whyNothingIsChecked = (rowBalances: number, printedBalances: number, rejectedColumn: boolean): string => {
   const total = rowBalances + printedBalances;
   if (rejectedColumn) return "El archivo tiene una columna de saldo que no encadena con los importes: no se puede controlar la lectura renglón por renglón.";
@@ -56,6 +62,8 @@ export const buildWarnings = (input: CheckInput): CheckOutput => {
     const rowBalances = lines.filter((l) => l.balanceCents !== null).length;
     const rejectedColumn = j.balanceIs === null && input.hasLabeledBalanceColumn;
     warnings.push({ code: "sin-saldos", detail: whyNothingIsChecked(rowBalances, j.rows.checkpoints.length, rejectedColumn), blocksProposals: false });
+  } else if (j.checked < MIN_CHECKED) {
+    warnings.push({ code: "sin-saldos", detail: "El archivo trae un solo saldo con qué controlar: se controla el total, no cada renglón.", blocksProposals: false });
   }
   const broken = lines.filter((l) => l.chains === false).map((l) => l.order);
   if (broken.length > 0) {
@@ -154,6 +162,6 @@ export const buildWarnings = (input: CheckInput): CheckOutput => {
   return { warnings, closesWithOwnBalances: own, closesWithProntoNet: pn };
 };
 
-/** Verificada: hay saldos, todos encadenan y ningún aviso frena. */
+/** Verificada: hay al menos dos renglones controlados, todos encadenan y ningún aviso frena. */
 export const verdictOf = (j: Judgement, warnings: Warning[]): "verified" | "weak" =>
-  j.checked > 0 && j.chained === j.checked && !warnings.some((w) => w.blocksProposals) ? "verified" : "weak";
+  j.checked >= MIN_CHECKED && j.chained === j.checked && !warnings.some((w) => w.blocksProposals) ? "verified" : "weak";

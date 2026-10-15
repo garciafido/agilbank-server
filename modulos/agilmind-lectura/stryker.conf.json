@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "jest",
+  "jest": { "configFile": "jest.config.js" },
+  "mutate": [
+    "src/herramientasDeLectura.ts",
+    "src/inclinacionDeLaPagina.ts",
+    "src/pdfReparado.ts",
+    "src/textoPorGeometria.ts",
+    "src/pdfGeometry.ts",
+    "src/ordenDeLectura.ts",
+    "src/paginasDePdf.ts",
+    "src/paginasDelPdf.ts"
+  ],
+  "coverageAnalysis": "perTest",
+  "reporters": ["clear-text", "progress"],
+  "clearTextReporter": { "logTests": false },
+  "thresholds": { "high": 80, "low": 60, "break": 80 }
+}

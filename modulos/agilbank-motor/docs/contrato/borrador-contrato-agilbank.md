@@ -110,7 +110,7 @@ planilla XML 2003. PDF, JPG y PNG llegan en la próxima: hasta entonces vuelven 
       "contraparte": { "cuit": "30234567892", "nombre": "ACME", "cbu": null },
       "delBanco": { "codigo": "974", "texto": "Transf. Interbanking - Distinto Titular Ord.:30234567892-ACME", "complementos": [] },
       "encadena": null,
-      "procedencia": { "origen": "celda", "hoja": "saldos_y_movimientos", "filaDesde": 66, "filaHasta": 67 }
+      "procedencia": { "origen": "celda", "hoja": "saldos_y_movimientos", "pagina": null, "paginaHasta": null, "filaDesde": 66, "filaHasta": 67 }
     }
   ],
   "avisos": [],
@@ -161,7 +161,7 @@ Un aviso que no frena las propuestas, como `concepto-nuevo`, puede venir con `ve
 | `contraparte` | CUIT, nombre y CBU de la otra parte, cuando el extracto los trae. El nombre puede venir cortado por el banco |
 | `delBanco` | Lo que dice el banco, tal cual: su código de operación, su texto y las otras columnas de la fila |
 | `encadena` | `true` si el saldo anterior más el importe da su saldo; `false` si no; `null` si no hay con qué controlarlo: los renglones sin saldo y el primer renglón con saldo cuando el archivo no imprime el saldo inicial (es el punto de partida) |
-| `procedencia` | De dónde salió el renglón: `celda` (una planilla, con su hoja) o `texto` (un CSV o TXT), y sus filas, numeradas desde 1 como en la planilla |
+| `procedencia` | De dónde salió el renglón: `celda` (una planilla, con su hoja), `texto` (un CSV o TXT), `pdf` (el texto de un PDF) u `ocr` (la imagen de un PDF o una foto). `pagina` y `paginaHasta` son la página donde empieza y donde termina el renglón (`null` en planillas y textos). `filaDesde` y `filaHasta` son filas numeradas desde 1 como en la planilla; en `pdf` y `ocr`, líneas dentro de su página |
 
 ### Los avisos
 

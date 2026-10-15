@@ -8,6 +8,9 @@ import type { BuiltRows } from "./rows";
 import { CBU_PATTERN, isValidCbu } from "./counterparty";
 import { normalizeConcept } from "./values";
 
+/** El CBU impreso en sus dos bloques, el del banco y la sucursal y el de la cuenta: «01700015 00000123456784». */
+const SPLIT_CBU = /(?<!\d)(\d{8})[\s-](\d{14})(?!\d)/g;
+
 export interface Bank {
   code: string;
   name: string | null;
@@ -51,10 +54,10 @@ export const cbusOutsideMovements = (grid: Grid, rows: BuiltRows): string[] => {
   const found = new Set<string>();
   grid.rows.forEach((row, r) => {
     if (r >= first && r <= last) return;
-    for (const v of row) {
-      if (v === null) continue;
-      for (const m of String(v).matchAll(CBU_PATTERN)) if (isValidCbu(m[0])) found.add(m[0]);
-    }
+    // La fila entera: el banco puede partir el CBU en dos bloques y el PDF ponerlos en dos celdas.
+    const text = row.filter((v) => v !== null).map(String).join(" ");
+    for (const m of text.matchAll(CBU_PATTERN)) if (isValidCbu(m[0])) found.add(m[0]);
+    for (const m of text.matchAll(SPLIT_CBU)) if (isValidCbu(m[1] + m[2])) found.add(m[1] + m[2]);
   });
   return [...found];
 };

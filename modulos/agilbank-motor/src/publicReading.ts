@@ -20,6 +20,8 @@ const SEGUN: Record<TypeSource, "empresa" | "tabla" | "regla" | "ninguna"> = {
   none: "ninguna",
 };
 
+const ORIGENES = { cell: "celda", text: "texto", pdf: "pdf", ocr: "ocr" } as const;
+
 const pesos = (cents: number | null): number | null => (cents === null ? null : cents / 100);
 
 export interface LecturaPublica {
@@ -48,7 +50,7 @@ export interface LecturaPublica {
     contraparte: { cuit: string | null; nombre: string | null; cbu: string | null } | null;
     delBanco: { codigo: string | null; texto: string; complementos: string[] };
     encadena: boolean | null;
-    procedencia: { origen: "celda" | "texto"; hoja: string | null; filaDesde: number; filaHasta: number };
+    procedencia: { origen: "celda" | "texto" | "pdf" | "ocr"; hoja: string | null; pagina: number | null; paginaHasta: number | null; filaDesde: number; filaHasta: number };
   }>;
   avisos: Array<{ codigo: string; detalle: string; frenaPropuestas: boolean; renglones?: number[]; datos?: Record<string, string | number | null> }>;
   controles: {
@@ -102,8 +104,10 @@ export const toPublicReading = (r: StatementReading): LecturaPublica => {
             delBanco: { codigo: l.bank.code, texto: l.bank.text, complementos: [...l.bank.extras] },
             encadena: l.chains,
             procedencia: {
-              origen: l.provenance.origin === "cell" ? "celda" : "texto",
+              origen: ORIGENES[l.provenance.origin],
               hoja: l.provenance.sheet,
+              pagina: l.provenance.page,
+              paginaHasta: l.provenance.pageTo,
               filaDesde: l.provenance.fromRow,
               filaHasta: l.provenance.toRow,
             },

@@ -52,6 +52,15 @@ describe("formatOf", () => {
     expect(formatOf(Buffer.from("Fecha;Concepto\n"))).toBe("text");
   });
 
+  it("una foto HEIC se reconoce por su caja ftyp", () => {
+    const heic = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypheic"), Buffer.alloc(16)]);
+    expect(formatOf(heic)).toBe("heic");
+    const mif1 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypmif1"), Buffer.alloc(16)]);
+    expect(formatOf(mif1)).toBe("heic");
+    expect(formatOf(Buffer.from("Fecha;Coheic\n"))).toBe("text");
+    expect(formatOf(Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypisom"), Buffer.alloc(16)]))).toBe("text");
+  });
+
   it("una tabla HTML o una planilla XML 2003 son marcado, aunque vengan con espacios o la marca de orden de bytes adelante", () => {
     expect(formatOf(Buffer.from(HTML_XLS))).toBe("markup");
     expect(formatOf(Buffer.from(XML_2003))).toBe("markup");

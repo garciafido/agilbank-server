@@ -499,3 +499,37 @@ describe("classify: la corrección de la empresa solo aplica si su tipo cabe en 
     expect(c("Mov interno", 0, null, null, [{ bankCode: null, text: "Mov", type: "comision" }])).toEqual(company("comision"));
   });
 });
+
+describe("classify: el banco 017 deja pasar lo que deciden las reglas generales", () => {
+  const sameAsOtherBank = (text: string, amount: number) => c(text, amount, "017").type.code === c(text, amount, null).type.code;
+
+  it.each([
+    ["TRANSFERENCIA CTAS PROPIAS", -100, "transferencia-cuenta-propia"],
+    ["TRANSFERENCIA CTAS PROPIAS", 100, "transferencia-cuenta-propia"],
+    ["TRANSFERENCIA CUENTAS PROPIAS", -100, "transferencia-cuenta-propia"],
+    ["TRANSFERENCIA MISMA TITULARIDAD", -100, "transferencia-cuenta-propia"],
+    ["TRANSFERENCIA PAGO DE HABERES", -100, "pago-masivo"],
+    ["TRANSFERENCIA PAGO DE HABERES", 100, "transferencia-recibida"],
+    ["TRANSFERENCIA HABERES", -100, "pago-masivo"],
+    ["TRANSFERENCIA ACREDITAMIENTO DE HABERES", -100, "pago-masivo"],
+    ["TRANSFERENCIA PAGO A PROVEEDORES", -100, "pago-masivo"],
+    ["TRANSFERENCIA PAGO MASIVO", -100, "pago-masivo"],
+    ["TRANSFERENCIA EMBARGO JUDICIAL", -100, "orden-judicial"],
+    ["TRANSFERENCIA EMBARGO JUDICIAL", 100, "transferencia-recibida"],
+    ["TRANSFERENCIA EMBARGO", -100, "orden-judicial"],
+    ["TRANSFERENCIA JUDICIAL", -100, "orden-judicial"],
+    ["TRANSFERENCIA JUDIC", -100, "orden-judicial"],
+    ["DEBITO DIRECTO AFIP", -100, "pago-arca"],
+    ["DEBITO DIRECTO ARCA", -100, "pago-arca"],
+    ["DEBITO DIRECTO VEP", -100, "pago-arca"],
+  ])("«%s» (%d) es %s con el 017, igual que con otro banco", (text, amount, code) => {
+    expect(c(text, amount, "017").type.code).toBe(code);
+    expect(sameAsOtherBank(text, amount)).toBe(true);
+  });
+
+  it("«TRANSFERENCIA» sola y «DEBITO DIRECTO» solo siguen como hoy en el 017", () => {
+    expect(c("TRANSFERENCIA", 100, "017").type).toEqual({ code: "transferencia-recibida", source: "table" });
+    expect(c("TRANSFERENCIA", -100, "017").type).toEqual({ code: "transferencia-enviada", source: "table" });
+    expect(c("DEBITO DIRECTO", -100, "017").type).toEqual({ code: "debito-automatico", source: "table" });
+  });
+});

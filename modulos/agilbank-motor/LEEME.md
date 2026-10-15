@@ -67,3 +67,62 @@ Los ámbitos de la credencial son `ab:leer` (enviar y consultar extractos) y `ab
 tiene que traer usuario de servicio.
 
 La referencia para BDL es `agilbank-server/docs/api-agilbank.html`.
+
+## La lectura visual
+
+Un PDF o una foto se lee en `src/sources/visual.ts`, con poppler y PP-OCR del módulo
+`@agilmind/lectura`. El formato sale de los primeros bytes, nunca del nombre.
+
+- **PDF:** cada página se lee por su texto si el texto sirve; la que no, por OCR. Si alguna página
+  necesita OCR y el OCR no está, la lectura sale `unavailable`: no se lee a medias. Un PDF dañado o
+  con contraseña sale `abstained`.
+- **Fotos JPG y PNG:** hasta 4.000.000 de píxeles, enderezadas por su EXIF. Si no aparecen
+  movimientos, se prueban giradas. Las fotos HEIC salen `abstained`, con el pedido de mandarlas en
+  JPG, PNG o PDF.
+- **Techos** (`VISUAL_LIMITS`): 240 s de lectura y 60 páginas. Pasado cualquiera, se devuelve lo leído
+  hasta la última página entera, con el aviso `lectura-parcial`, que frena las propuestas.
+- **Resolución:** el OCR renderiza a **150 dpi**. A 200 dpi no lee mejor en conjunto y tarda entre
+  1,24 y 1,34 veces más. El Credicoop 06, de 38 páginas, tardó 213 s a 150 dpi con carga de 4 a 6, en
+  una corrida anterior a los arreglos de columnas: por 1,24, a 200 serían unos 264 s, fuera del techo.
+- **Meta de 180 s:** no se alcanza. El Credicoop 06 a 150 dpi tarda 213 s con la mejor carga medida y
+  340 s con carga 8 a 10. Repartir el OCR en paralelo dentro de un proceso no rinde: lo mostró la
+  medición de la enmienda de la spec de la lectura
+  (`agilpost-motor/docs/superpowers/specs/2026-10-09-agilbank-lectura-design.md`). No se agrega paralelismo en esta etapa.
+
+La medición del 14-10-2026, con `npm run bench:visual`. Cada archivo se leyó a 150 y a 200 dpi,
+intercalados, dos veces cada uno y sin el techo de tiempo. Las dos pasadas de cada resolución dieron
+lo mismo. Con carga de 4 a 14 en 8 núcleos, los segundos sirven para
+comparar las resoluciones entre sí, no como el tiempo del servidor.
+
+| archivo | renglones 150 / 200 | encadenan 150 / 200 | veredicto | s 150 / 200 | 200 / 150 | carga |
+|---|---|---|---|---|---|---|
+| BBVA 06 (fuente rota) | 114 / 115 | **102/109** / 99/108 | weak en las dos | 45 / 61 | 1,34 | 4 a 13 |
+| Credicoop 06 (caso 01) | 962 / 960 | 0/0 / 0/0 | weak en las dos | 340 / 420 | 1,24 | 8 a 10 |
+| BPN 06 | 378 / 359 | 0/0 / **236/359** | weak en las dos | 67 / 86 | 1,28 | 8 a 14 |
+| BPN 08 | 193 / 194 | 0/0 / 0/0 | weak en las dos | 39 / 51 | 1,29 | 7 a 11 |
+| BPN 09 | 211 / 213 | **150/211** / 0/0 | weak en las dos | 42 / 53 | 1,26 | 6 a 8 |
+
+Ninguna resolución gana en todos. A 200 el BPN 06 encadena, pero con todos los importes en positivo,
+y no cierra. A 200 se pierde el encadenamiento del BPN 09 y tres renglones que encadenaban en el
+BBVA 06. En el BPN 08, 82 importes cambian de signo, y no hay saldos que digan cuál es el correcto.
+El Credicoop 06 no trae saldos por renglón: las dos lecturas coinciden en 950 renglones de 962 y 960
+(`bench:visual`). En una sonda aparte, que no está en el repo, la suma de sus importes quedó 4,4
+veces más lejos del cierre de `cuenta.json` a 200 que a 150.
+Con esta carga, el Credicoop 06 pasó los 240 s también a 150 dpi (340 s): con el techo de
+producción se habría cortado con `lectura-parcial`.
+
+Para correr:
+
+- `npm run test:integration`: los tests que corren PP-OCR, con imágenes y PDF sintéticos. Toman los
+  modelos del módulo de lectura si `AP_PADDLE_MODELS_DIR` no está.
+- `npm run bench`: el banco de las etapas 2 y 3, sobre los extractos de BDL (`AB_IEB_DIR`).
+  `AB_BENCH_BUDGET_MS` sube el techo de tiempo para medir solo la lectura con la máquina cargada.
+- `npm run bench:visual`: la medición de la resolución. `AB_VISUAL_FILES` (las etiquetas de
+  `bench/files.ts`, separadas por comas) elige qué archivos medir. `AB_VISUAL_PASSES`, un entero
+  ≥ 1 (por defecto 2), cuántas pasadas por resolución; con menos de 2, «pasadas iguales» dice «n/a».
+
+Los dos bancos necesitan los modelos:
+
+```bash
+AP_PADDLE_MODELS_DIR=$(pwd)/node_modules/@agilmind/lectura/modelos/paddle-latin-v5 npm run bench:visual
+```

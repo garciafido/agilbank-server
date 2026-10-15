@@ -1,8 +1,9 @@
-import type { Grid, ReadOptions, StatementHeader, StatementLine, StatementReading } from "./types";
+import type { Grid, ReadOptions, StatementHeader, StatementLine, StatementReading, Warning } from "./types";
 import { catalog } from "./catalog/catalog";
 import { formatOf } from "./sources/format";
 import { SpreadsheetTooLarge, gridsFromMarkup, gridsFromSpreadsheet } from "./sources/spreadsheet";
 import { NotText, TextTooLarge, gridFromText } from "./sources/text";
+import { VISUAL_LIMITS, readImage, readPdf, type VisualLimits } from "./sources/visual";
 import { readTable, type Table } from "./columns";
 import { chronologicalOrder, judge, netChained, type Judgement } from "./judge";
 import { counterpartyOf, splitLeadingCode } from "./counterparty";
@@ -10,6 +11,9 @@ import { classify } from "./classify";
 import { assignIds, fingerprintOf } from "./identity";
 import { balancesOf, bankOf, cbusOutsideMovements, hasLabeledBalanceColumn, lineBalancesOf, normalizeCbu } from "./header";
 import { buildWarnings, verdictOf } from "./checks";
+import { completeYears } from "./years";
+import { splitSections } from "./sections";
+import { annexEntries, applyAnnexes } from "./annexes";
 
 const spreadsheetReason = (e: unknown): string =>
   /password|encrypt|protect/i.test(String((e as Error)?.message ?? e))
@@ -30,6 +34,20 @@ const accountNumberKey = (number: string | null | undefined): string | null => {
   return key === "" ? null : `cuenta:${key}`;
 };
 
+/** Las filas como las numera la planilla, desde 1; en un PDF o una foto, la página y la línea dentro de ella. */
+export const provenanceOf = (grid: Grid, fromRow: number, toRow: number): StatementLine["provenance"] => {
+  const from = grid.places?.[fromRow];
+  const to = grid.places?.[toRow];
+  return {
+    origin: from?.origin ?? grid.origin,
+    sheet: grid.sheet,
+    page: from?.page ?? null,
+    pageTo: to?.page ?? null,
+    fromRow: from ? from.line : fromRow + 1,
+    toRow: to ? to.line : toRow + 1,
+  };
+};
+
 /**
  * Entre las hojas de un libro, la que mejor encadena y después la de más movimientos; si empatan, la
  * primera. La que más filas tiene puede ser la conciliación del cliente, con fechas e importes pero
@@ -38,24 +56,51 @@ const accountNumberKey = (number: string | null | undefined): string | null => {
 const betterSheet = (a: Judgement, b: Judgement): boolean =>
   netChained(a) !== netChained(b) ? netChained(a) > netChained(b) : a.rows.movements.length > b.rows.movements.length;
 
+/** Un techo que no es un entero positivo vale como el de siempre: un techo vacío no puede dejar la lectura sin techo. */
+const pick = (v: number | undefined, d: number): number => (Number.isInteger(v) && v! > 0 ? v! : d);
+
+const visualLimits = (o: Partial<VisualLimits> = {}): VisualLimits => ({
+  budgetMs: pick(o.budgetMs, VISUAL_LIMITS.budgetMs),
+  maxPages: pick(o.maxPages, VISUAL_LIMITS.maxPages),
+  dpi: pick(o.dpi, VISUAL_LIMITS.dpi),
+});
+
+/** Lo que se leyó de un archivo que no se terminó de leer. Frena las propuestas: faltan renglones. */
+const partialWarning = ({ pages, pagesRead }: { pages: number; pagesRead: number }): Warning => ({
+  code: "lectura-parcial",
+  detail: `Se leyeron ${pagesRead} de ${pages} páginas: la lectura se cortó por tiempo o por la cantidad de páginas. Los renglones de las otras páginas no están en esta lectura.`,
+  blocksProposals: true,
+  data: { paginas: pages, paginasLeidas: pagesRead },
+});
+
 /**
  * Lee un extracto y lo lleva al resumen bancario canónico, con sus controles.
  *
- * Es asincrónica aunque la lectura tabular no espera nada: la de PDF (etapa 3) sí, y la firma no
- * tiene que cambiar para los que ya la usan.
+ * Es asincrónica porque la lectura de un PDF o de una foto espera a poppler y al OCR.
  */
 export const readStatement = async (file: Buffer, options: ReadOptions = {}): Promise<StatementReading> => {
   const fingerprint = fingerprintOf(file);
   const abstain = (reason: string): StatementReading => ({ fingerprint, verdict: "abstained", reason, header: null, lines: [], warnings: [], checks: null });
 
   const format = formatOf(file);
-  if (format === "pdf" || format === "image") return abstain("Este formato no se lee por esta vía: manden el extracto en Excel, CSV o texto.");
+  if (format === "heic") return abstain("Las fotos HEIC no se leen: manden la foto en JPG o PNG, o el extracto en PDF.");
   let grids: Grid[];
-  try {
-    grids = format === "text" ? [gridFromText(file)] : format === "markup" ? gridsFromMarkup(file) : gridsFromSpreadsheet(file);
-  } catch (e) {
-    return abstain(unreadableReason(e));
+  let partial: { pages: number; pagesRead: number } | null = null;
+  if (format === "pdf" || format === "image") {
+    const v = format === "pdf" ? await readPdf(file, visualLimits(options.visual)) : await readImage(file);
+    if (v.kind === "unavailable") return { ...abstain(v.reason), verdict: "unavailable" };
+    if (v.kind === "unreadable") return abstain(v.reason);
+    grids = [v.grid];
+    if (v.pagesRead < v.pages) partial = { pages: v.pages, pagesRead: v.pagesRead };
+  } else {
+    try {
+      grids = format === "text" ? [gridFromText(file)] : format === "markup" ? gridsFromMarkup(file) : gridsFromSpreadsheet(file);
+    } catch (e) {
+      return abstain(unreadableReason(e));
+    }
   }
+  const period = { from: options.account?.periodFrom ?? null, to: options.account?.periodTo ?? null };
+  grids = grids.map((g) => completeYears(g, period));
 
   const account = options.account && { ...options.account, cbu: normalizeCbu(options.account.cbu) };
   const known =
@@ -63,9 +108,10 @@ export const readStatement = async (file: Buffer, options: ReadOptions = {}): Pr
       ? { openingCents: Math.round(account.openingBalance * 100), closingCents: Math.round(account.closingBalance * 100) }
       : null;
 
-  let best: { grid: Grid; table: Table; judgement: Judgement } | null = null;
+  let best: { grid: Grid; table: Table; judgement: Judgement; annexes: Grid[] } | null = null;
   let withoutSign = false;
-  for (const grid of grids) {
+  for (const whole of grids) {
+    const { main: grid, annexes } = splitSections(whole);
     const table = readTable(grid);
     if (table === null) continue;
     if (table.interpretations.length === 0) {
@@ -73,7 +119,7 @@ export const readStatement = async (file: Buffer, options: ReadOptions = {}): Pr
       continue;
     }
     const judgement = judge(grid, table, catalog.synonyms.nonMovements, known);
-    if (judgement && (best === null || betterSheet(judgement, best.judgement))) best = { grid, table, judgement };
+    if (judgement && (best === null || betterSheet(judgement, best.judgement))) best = { grid, table, judgement, annexes };
   }
   if (best === null) {
     return abstain(
@@ -95,7 +141,7 @@ export const readStatement = async (file: Buffer, options: ReadOptions = {}): Pr
   const accountKey = account?.cbu ?? accountNumberKey(account?.number) ?? fileCbus[0] ?? "sin-cuenta";
   const ids = assignIds(accountKey, ms, chronologicalOrder(ms.length, j.direction));
 
-  const lines: StatementLine[] = ms.map((m, k) => {
+  const rows: StatementLine[] = ms.map((m, k) => {
     const split = m.code === null ? splitLeadingCode(m.concept) : { code: m.code, text: m.concept };
     const { type } = classify(
       { text: split.text, code: split.code, amountCents: m.amountCents },
@@ -116,12 +162,13 @@ export const readStatement = async (file: Buffer, options: ReadOptions = {}): Pr
       counterparty: counterpartyOf(m.concept, m.extras),
       bank: { code: split.code, text: split.text, extras: m.extras.map((e) => e.text) },
       chains: j.chains[k],
-      // Las filas como las numera la planilla, desde 1: es como las va a buscar quien abra el archivo.
-      provenance: { origin: grid.origin, sheet: grid.sheet, fromRow: m.fromRow + 1, toRow: m.toRow + 1 },
+      provenance: provenanceOf(grid, m.fromRow, m.toRow),
     };
   });
 
-  const dates = lines.map((l) => l.date).sort();
+  const linked = applyAnnexes(rows, best.annexes.flatMap(annexEntries));
+
+  const dates = linked.map((l) => l.date).sort();
   const balances = balancesOf(j);
   const header: StatementHeader = {
     bankCode: bank?.code ?? null,
@@ -137,21 +184,22 @@ export const readStatement = async (file: Buffer, options: ReadOptions = {}): Pr
   const accounts = [...new Set(ms.map((m) => m.account).filter((a): a is string => a !== null))];
   const out = buildWarnings({
     judgement: j,
-    lines,
+    lines: linked,
     header,
     account,
     fileCbus,
     accounts,
     hasLabeledBalanceColumn: hasLabeledBalanceColumn(grid, table),
   });
+  const warnings = partial === null ? out.warnings : [...out.warnings, partialWarning(partial)];
 
   return {
     fingerprint,
-    verdict: verdictOf(j, out.warnings),
+    verdict: verdictOf(j, warnings),
     reason: null,
     header,
-    lines,
-    warnings: out.warnings,
+    lines: linked,
+    warnings,
     checks: {
       direction: j.direction,
       balanceIs: j.balanceIs,
