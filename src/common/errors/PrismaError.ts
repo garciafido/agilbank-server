@@ -105,9 +105,9 @@ const messages: Record<string, string> = {
   P1000:
     "Fallo en el acceso al servidor de base de datos. Las credenciales no son válidas",
   P1001:
-    "No se puede acceder al servidor de base de datos. Asegúrese de que el servidor de base de datos esté ejecutándose",
+    "No se puede acceder al servidor de base de datos. Asegúrate de que el servidor de base de datos esté ejecutándose",
   P1002:
-    "Tiempo de espera agotado. Asegúrese que el servidor de base de datos esté activo",
+    "Tiempo de espera agotado. Asegúrate de que el servidor de base de datos esté activo",
   P1003: "El servidor no puede conectarse con la base de datos",
   P1008: "Tiempo de espera agotado durante la operación",
   P1009: "La base de datos ya existe en el servidor",

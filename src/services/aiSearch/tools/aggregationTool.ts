@@ -1032,7 +1032,7 @@ export function createAggregationTool(
         if (having) {
           // having requires countRelation (with or without groupBy)
           if (!countRelation) {
-            return { success: false, error: 'El parámetro having requiere countRelation. Especifique qué relación contar.' };
+            return { success: false, error: 'El parámetro having requiere countRelation: falta decir qué relación contar.' };
           }
           // Validate having.countField matches countRelation
           if (having.countField !== countRelation) {

@@ -26,7 +26,7 @@ async function moveUploaded(
   // revienta con un ENOENT críptico. Error claro y accionable para el usuario.
   if (!fs.existsSync(source)) {
     throw new ValidationError(
-      `El archivo subido "${filename}" ya no está disponible (la subida expiró). Vuelva a subirlo y guarde nuevamente.`,
+      `El archivo subido "${filename}" ya no está disponible (la subida expiró). Vuelve a subirlo y guarda nuevamente.`,
       { code: "UPLOAD_TEMP_EXPIRED", field: baseName }
     );
   }

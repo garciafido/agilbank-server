@@ -197,7 +197,7 @@ Respond in JSON format:
   "ambiguousTerm": "the problematic term if any",
   "reason": "brief explanation",
   "suggestedOptions": ["option1", "option2", "option3"],
-  "clarificationQuestion": "Question to ask the user"
+  "clarificationQuestion": "Question to ask the user, in the user's language; in Spanish, address the user as tú (Latin American: puedes, elige), never as usted or vos"
 }
 
 IMPORTANT - BE CONSERVATIVE:

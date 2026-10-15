@@ -32,7 +32,7 @@ Documentacion de todos los pipelines del sistema.
 **Parametros:**
 - `statementId` = ref
 **Retorno:**
-- `fields`: [{"name":"status","typeDefinition":{"type":"Identifier","name":"string","sourceToken":{"string":"string","start":[197,17],"end":[197,23],"line":"        status = string"}},"baseType":"string","attributes":{},"sourceToken":{"string":"status","start":[197,8],"end":[197,14],"line":"        status = string"}}]
-- `fieldsByName`: {"status":{"name":"status","typeDefinition":{"type":"Identifier","name":"string","sourceToken":{"string":"string","start":[197,17],"end":[197,23],"line":"        status = string"}},"baseType":"string","attributes":{},"sourceToken":{"string":"status","start":[197,8],"end":[197,14],"line":"        status = string"}}}
+- `fields`: [{"name":"status","typeDefinition":{"type":"Identifier","name":"string","sourceToken":{"string":"string","start":[200,17],"end":[200,23],"line":"        status = string"}},"baseType":"string","attributes":{},"sourceToken":{"string":"status","start":[200,8],"end":[200,14],"line":"        status = string"}}]
+- `fieldsByName`: {"status":{"name":"status","typeDefinition":{"type":"Identifier","name":"string","sourceToken":{"string":"string","start":[200,17],"end":[200,23],"line":"        status = string"}},"baseType":"string","attributes":{},"sourceToken":{"string":"status","start":[200,8],"end":[200,14],"line":"        status = string"}}}
 
 

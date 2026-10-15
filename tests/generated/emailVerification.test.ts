@@ -177,7 +177,9 @@ describe("el mail: el nombre escapado en el HTML y tal cual en el texto y el asu
       `${NAME} requiere que cargues y/o verifiques tus datos.`
     );
     expect(mail.html + mail.text).not.toContain("{tenantName}");
-    expect(mail.subject).toBe("Verifica tu email y revisa tus datos");
+    expect(mail.subject).toBe(
+      "Verificación de tu email y revisión de tus datos"
+    );
   });
 
   it("con logo y sitio: el alt y el texto del link", () => {
@@ -233,21 +235,21 @@ describe("el mail: el nombre escapado en el HTML y tal cual en el texto y el asu
       params(false, { tenantName: "Ediciones {appName} & cía" })
     );
     expect(mail.text).toContain(
-      "Ediciones {appName} & cía ha registrado tu dirección de email en App."
+      "Ediciones {appName} & cía registró tu dirección de email en App."
     );
     expect(mail.html).toContain(
-      "Ediciones {appName} &amp; cía ha registrado tu dirección de email en App."
+      "Ediciones {appName} &amp; cía registró tu dirección de email en App."
     );
   });
 
   it("verificación simple: el asunto con el nombre tal cual y el mensaje escapado en el HTML", () => {
     const mail = getEmailVerificationTemplate(params(false));
-    expect(mail.subject).toBe(`[${NAME}] Verificación de correo electrónico`);
+    expect(mail.subject).toBe(`[${NAME}] Verificación de email`);
     expect(mail.html).toContain(
-      `${ESCAPED} ha registrado tu dirección de email en App.`
+      `${ESCAPED} registró tu dirección de email en App.`
     );
     expect(mail.text).toContain(
-      `${NAME} ha registrado tu dirección de email en App.`
+      `${NAME} registró tu dirección de email en App.`
     );
     expect(mail.html).not.toContain('<a href="https://evil.example">');
   });
