@@ -533,3 +533,27 @@ describe("classify: el banco 017 deja pasar lo que deciden las reglas generales"
     expect(c("DEBITO DIRECTO", -100, "017").type).toEqual({ code: "debito-automatico", source: "table" });
   });
 });
+
+describe("classify: el 017 y el impuesto 25.413 que no dice el lado", () => {
+  it("«IMP.LEY 25413» sin lado es impuesto-25413 con el 017", () => {
+    expect(c("IMP.LEY 25413 14/03/25 00417", -100, "017").type).toEqual({ code: "impuesto-25413", source: "table" });
+  });
+
+  it("el tipo no lleva lado ni lo infiere de los vecinos", () => {
+    const neighbors = { previous: 100000, next: null };
+    expect(c("IMP.LEY 25413 14/03/25 00417", -600, "017", null, [], neighbors).type.code).toBe("impuesto-25413");
+  });
+
+  it.each([
+    ["Imp. Ley 25413 Ali Gral s/Debitos", "impuesto-debitos"],
+    ["Imp. Ley 25413 Ali Gral s/Creditos", "impuesto-creditos"],
+    ["IMPUESTO DEBITO LEY 25413", "impuesto-debitos"],
+    ["IMPUESTO CREDITO LEY 25413", "impuesto-creditos"],
+  ])("«%s» sigue siendo %s con el 017", (text, code) => {
+    expect(c(text, -100, "017").type.code).toBe(code);
+  });
+
+  it("otro banco no recibe el tipo sin lado", () => {
+    expect(c("IMP.LEY 25413 14/03/25 00417", -100, "191").type.code).not.toBe("impuesto-25413");
+  });
+});

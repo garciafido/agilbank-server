@@ -58,13 +58,14 @@ usa para otra.
 
 **Un archivo que ya mandaron** (la misma huella, la misma empresa) responde **200** con el mismo
 `idExtracto` y su resultado, sin leerlo de nuevo (RF-11). La excepción es una falla nuestra: si el
-intento anterior quedó en `fallido` o terminó con el veredicto `no-disponible`, el archivo se lee de
-nuevo, porque ninguno de los dos dice nada del archivo. Esa vez responde **202** con el mismo
+intento anterior quedó en `fallido`, terminó con el veredicto `no-disponible` o con una
+`lectura-parcial` cortada por tiempo, render u OCR, el archivo se lee de nuevo, porque nada de eso dice
+nada del archivo. Esa vez responde **202** con el mismo
 `idExtracto` y `"estado": "en-proceso"`. La huella es el SHA-256 del archivo: la pueden calcular ustedes.
 
-Formatos: en esta etapa XLSX, XLS, CSV y TXT; también el «XLS» que en realidad es una tabla HTML o una
-planilla XML 2003. PDF, JPG y PNG llegan en la próxima: hasta entonces vuelven con el veredicto
-`sin-lectura` y el motivo.
+Formatos: XLSX, XLS, CSV y TXT; también el «XLS» que en realidad es una tabla HTML o una planilla XML
+2003. Desde la etapa 3, también PDF (con texto o escaneado) y fotos JPG, PNG, TIFF y WebP; las fotos
+HEIC y los TIFF de varias páginas vuelven con el veredicto `sin-lectura` y el motivo. El detalle está en la referencia de la API.
 
 ## 4. Consultar un extracto
 
@@ -173,10 +174,10 @@ refiere a renglones, `renglones` con sus órdenes.
 | `no-cierra` | El saldo inicial más los renglones no da el saldo final, o los saldos del archivo no son los que mandaron (solo si mandaron el período y el archivo lo cubre). Puede venir más de una vez | Sí |
 | `varias-cuentas` | El archivo trae movimientos de más de una cuenta. `datos.cuentas` las identifica | Sí |
 | `cuenta-distinta` | El CBU del archivo no es el que mandaron. `datos.cbuDelArchivo` y `datos.cbuDeProntoNet` dicen cuáles son | Sí |
-| `sin-saldos` | Ningún renglón se pudo controlar contra el saldo anterior: el archivo no trae saldos, trae solo los saldos inicial y final, trae un solo saldo, tiene una columna de saldo que no encadena con los importes, o sus saldos no se controlan entre sí. `detalle` dice cuál | No |
+| `sin-saldos` | Ningún renglón se pudo controlar contra el saldo anterior: el archivo no trae saldos, trae solo los saldos inicial y final, trae un solo saldo, tiene una columna de saldo que no encadena con los importes, o sus saldos no se controlan entre sí. También sale cuando solo se pudo controlar un renglón: `verificada` pide al menos dos. `detalle` dice cuál | No |
 | `no-encadena` | Hay renglones cuyo saldo no encadena con el anterior | No |
 | `concepto-nuevo` | Un concepto que no está en la tabla. `datos.texto` trae el texto del banco, `datos.codigo` su código de operación (o `null`) y `datos.tipo` lo que se propuso | No |
-| `lectura-parcial` | La lectura se cortó a mitad (tiempo o páginas). Se usa desde la lectura de PDF | No |
+| `lectura-parcial` | La lectura de un PDF se cortó a mitad. `datos.causa` dice por qué: `tiempo`, `render`, `ocr` o `paginas`. Con las tres primeras, el reenvío lo lee de nuevo; si una por `tiempo` se vuelve a cortar, hay que mandarlo partido en archivos más chicos | Sí |
 
 ### Los controles
 
@@ -233,7 +234,7 @@ texto con más de 200.000 líneas, o un «XLS» de HTML o XML 2003 con más de 2
 
 ## Anexo: los tipos canónicos (primera versión)
 
-Hay 29 tipos, en tres familias: «Movimientos con terceros», «Gastos e impuestos del banco» y
+Hay 30 tipos, en tres familias: «Movimientos con terceros», «Gastos e impuestos del banco» y
 «Sin tipo».
 
 | Código | Nombre | Familia |
@@ -256,6 +257,7 @@ Hay 29 tipos, en tres familias: «Movimientos con terceros», «Gastos e impuest
 | `orden-judicial` | Embargo o transferencia por orden judicial | Movimientos con terceros |
 | `impuesto-debitos` | Impuesto ley 25.413 sobre débitos | Gastos e impuestos del banco |
 | `impuesto-creditos` | Impuesto ley 25.413 sobre créditos | Gastos e impuestos del banco |
+| `impuesto-25413` | Impuesto ley 25.413, sin decir si es sobre débitos o sobre créditos | Gastos e impuestos del banco |
 | `devolucion-impuesto` | Devolución o reversión del impuesto 25.413 | Gastos e impuestos del banco |
 | `anulacion-debito` | Anulación o reversión de un débito | Gastos e impuestos del banco |
 | `sircreb` | Recaudación de IIBB sobre acreditaciones | Gastos e impuestos del banco |

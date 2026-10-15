@@ -1,6 +1,6 @@
 // Corre sharp de verdad, sobre imágenes generadas en el test.
 import sharp from "sharp";
-import { girarPng, pixelesGrises, prepararFoto } from "../src/foto";
+import { girarPng, paginasDeImagen, pixelesGrises, prepararFoto } from "../src/foto";
 import { tamanoDelPng } from "../src/paginasDelPdf";
 
 const jpeg = async (ancho: number, alto: number, orientacion?: number): Promise<Buffer> => {
@@ -35,6 +35,49 @@ describe("prepararFoto", () => {
 
   it("null si no es una imagen", async () => {
     expect(await prepararFoto(Buffer.from("no es una imagen"))).toBeNull();
+  });
+});
+
+/**
+ * Un TIFF de varias páginas en blanco, como el de un escáner con alimentador. sharp no arma uno desde
+ * cero: se le da un GIF animado de esas páginas, que sí abre como varias. Cada píxel del GIF va
+ * después del código de limpieza, así todos los códigos LZW son de 3 bits.
+ */
+const tiffDePaginas = (ancho: number, alto: number, paginas: number): Promise<Buffer> => {
+  const u16 = (n: number) => [n & 255, n >> 8];
+  const gif = [...Buffer.from("GIF89a"), ...u16(ancho), ...u16(alto), 0x80, 0, 0, 255, 255, 255, 0, 0, 0];
+  for (let p = 0; p < paginas; p++) {
+    gif.push(0x2c, 0, 0, 0, 0, ...u16(ancho), ...u16(alto), 0, 2);
+    const bytes: number[] = [];
+    let acc = 0;
+    let bits = 0;
+    for (const c of [...Array.from({ length: ancho * alto }, () => [4, 0]).flat(), 5]) {
+      acc |= c << bits;
+      for (bits += 3; bits >= 8; bits -= 8, acc >>= 8) bytes.push(acc & 255);
+    }
+    if (bits > 0) bytes.push(acc & 255);
+    for (let i = 0; i < bytes.length; i += 255) gif.push(Math.min(255, bytes.length - i), ...bytes.slice(i, i + 255));
+    gif.push(0);
+  }
+  gif.push(0x3b);
+  return sharp(Buffer.from(gif), { animated: true }).tiff().toBuffer();
+};
+
+describe("paginasDeImagen", () => {
+  it("un TIFF de dos páginas tiene 2", async () => {
+    expect(await paginasDeImagen(await tiffDePaginas(30, 20, 2))).toBe(2);
+  });
+
+  it("un TIFF de una página tiene 1", async () => {
+    expect(await paginasDeImagen(await tiffDePaginas(30, 20, 1))).toBe(1);
+  });
+
+  it("una foto que no dice cuántas páginas tiene, como un JPG, tiene 1", async () => {
+    expect(await paginasDeImagen(await jpeg(30, 20))).toBe(1);
+  });
+
+  it("null si no es una imagen", async () => {
+    expect(await paginasDeImagen(Buffer.from("no es una imagen"))).toBeNull();
   });
 });
 

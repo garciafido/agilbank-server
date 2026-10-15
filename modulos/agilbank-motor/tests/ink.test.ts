@@ -47,7 +47,11 @@ describe("inkColumns", () => {
   });
   it("una caja que se sale de la imagen se recorta, y las posiciones fraccionarias se redondean hacia afuera", () => {
     expect(inkColumns(gray, { x: 6.5, y: -2, w: 2, h: 10 })).toEqual([0, 1, 0]);
-    expect(inkColumns(gray, { x: -3, y: 0, w: 6, h: 4 })).toEqual([0, 0, 2]);
+    expect(inkColumns(gray, { x: 8, y: 0, w: 6, h: 4 })).toEqual([0, 0]);
+  });
+  it("una caja que empieza antes de la imagen: las columnas de afuera valen 0 y el perfil empieza en floor(x)", () => {
+    expect(inkColumns(gray, { x: -3, y: 0, w: 6, h: 4 })).toEqual([0, 0, 0, 0, 0, 2]);
+    expect(inkColumns(gray, { x: -1.5, y: 0, w: 5, h: 4 })).toEqual([0, 0, 0, 0, 2, 1]);
   });
 });
 
@@ -206,6 +210,15 @@ describe("measureAmounts", () => {
       return w;
     });
   };
+
+  it("una caja del OCR que empieza antes del borde de la imagen mide el importe donde está la tinta", () => {
+    const parts: Array<[number, string]> = [[0, "100.00"], [200, "COMISION"], [500, "900.00"]];
+    // La caja arranca 4 píxeles antes de la imagen: el OCR la estira hacia afuera.
+    const words = ocrBox(parts).map((w, k) => (k === 0 ? { ...w, x: w.x - 4, w: w.w + 4 } : w));
+    const out = measureAmounts(words, grayWith(printed(parts)), (t) => /^\d+\.\d\d$/.test(t));
+    expect(out[0]).toMatchObject({ x: 0, w: 36, measured: true });
+    expect(out[2]).toMatchObject({ x: 500, w: 36, measured: true });
+  });
 
   it("un débito y un crédito con el mismo texto toman su posición medida; el texto queda como estaba", () => {
     const debit: Array<[number, string]> = [[10, "1/7/2026"], [70, "COMISION"], [300, "100.00"], [500, "900.00"]];

@@ -296,10 +296,37 @@ describe("buildRows: los bordes", () => {
     it("en una fuente visual, una fila de otra página no completa el concepto; una de la misma, sí", () => {
       const onPages = (pages: number[]): Grid => {
         const g = base([null, "TERMINOS Y CONDICIONES", null, null]);
-        return { ...g, origin: "pdf", places: pages.map((page, k) => ({ page, line: k + 1, origin: "pdf" as const })) };
+        return { ...g, origin: "pdf", places: pages.map((page, k) => ({ page, line: k + 1, origin: "pdf" as const, gap: 0 })) };
       };
       expect(first(onPages([1, 1, 2, 2])).movements[0].concept).toBe("Transf. recibida");
       expect(first(onPages([1, 1, 1, 2])).movements[0].concept).toBe("Transf. recibida TERMINOS Y CONDICIONES");
+    });
+
+    describe("en una fuente visual, solo la fila pegada a la anterior completa el concepto", () => {
+      const withGap = (gap: number | undefined): Grid => {
+        const g = base([null, "CUIT 30123456781 ACME SA", null, null]);
+        return { ...g, origin: "ocr", places: [0, 1, 2, 3].map((k) => ({ page: 1, line: k + 1, origin: "ocr" as const, ...(k === 2 && gap === undefined ? {} : { gap: k === 2 ? gap : 0.5 }) })) };
+      };
+
+      it.each([0, 0.4, 1.9, 2])("con un hueco de %s altos de renglón, la completa", (gap) => {
+        const r = first(withGap(gap));
+        expect(r.movements[0].concept).toBe("Transf. recibida CUIT 30123456781 ACME SA");
+        expect(r.movements[0].toRow).toBe(2);
+      });
+
+      it.each([2.1, 30])("con un hueco de %s altos de renglón, no: es un pie de página", (gap) => {
+        const r = first(withGap(gap));
+        expect(r.movements[0].concept).toBe("Transf. recibida");
+        expect(r.movements[0].toRow).toBe(1);
+      });
+
+      it("sin el hueco medido, no la completa", () => {
+        expect(first(withGap(undefined)).movements[0].concept).toBe("Transf. recibida");
+      });
+
+      it("en una planilla, sin lugares, la fila siguiente la completa como siempre", () => {
+        expect(first(base([null, "CUIT 30123456781 ACME SA", null, null])).movements[0].concept).toBe("Transf. recibida CUIT 30123456781 ACME SA");
+      });
     });
 
     it("la continuación de un movimiento sin concepto no deja un espacio de más", () => {

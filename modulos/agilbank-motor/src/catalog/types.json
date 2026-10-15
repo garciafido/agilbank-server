@@ -17,6 +17,7 @@
   { "code": "orden-judicial", "name": "Embargo o transferencia por orden judicial", "family": "terceros", "sign": "-" },
   { "code": "impuesto-debitos", "name": "Impuesto ley 25.413 sobre débitos", "family": "banco", "sign": "-" },
   { "code": "impuesto-creditos", "name": "Impuesto ley 25.413 sobre créditos", "family": "banco", "sign": "-" },
+  { "code": "impuesto-25413", "name": "Impuesto ley 25.413, sin decir si es sobre débitos o sobre créditos", "family": "banco", "sign": "-" },
   { "code": "devolucion-impuesto", "name": "Devolución o reversión del impuesto 25.413", "family": "banco", "sign": "+" },
   { "code": "anulacion-debito", "name": "Anulación o reversión de un débito", "family": "banco", "sign": "+" },
   { "code": "sircreb", "name": "Recaudación de IIBB sobre acreditaciones", "family": "banco", "sign": "-" },

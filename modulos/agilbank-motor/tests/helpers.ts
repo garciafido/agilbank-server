@@ -1,4 +1,6 @@
 import * as XLSX from "xlsx";
+// La misma copia de sharp que usa el lector: una segunda cargaría otra libvips en el mismo proceso.
+import sharp from "@agilmind/lectura/node_modules/sharp";
 import type { StatementLine } from "../src/types";
 
 /** Una fecha como la escribe Galicia: t="d" con la fecha ISO. */
@@ -148,4 +150,29 @@ export const statementPdf = (): Buffer => {
      ...row(740, "01/07/2026", "COMISION", "-10,00", null, "990,00"), ...row(720, "02/07/2026", "TRANSFERENCIA", null, "40,00", "1.030,00"), ...foot(1)],
     [...header(780), ...row(760, "03/07/2026", "IVA", "-2,10", null, "1.027,90"), ...row(740, "04/07/2026", "DEPOSITO", null, "2,10", "1.030,00"), ...foot(2)],
   ]);
+};
+
+/**
+ * Un TIFF de varias páginas en blanco, como el de un escáner con alimentador. sharp no arma uno desde
+ * cero: se le da un GIF animado de esas páginas, que sí abre como varias. Cada píxel del GIF va
+ * después del código de limpieza, así todos los códigos LZW son de 3 bits.
+ */
+export const tiffDePaginas = (ancho: number, alto: number, paginas: number): Promise<Buffer> => {
+  const u16 = (n: number) => [n & 255, n >> 8];
+  const gif = [...Buffer.from("GIF89a"), ...u16(ancho), ...u16(alto), 0x80, 0, 0, 255, 255, 255, 0, 0, 0];
+  for (let p = 0; p < paginas; p++) {
+    gif.push(0x2c, 0, 0, 0, 0, ...u16(ancho), ...u16(alto), 0, 2);
+    const bytes: number[] = [];
+    let acc = 0;
+    let bits = 0;
+    for (const c of [...Array.from({ length: ancho * alto }, () => [4, 0]).flat(), 5]) {
+      acc |= c << bits;
+      for (bits += 3; bits >= 8; bits -= 8, acc >>= 8) bytes.push(acc & 255);
+    }
+    if (bits > 0) bytes.push(acc & 255);
+    for (let i = 0; i < bytes.length; i += 255) gif.push(Math.min(255, bytes.length - i), ...bytes.slice(i, i + 255));
+    gif.push(0);
+  }
+  gif.push(0x3b);
+  return sharp(Buffer.from(gif), { animated: true }).tiff().toBuffer();
 };

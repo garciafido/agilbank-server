@@ -174,7 +174,10 @@
         { "prefix": "percepcion iva rg", "type": "percepcion-iva" },
         { "prefix": "interes saldo deudor acorda", "type": "intereses" },
         { "prefix": "impuesto sellos", "type": "sellos" },
-        { "prefix": "ug impuesto a los sell", "type": "sellos" }
+        { "prefix": "ug impuesto a los sell", "type": "sellos" },
+        { "prefix": "imp ley", "type": "impuesto-25413" },
+        { "prefix": "imp ley ali gral s debitos", "type": "impuesto-debitos" },
+        { "prefix": "imp ley ali gral s creditos", "type": "impuesto-creditos" }
       ]
     }
   },

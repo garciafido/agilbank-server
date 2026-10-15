@@ -391,12 +391,23 @@ const signature = (phrases: Phrase[]): string => {
 const isHeader = (phrases: Phrase[]): boolean => phrases.filter((p) => roleOf(p.text) !== null).length >= 2;
 
 interface Line {
-  page: PageWords;
+  page: PageWords & { lineHeight: number };
   /** El lugar de la página en la lista: dos páginas pueden traer el mismo número. */
   at: number;
   line: number;
   phrases: Phrase[];
+  /** Arriba y abajo de la línea, en la unidad de la grilla. */
+  top: number;
+  bottom: number;
 }
+
+/** El lugar de cada línea, con el blanco que la separa de la anterior de su página (ver `Place`). */
+const placesOf = (lines: Line[]): Place[] =>
+  lines.map((l, k) => {
+    const place: Place = { page: l.page.page, line: l.line, origin: l.page.origin };
+    const previous = lines[k - 1];
+    return previous?.at === l.at ? { ...place, gap: (l.top - previous.bottom) / l.page.lineHeight } : place;
+  });
 
 /**
  * Las palabras de las páginas llevadas a la grilla común: filas por renglón impreso, columnas por
@@ -413,14 +424,11 @@ export const gridFromPages = (pages: PageWords[]): Grid => {
     const plain = upright.map((w) => ({ ...w, text: w.text.replace(TYPOGRAPHIC_MINUS, "-") }));
     const format = pageFormatOf(plain);
     const placed: PlacedWord[] = p.origin === "ocr" ? straightenOcrBoxes(plain, format) : plain;
-    return {
-      ...p,
-      format,
-      words: placed
-        .flatMap(splitGluedDate)
-        .flatMap((w) => splitGluedAmount(w, format))
-        .map((w) => ({ ...w, x: w.x * f, y: w.y * f, w: w.w * f, h: w.h * f })),
-    };
+    const words = placed
+      .flatMap(splitGluedDate)
+      .flatMap((w) => splitGluedAmount(w, format))
+      .map((w) => ({ ...w, x: w.x * f, y: w.y * f, w: w.w * f, h: w.h * f }));
+    return { ...p, format, words, lineHeight: median(words.map((w) => w.h)) || 1 };
   });
   const grouped = scaled.map((p) => ({ p, rows: rowsOf(p.words) }));
   // El ancho de un carácter sale de las filas de datos (una fecha al principio y un importe): el texto
@@ -441,6 +449,8 @@ export const gridFromPages = (pages: PageWords[]): Grid => {
         PHRASE_GAP * charWidth,
         amountOf(p.format),
       ),
+      top: Math.min(...row.map((w) => w.y)),
+      bottom: Math.max(...row.map((w) => w.y + w.h)),
     }));
     // La columna de fechas queda donde la dejó la página anterior: un escaneo corrido no corre las columnas.
     const firsts = pageLines.filter((l) => isDataRow(l.phrases)).map((l) => l.phrases[0].left);
@@ -458,7 +468,7 @@ export const gridFromPages = (pages: PageWords[]): Grid => {
 
   const data = lines.filter((l) => isDataRow(l.phrases)).map((l) => l.phrases);
   if (data.length === 0) {
-    return { origin, sheet: null, rows: lines.map((l) => l.phrases.map((p) => p.text)), places: lines.map((l) => ({ page: l.page.page, line: l.line, origin: l.page.origin })) };
+    return { origin, sheet: null, rows: lines.map((l) => l.phrases.map((p) => p.text)), places: placesOf(lines) };
   }
   // Las frases con la posición estimada no arman columnas. Toda fila con importes conserva uno cierto:
   // el último de una caja estirada se ubica desde su borde derecho.
@@ -493,10 +503,12 @@ export const gridFromPages = (pages: PageWords[]): Grid => {
   });
 
   const rows: Cell[][] = kept.map((l) => cellsOf(columns, l.phrases));
-  const places: Place[] = kept.map((l) => ({ page: l.page.page, line: l.line, origin: l.page.origin }));
-  return { origin, sheet: null, rows, places };
+  return { origin, sheet: null, rows, places: placesOf(kept) };
 };
 
-/** Las filas que tienen una fecha y un importe: cuántos movimientos parece haber. */
+/**
+ * Las filas que tienen una fecha y un importe: cuántos movimientos parece haber. La fecha puede venir
+ * sin año («03/07»): el año se completa después, y esto decide antes si una foto se gira.
+ */
 export const countDataRows = (grid: Grid): number =>
-  grid.rows.filter((r) => r.some((v) => typeof v === "string" && isoDate(v) !== null) && r.some((v) => typeof v === "string" && AMOUNT.test(v) && (parseCents(v, "ar") !== null || parseCents(v, "us") !== null))).length;
+  grid.rows.filter((r) => r.some((v) => typeof v === "string" && (DATE.test(v) || isoDate(v) !== null)) && r.some((v) => typeof v === "string" && AMOUNT.test(v) && (parseCents(v, "ar") !== null || parseCents(v, "us") !== null))).length;

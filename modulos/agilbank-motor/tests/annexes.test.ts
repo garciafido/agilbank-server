@@ -12,7 +12,7 @@ describe("annexEntries", () => {
     ]);
   });
   it("una fila sin CUIT válido, sin fecha o sin importe no es una entrada", () => {
-    expect(annexEntries(g([ANNEX, ["02/07/2026", "BBVSEGUROS", "R", "632,50"], ["x", "30712345671 A", "R", "1,00"], ["02/07/2026", "30712345671 A", "R", null], ["02/07/2026", "30712345672 B", "R", "1,00"]]))).toEqual([]);
+    expect(annexEntries(g([ANNEX, ["02/07/2026", "SEGUROS GENERICOS", "R", "45,10"], ["x", "30712345671 A", "R", "1,00"], ["02/07/2026", "30712345671 A", "R", null], ["02/07/2026", "30712345672 B", "R", "1,00"]]))).toEqual([]);
   });
   it("sin columna de fecha o de importe en el encabezado, nada", () => {
     expect(annexEntries(g([["Empresa", "Referencia", "Cuenta"], ["30712345671 A", "R", "C"]]))).toEqual([]);

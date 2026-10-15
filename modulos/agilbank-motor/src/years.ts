@@ -11,10 +11,12 @@ const FULL = /(?<![\d/])\d{1,2}[/.-]\d{1,2}[/.-](?:\d{4}|\d{2})(?![\d/])/g;
 /** Más lejos que esto de la referencia no hay año que sirva (el «29/02» fuera de un año bisiesto). */
 const MAX_DISTANCE_MS = 200 * 24 * 3600 * 1000;
 
+type Period = { from?: string | null; to?: string | null };
+
 const time = (iso: string): number => Date.parse(`${iso}T00:00:00Z`);
 
 /** El medio del período de ProntoNet; sin él, la mediana de las fechas completas que trae el archivo. */
-const referenceOf = (grid: Grid, period: { from?: string | null; to?: string | null }): number | null => {
+const referenceOf = (grid: Grid, period: Period): number | null => {
   const hints = [period.from, period.to].map((d) => (d ? isoDate(d) : null)).filter((d): d is string => d !== null);
   if (hints.length > 0) return hints.reduce((sum, d) => sum + time(d), 0) / hints.length;
   const found: number[] = [];
@@ -38,8 +40,13 @@ const referenceOf = (grid: Grid, period: { from?: string | null; to?: string | n
  * extremo que haya): está pensado para extractos mensuales. De diciembre a enero, enero cae en el año
  * siguiente. Una fecha que ningún año deja a menos de 200 días queda como está.
  */
-export const completeYears = (grid: Grid, period: { from?: string | null; to?: string | null } = {}): Grid => {
-  if (!grid.rows.some((r) => r.some((v) => typeof v === "string" && YEARLESS.test(v.trim())))) return grid;
+const hasYearless = (grid: Grid): boolean => grid.rows.some((r) => r.some((v) => typeof v === "string" && YEARLESS.test(v.trim())));
+
+/** Si la grilla trae fechas sin año y no hay de dónde sacarlo: ni el período ni una fecha completa. */
+export const yearUnknown = (grid: Grid, period: Period = {}): boolean => hasYearless(grid) && referenceOf(grid, period) === null;
+
+export const completeYears = (grid: Grid, period: Period = {}): Grid => {
+  if (!hasYearless(grid)) return grid;
   const reference = referenceOf(grid, period);
   if (reference === null) return grid;
   const year = new Date(reference).getUTCFullYear();

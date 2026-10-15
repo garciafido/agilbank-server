@@ -3,7 +3,7 @@ import { catalog } from "./catalog/catalog";
 import { formatOf } from "./sources/format";
 import { SpreadsheetTooLarge, gridsFromMarkup, gridsFromSpreadsheet } from "./sources/spreadsheet";
 import { NotText, TextTooLarge, gridFromText } from "./sources/text";
-import { VISUAL_LIMITS, readImage, readPdf, type VisualLimits } from "./sources/visual";
+import { VISUAL_LIMITS, readImage, readPdf, type Cut, type VisualLimits } from "./sources/visual";
 import { readTable, type Table } from "./columns";
 import { chronologicalOrder, judge, netChained, type Judgement } from "./judge";
 import { counterpartyOf, splitLeadingCode } from "./counterparty";
@@ -11,7 +11,7 @@ import { classify } from "./classify";
 import { assignIds, fingerprintOf } from "./identity";
 import { balancesOf, bankOf, cbusOutsideMovements, hasLabeledBalanceColumn, lineBalancesOf, normalizeCbu } from "./header";
 import { buildWarnings, verdictOf } from "./checks";
-import { completeYears } from "./years";
+import { completeYears, yearUnknown } from "./years";
 import { splitSections } from "./sections";
 import { annexEntries, applyAnnexes } from "./annexes";
 
@@ -65,12 +65,40 @@ const visualLimits = (o: Partial<VisualLimits> = {}): VisualLimits => ({
   dpi: pick(o.dpi, VISUAL_LIMITS.dpi),
 });
 
+interface PartialReading {
+  pages: number;
+  pagesRead: number;
+  cut: Cut;
+  maxPages: number;
+}
+
+const OURS = "Es una falla nuestra: envíen el archivo de nuevo y se vuelve a leer.";
+const SPLIT = "manden el extracto partido en archivos más chicos.";
+
+/**
+ * Por qué se cortó, para el usuario. Las fallas nuestras se leen de nuevo al reenviar el archivo. Un
+ * escaneado largo pasa el techo de tiempo con cualquier carga: si el reenvío se vuelve a cortar, el
+ * techo es del archivo, y lo que sirve es partirlo.
+ */
+const cutReason = ({ pagesRead, cut, maxPages }: PartialReading): string =>
+  cut === "paginas"
+    ? `el archivo pasa el tope de ${maxPages} páginas. Para leer el resto, ${SPLIT}`
+    : cut === "tiempo"
+      ? `se acabó el tiempo de la lectura. ${OURS} Si vuelve a cortarse, ${SPLIT}`
+      : cut === "render"
+        ? `la página ${pagesRead + 1} no se pudo preparar para leerla. ${OURS}`
+        : `el lector de imágenes falló en la página ${pagesRead + 1}. ${OURS}`;
+
+/** Lo que no se encontró en un archivo que no se terminó de leer: la tabla puede estar en lo que falta. */
+const withoutTableIn = (p: PartialReading): string =>
+  `Se leyeron ${p.pagesRead} de ${p.pages} páginas y en ellas no está la tabla de movimientos: ${cutReason(p)}`;
+
 /** Lo que se leyó de un archivo que no se terminó de leer. Frena las propuestas: faltan renglones. */
-const partialWarning = ({ pages, pagesRead }: { pages: number; pagesRead: number }): Warning => ({
+const partialWarning = (p: PartialReading): Warning => ({
   code: "lectura-parcial",
-  detail: `Se leyeron ${pagesRead} de ${pages} páginas: la lectura se cortó por tiempo o por la cantidad de páginas. Los renglones de las otras páginas no están en esta lectura.`,
+  detail: `Se leyeron ${p.pagesRead} de ${p.pages} páginas: ${cutReason(p)} Los renglones de las otras páginas no están en esta lectura.`,
   blocksProposals: true,
-  data: { paginas: pages, paginasLeidas: pagesRead },
+  data: { paginas: p.pages, paginasLeidas: p.pagesRead, causa: p.cut },
 });
 
 /**
@@ -85,13 +113,14 @@ export const readStatement = async (file: Buffer, options: ReadOptions = {}): Pr
   const format = formatOf(file);
   if (format === "heic") return abstain("Las fotos HEIC no se leen: manden la foto en JPG o PNG, o el extracto en PDF.");
   let grids: Grid[];
-  let partial: { pages: number; pagesRead: number } | null = null;
+  let partial: PartialReading | null = null;
   if (format === "pdf" || format === "image") {
-    const v = format === "pdf" ? await readPdf(file, visualLimits(options.visual)) : await readImage(file);
+    const limits = visualLimits(options.visual);
+    const v = format === "pdf" ? await readPdf(file, limits) : await readImage(file);
     if (v.kind === "unavailable") return { ...abstain(v.reason), verdict: "unavailable" };
     if (v.kind === "unreadable") return abstain(v.reason);
     grids = [v.grid];
-    if (v.pagesRead < v.pages) partial = { pages: v.pages, pagesRead: v.pagesRead };
+    if (v.cut !== null) partial = { pages: v.pages, pagesRead: v.pagesRead, cut: v.cut, maxPages: limits.maxPages };
   } else {
     try {
       grids = format === "text" ? [gridFromText(file)] : format === "markup" ? gridsFromMarkup(file) : gridsFromSpreadsheet(file);
@@ -100,6 +129,7 @@ export const readStatement = async (file: Buffer, options: ReadOptions = {}): Pr
     }
   }
   const period = { from: options.account?.periodFrom ?? null, to: options.account?.periodTo ?? null };
+  const withoutYear = grids.some((g) => yearUnknown(g, period));
   grids = grids.map((g) => completeYears(g, period));
 
   const account = options.account && { ...options.account, cbu: normalizeCbu(options.account.cbu) };
@@ -122,10 +152,16 @@ export const readStatement = async (file: Buffer, options: ReadOptions = {}): Pr
     if (judgement && (best === null || betterSheet(judgement, best.judgement))) best = { grid, table, judgement, annexes };
   }
   if (best === null) {
+    // Cortada por nosotros, lo que falta leer puede traer la tabla: no es una conclusión sobre el archivo.
+    if (partial !== null && partial.cut !== "paginas") return { ...abstain(withoutTableIn(partial)), verdict: "unavailable" };
     return abstain(
       withoutSign
         ? "No se puede saber el signo de los importes: el archivo trae una sola columna de importes, sin signo y sin saldo."
-        : "No se encontró una tabla de movimientos con fecha e importe.",
+        : withoutYear
+          ? "El extracto trae las fechas sin año y no dice de qué período es: manden el período en la cuenta (periodoDesde y periodoHasta)."
+          : partial !== null
+            ? withoutTableIn(partial)
+            : "No se encontró una tabla de movimientos con fecha e importe.",
     );
   }
 

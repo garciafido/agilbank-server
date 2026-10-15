@@ -78,9 +78,19 @@ const stale = (row: StatementRow): boolean => {
   return inProcess(row) && !!since && Date.now() - since.getTime() > STALE_AFTER_MINUTES * 60 * 1000;
 };
 
-/** Un intento que no dice nada del archivo: un fallo nuestro, una lectura que no pudo mirar, o un trabajo perdido. */
+/**
+ * Las causas de una lectura parcial que son nuestras y de un momento: el tiempo, una página que no salió
+ * del render o del OCR. Otra lectura puede llegar más lejos. El tope de páginas es del archivo.
+ */
+const PASSING_CUTS = new Set<unknown>(["tiempo", "render", "ocr"]);
+
+const cutShort = (row: StatementRow): boolean =>
+  row.status === "read" &&
+  ((row.reading as StatementReading | null)?.warnings ?? []).some((w) => w.code === "lectura-parcial" && PASSING_CUTS.has(w.data?.causa));
+
+/** Un intento que no dice nada del archivo: un fallo nuestro, una lectura que no pudo mirar o que se cortó por nosotros, o un trabajo perdido. */
 const rereadable = (row: StatementRow): boolean =>
-  row.status === "failed" || (row.status === "read" && row.verdict === "unavailable") || stale(row);
+  row.status === "failed" || (row.status === "read" && row.verdict === "unavailable") || cutShort(row) || stale(row);
 
 const UPLOAD_PROBLEMS: Record<UploadProblem, ApiResponse> = {
   "not-multipart": fail(415, "ENVIO_NO_MULTIPART", "El extracto se envía como multipart/form-data, con la parte archivo."),

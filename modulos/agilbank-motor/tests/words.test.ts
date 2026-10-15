@@ -48,7 +48,26 @@ describe("gridFromPages", () => {
       ["03/07/2026", "IVA", "-21,00", null, "9.479,00"],
     ]);
     expect(g.origin).toBe("pdf");
-    expect(g.places).toEqual([1, 2, 3, 4].map((line) => ({ page: 1, line, origin: "pdf" })));
+    // Renglones de 10 de alto cada 20: entre uno y otro, un alto de renglón en blanco.
+    expect(g.places).toEqual([1, 2, 3, 4].map((line) => ({ page: 1, line, origin: "pdf", ...(line > 1 ? { gap: 1 } : {}) })));
+  });
+
+  it("cada lugar trae el hueco en blanco antes de su línea, en altos de renglón de su página, y la primera de cada página no", () => {
+    const pie = (y: number) => at(y, 150, "BANCO EJEMPLO SA CUIT 30123456781");
+    const rows = [header(100), debit(120, "01/07/2026", "COMISION", "-1.000,00", "9.000,00"), at(135, 150, "CONTINUA"), pie(1300)];
+    const g = gridFromPages([page(1, rows), page(2, [header(100), credit(120, "02/07/2026", "DEP", "500,00", "9.500,00")])]);
+    expect(g.places?.map((p) => p.gap)).toEqual([undefined, 1, 0.5, 115.5, undefined, 1]);
+  });
+
+  it("el hueco no depende de la escala: en píxeles del OCR da lo mismo que en puntos", () => {
+    const pdf = page(1, [header(100), debit(120, "01/07/2026", "COMISION", "-1.000,00", "9.000,00"), at(160, 150, "MAS ABAJO")]);
+    const px: PageWords = { ...pdf, width: 3000, origin: "ocr", words: pdf.words.map((w) => ({ ...w, x: w.x * 3, y: w.y * 3, w: w.w * 3, h: w.h * 3 })) };
+    expect(gridFromPages([px]).places?.map((p) => p.gap)).toEqual([undefined, 1, 3]);
+  });
+
+  it("sin filas de datos, los lugares también traen el hueco", () => {
+    const g = gridFromPages([page(1, [at(100, 50, "Legales"), at(150, 50, "Texto")])]);
+    expect(g.places?.map((p) => p.gap)).toEqual([undefined, 4]);
   });
 
   it("un importe pegado al concepto, como lo junta el OCR en una caja, va a su columna", () => {
@@ -130,6 +149,14 @@ describe("splitGluedDate", () => {
 describe("countDataRows", () => {
   it("cuenta las filas con una fecha y un importe", () => {
     expect(countDataRows({ origin: "ocr", sheet: null, rows: [["FECHA", "IMPORTE"], ["01/07/2026", "1,00"], ["01/07/2026", null], [null, "2,00"]] })).toBe(1);
+  });
+
+  it("la fecha sin año también es una fecha: los años se completan después, y la foto se gira antes", () => {
+    expect(countDataRows({ origin: "ocr", sheet: null, rows: [["03/07", "COMISION", "-10,00"], ["04/07", "1,00"], ["4/7", "2,00"], ["03/07", null]] })).toBe(3);
+  });
+
+  it("sin una fecha, con o sin año, no cuenta", () => {
+    expect(countDataRows({ origin: "ocr", sheet: null, rows: [["0307", "1,00"], ["03/07/", "1,00"], ["SALDO 03/07", "1,00"]] })).toBe(0);
   });
 });
 
@@ -380,7 +407,7 @@ describe("gridFromPages: columnas", () => {
     expect(g.places).toEqual([
       { page: 1, line: 1, origin: "pdf" },
       { page: 2, line: 1, origin: "ocr" },
-      { page: 2, line: 2, origin: "ocr" },
+      { page: 2, line: 2, origin: "ocr", gap: 1 },
     ]);
     expect(g.origin).toBe("ocr");
   });

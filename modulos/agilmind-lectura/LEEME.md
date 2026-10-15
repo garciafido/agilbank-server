@@ -19,7 +19,7 @@ geometría y del orden de lectura están acá y también en el motor, que prueba
 motor, con los que corren poppler y con los bancos de los dos motores: `paddleOcr.ts` (cargar el
 modelo ONNX y leer con él), `pdf.ts` (pdftoppm y pdfinfo), `pdfTextGeometry.ts` (pdftotext) y
 `pdfPaginas.ts` (pdftotext y pdftoppm sobre un rango de páginas) y `foto.ts` (sharp: enderezar por EXIF,
-achicar y girar una foto, y los píxeles en grises de una imagen). Lo que esos cinco deciden sobre
+achicar y girar una foto, los píxeles en grises de una imagen y cuántas páginas tiene). Lo que esos cinco deciden sobre
 datos está en `ordenDeLectura.ts`, `paginasDePdf.ts`, `pdfGeometry.ts` y `paginasDelPdf.ts` (las
 palabras por página, el número de página de un render y el tamaño de un PNG), que sí se miden. Una
 función nueva con E/S va en uno de los cinco; una que solo transforma datos, en uno de los otros.
