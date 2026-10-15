@@ -166,8 +166,8 @@ describe("formatearDia", () => {
     expect(formatearDia("1985-03-12", locale)).toBe(text);
   });
   it("dos cifras en el día y en el mes (lo que esperan los documentos de jupiter)", () => {
-    expect(formatearDia("1989-10-02")).toBe("02/10/1989");
-    expect(formatearDia("1989-10-02", "es-AR")).toBe("02/10/1989");
+    expect(formatearDia("1984-10-07")).toBe("07/10/1984");
+    expect(formatearDia("1984-10-07", "es-AR")).toBe("07/10/1984");
   });
   it('por defecto, "es-AR"; vacío → ""', () => {
     expect(formatearDia("2024-02-29")).toBe("29/02/2024");

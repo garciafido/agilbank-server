@@ -46,6 +46,7 @@ const commonOptions = {
     'playwright-core',
     'onnxruntime-node',
     '@xenova/transformers',
+    '@gutenye/ocr-node',
   ],
   loader: {
     '.graphql': 'text',

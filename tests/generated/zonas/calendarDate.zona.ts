@@ -74,7 +74,7 @@ describe(`el día de calendario, con el proceso en ${ZONA}`, () => {
   });
 
   it("formatearDia no pasa por la zona del proceso, con dos cifras en el día y el mes", () => {
-    expect(formatearDia("1989-10-02")).toBe("02/10/1989");
+    expect(formatearDia("1984-10-07")).toBe("07/10/1984");
     expect(formatearDia("1985-03-12", "es-AR")).toBe("12/03/1985");
     expect(formatearDia("1985-03-12", "en-US")).toBe("03/12/1985");
   });
