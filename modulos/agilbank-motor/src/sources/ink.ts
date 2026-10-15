@@ -78,14 +78,15 @@ const LINE_ASPECT = 8;
 
 /**
  * Cuántos píxeles de tinta hay en cada columna de la caja, desde `floor(x)` hasta `ceil(x + w)`,
- * recortada a la imagen; 0 en los trazos de una línea fina.
+ * recortada a la derecha de la imagen; 0 en los trazos de una línea fina y en las columnas antes del
+ * borde izquierdo, para que el perfil empiece siempre en `floor(x)`.
  */
 export const inkColumns = (gray: Gray, box: Box, threshold = INK_THRESHOLD): number[] => {
   const left = Math.floor(box.x);
   const right = Math.ceil(box.x + box.w);
   const top = Math.max(0, Math.floor(box.y));
   const bottom = Math.min(gray.alto, Math.ceil(box.y + box.h));
-  const out: number[] = [];
+  const out: number[] = new Array(Math.max(0, Math.min(-left, right - left))).fill(0);
   for (let x = Math.max(0, left); x < Math.min(gray.ancho, right); x++) {
     let n = 0;
     for (let y = top; y < bottom; y++) if (gray.datos[y * gray.ancho + x] < threshold) n++;

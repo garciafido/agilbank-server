@@ -61,7 +61,7 @@ describe("checkFile: lo que el banco exige de cada archivo", () => {
 });
 
 describe("pendingInTable: un pendiente que entró a la tabla sale de la lista", () => {
-  const pending = [{ bank: "017", text: "imp ley", reason: "x" }, { bank: "017", text: "honorarios", reason: "x" }];
+  const pending = [{ bank: "017", text: "cargo raro", reason: "x" }, { bank: "017", text: "honorarios", reason: "x" }];
   const withPrefix = (bank: string, prefix: string): Catalog => {
     const b = catalog.synonyms.banks[bank];
     return { ...catalog, synonyms: { ...catalog.synonyms, banks: { ...catalog.synonyms.banks, [bank]: { ...b, texts: [...b.texts, { prefix, type: "impuesto-debitos" }] } } } };
@@ -72,12 +72,12 @@ describe("pendingInTable: un pendiente que entró a la tabla sale de la lista", 
   });
 
   it("un prefijo del banco que lo cubre lo saca, aunque sea más corto que el texto", () => {
-    expect(pendingInTable(pending, withPrefix("017", "imp ley")).map((p) => p.text)).toEqual(["imp ley"]);
-    expect(pendingInTable(pending, withPrefix("017", "imp")).map((p) => p.text)).toEqual(["imp ley"]);
+    expect(pendingInTable(pending, withPrefix("017", "cargo raro")).map((p) => p.text)).toEqual(["cargo raro"]);
+    expect(pendingInTable(pending, withPrefix("017", "cargo")).map((p) => p.text)).toEqual(["cargo raro"]);
   });
 
   it("un prefijo de otro banco no cuenta", () => {
-    expect(pendingInTable(pending, withPrefix("191", "imp ley"))).toEqual([]);
+    expect(pendingInTable(pending, withPrefix("191", "cargo raro"))).toEqual([]);
   });
 
   it("un sinónimo general lo cubre", () => {

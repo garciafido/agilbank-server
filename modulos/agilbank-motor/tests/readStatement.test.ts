@@ -1,9 +1,12 @@
 import * as XLSX from "xlsx";
+// La misma copia de sharp que usa el lector: una segunda cargaría otra libvips en el mismo proceso.
+import sharp from "@agilmind/lectura/node_modules/sharp";
 import * as spreadsheet from "../src/sources/spreadsheet";
+import * as visual from "../src/sources/visual";
 import { provenanceOf, readStatement } from "../src/readStatement";
 import { assignIds } from "../src/identity";
 import type { KnownAccount } from "../src/types";
-import { pdfCifrado, pdfConTexto, sparseBook, statementPdf, xlsx } from "./helpers";
+import { pdfCifrado, pdfConTexto, rightAt, sparseBook, statementPdf, tiffDePaginas, xlsx } from "./helpers";
 
 const CBU_CREDICOOP = "1910018600001234567891";
 const CBU_PROVINCIA = "0140007600009876543219";
@@ -1161,6 +1164,38 @@ describe("readStatement", () => {
     expect(r.lines.map((l) => l.date)).toEqual(["2026-07-02", "2026-07-03"]);
     expect(r.verdict).toBe("verified");
   });
+
+  describe("fechas sin año sin el período ni una fecha completa", () => {
+    const NO_YEAR = "El extracto trae las fechas sin año y no dice de qué período es: manden el período en la cuenta (periodoDesde y periodoHasta).";
+    const csv = Buffer.from("Fecha;Concepto;Importe;Saldo\n;Saldo anterior;;1.000,00\n02/07;COMISION;-10,00;990,00\n03/07;TRANSFERENCIA;100,00;1.090,00\n");
+
+    it("en un texto: sin lectura, con el motivo que dice qué falta", async () => {
+      expect(await readStatement(csv)).toMatchObject({ verdict: "abstained", reason: NO_YEAR });
+    });
+
+    it("en un PDF, lo mismo", async () => {
+      const pdf = pdfConTexto([[
+        { x: 40, y: 780, texto: "FECHA" }, { x: 110, y: 780, texto: "CONCEPTO" }, { x: 400, y: 780, texto: "IMPORTE" }, { x: 500, y: 780, texto: "SALDO" },
+        { x: 40, y: 760, texto: "01/07" }, { x: 110, y: 760, texto: "COMISION" }, { x: 400, y: 760, texto: "-10,00" }, { x: 500, y: 760, texto: "990,00" },
+        { x: 40, y: 740, texto: "02/07" }, { x: 110, y: 740, texto: "IVA" }, { x: 400, y: 740, texto: "40,00" }, { x: 500, y: 740, texto: "1.030,00" },
+      ]]);
+      expect(await readStatement(pdf)).toMatchObject({ verdict: "abstained", reason: NO_YEAR });
+    });
+
+    it.each([[{ periodTo: "2026-07-31" }], [{ periodFrom: "2026-07-01" }]])("con un solo extremo del período alcanza para leerlo: %j", async (account) => {
+      expect((await readStatement(csv, { account })).verdict).toBe("verified");
+    });
+
+    it("en un libro, basta una hoja con fechas sin año para dar el motivo", async () => {
+      const book = xlsx({ Notas: [["Sin movimientos"]], Movimientos: [["Fecha", "Concepto", "Importe"], ["02/07", "COMISION", "-10,00"]] });
+      expect(await readStatement(book)).toMatchObject({ verdict: "abstained", reason: NO_YEAR });
+    });
+
+    it("sin fechas sin año, el motivo de siempre", async () => {
+      const r = await readStatement(Buffer.from("Fecha;Concepto\nayer;nada\n"));
+      expect(r.reason).toBe("No se encontró una tabla de movimientos con fecha e importe.");
+    });
+  });
 });
 
 describe("provenanceOf", () => {
@@ -1214,15 +1249,138 @@ describe("un PDF con texto", () => {
     expect(r.lines.some((l) => /Pagina/.test(l.bank.text))).toBe(false);
   });
 
+  describe("la línea sin fecha ni importe debajo del último movimiento", () => {
+    const header = (y: number) => [{ x: 40, y, texto: "FECHA" }, { x: 110, y, texto: "CONCEPTO" }, rightAt(380, y, "DEBITO"), rightAt(460, y, "CREDITO"), rightAt(550, y, "SALDO")];
+    const row = (y: number, date: string, concept: string, debit: string | null, credit: string | null, balance: string) => [
+      { x: 40, y, texto: date }, { x: 110, y, texto: concept }, ...(debit ? [rightAt(380, y, debit)] : []), ...(credit ? [rightAt(460, y, credit)] : []), rightAt(550, y, balance),
+    ];
+    const statement = (below: { y: number; texto: string }) =>
+      pdfConTexto([[
+        ...header(780), { x: 110, y: 760, texto: "SALDO ANTERIOR" }, rightAt(550, 760, "1.000,00"),
+        ...row(740, "01/07/2026", "COMISION", "-10,00", null, "990,00"), ...row(720, "02/07/2026", "TRANSFERENCIA", null, "40,00", "1.030,00"),
+        ...row(700, "03/07/2026", "IVA", "-2,10", null, "1.027,90"),
+        { x: 110, ...below },
+      ]]);
+
+    it("el pie de la página, en la columna del concepto, no se pega al último movimiento ni le da contraparte", async () => {
+      const r = await readStatement(statement({ y: 100, texto: `BANCO EJEMPLO S.A. CUIT 30-71234567-1` }));
+      expect(r.verdict).toBe("verified");
+      expect(r.lines).toHaveLength(3);
+      expect(r.lines[2].bank.text).toBe("IVA");
+      expect(r.lines[2].counterparty).toBeNull();
+    });
+
+    it("la línea de abajo, pegada al movimiento, lo sigue completando: el CUIT de la contraparte", async () => {
+      const r = await readStatement(statement({ y: 688, texto: `CUIT ${CUIT} ACME SA` }));
+      expect(r.lines[2].bank.text).toBe(`IVA CUIT ${CUIT} ACME SA`);
+      expect(r.lines[2].counterparty).toMatchObject({ cuit: CUIT });
+    });
+  });
+
   it("con más páginas que el tope, lee las primeras y avisa la lectura parcial", async () => {
     const r = await readStatement(statementPdf(), { visual: { maxPages: 1 } });
     expect(r.lines).toHaveLength(2);
     const w = r.warnings.find((x) => x.code === "lectura-parcial");
-    expect(w).toMatchObject({ blocksProposals: true, data: { paginas: 2, paginasLeidas: 1 } });
+    expect(w).toMatchObject({ blocksProposals: true, data: { paginas: 2, paginasLeidas: 1, causa: "paginas" } });
     expect(w?.detail).toBe(
-      "Se leyeron 1 de 2 páginas: la lectura se cortó por tiempo o por la cantidad de páginas. Los renglones de las otras páginas no están en esta lectura.",
+      "Se leyeron 1 de 2 páginas: el archivo pasa el tope de 1 páginas. Para leer el resto, manden el extracto partido en archivos más chicos. Los renglones de las otras páginas no están en esta lectura.",
     );
     expect(r.verdict).toBe("weak");
+  });
+
+  describe("el aviso de la lectura parcial dice la causa del corte", () => {
+    const cutAt = async (cut: "tiempo" | "render" | "ocr") => {
+      const whole = await visual.readPdf(statementPdf());
+      if (whole.kind !== "read") throw new Error(whole.kind);
+      const spy = jest.spyOn(visual, "readPdf").mockResolvedValueOnce({ ...whole, pages: 3, pagesRead: 2, cut });
+      const r = await readStatement(statementPdf());
+      spy.mockRestore();
+      return r.warnings.find((x) => x.code === "lectura-parcial");
+    };
+
+    it.each([
+      ["tiempo", "Se leyeron 2 de 3 páginas: se acabó el tiempo de la lectura. Es una falla nuestra: envíen el archivo de nuevo y se vuelve a leer. Si vuelve a cortarse, manden el extracto partido en archivos más chicos. Los renglones de las otras páginas no están en esta lectura."],
+      ["render", "Se leyeron 2 de 3 páginas: la página 3 no se pudo preparar para leerla. Es una falla nuestra: envíen el archivo de nuevo y se vuelve a leer. Los renglones de las otras páginas no están en esta lectura."],
+      ["ocr", "Se leyeron 2 de 3 páginas: el lector de imágenes falló en la página 3. Es una falla nuestra: envíen el archivo de nuevo y se vuelve a leer. Los renglones de las otras páginas no están en esta lectura."],
+    ] as const)("%s", async (cut, detail) => {
+      const w = await cutAt(cut);
+      expect(w).toMatchObject({ blocksProposals: true, data: { paginas: 3, paginasLeidas: 2, causa: cut } });
+      expect(w?.detail).toBe(detail);
+    });
+
+    it("una lectura entera no trae el aviso", async () => {
+      expect((await readStatement(statementPdf())).warnings.some((w) => w.code === "lectura-parcial")).toBe(false);
+    });
+  });
+});
+
+describe("un PDF que no se terminó de leer y en lo leído no está la tabla", () => {
+  // Una portada con texto que sirve y sin movimientos.
+  const cover = [{ x: 40, y: 780, texto: "RESUMEN DE CUENTA CORRIENTE" }, { x: 40, y: 760, texto: "SUCURSAL CENTRO" }, { x: 40, y: 740, texto: "EMITIDO EN JULIO" }];
+  const table = (date: (day: number) => string) => [
+    { x: 40, y: 780, texto: "FECHA" }, { x: 110, y: 780, texto: "CONCEPTO" }, { x: 400, y: 780, texto: "IMPORTE" }, { x: 500, y: 780, texto: "SALDO" },
+    { x: 40, y: 760, texto: date(1) }, { x: 110, y: 760, texto: "COMISION" }, { x: 400, y: 760, texto: "-10,00" }, { x: 500, y: 760, texto: "990,00" },
+    { x: 40, y: 740, texto: date(2) }, { x: 110, y: 740, texto: "IVA" }, { x: 400, y: 740, texto: "40,00" }, { x: 500, y: 740, texto: "1.030,00" },
+  ];
+  const withYear = table((d) => `0${d}/07/2026`);
+  const withoutYear = table((d) => `0${d}/07`);
+  const NO_YEAR = "El extracto trae las fechas sin año y no dice de qué período es: manden el período en la cuenta (periodoDesde y periodoHasta).";
+
+  /** La lectura de `pages` cortada por `cut` después de `pagesRead`, con las páginas leídas que se pasan. */
+  const cutAt = async (read: Array<typeof cover>, pages: number, cut: "tiempo" | "render" | "ocr") => {
+    const whole = await visual.readPdf(pdfConTexto(read));
+    if (whole.kind !== "read") throw new Error(whole.kind);
+    const spy = jest.spyOn(visual, "readPdf").mockResolvedValueOnce({ ...whole, pages, pagesRead: read.length, cut });
+    const r = await readStatement(statementPdf());
+    spy.mockRestore();
+    return r;
+  };
+
+  it("la página 1 en blanco, el OCR falla en la 2 y la tabla está en la 3: no disponible, y no una conclusión sobre el archivo", async () => {
+    const white = await sharp({ create: { width: 100, height: 100, channels: 3, background: "#ffffff" } }).png().toBuffer();
+    let calls = 0;
+    const tools: Partial<visual.VisualTools> = {
+      ocrReady: async () => true,
+      render: async (_file, o) => Array.from({ length: o.hasta - o.desde + 1 }, (_, i) => ({ pagina: o.desde + i, png: white })),
+      ocr: async () => (++calls === 1 ? { vacia: true } : { fallo: "sin memoria" }),
+    };
+    const original = visual.readPdf;
+    const spy = jest.spyOn(visual, "readPdf").mockImplementationOnce((file, limits) => original(file, limits, tools));
+    const r = await readStatement(pdfConTexto([[], [], withYear]));
+    spy.mockRestore();
+    expect(r).toMatchObject({
+      verdict: "unavailable",
+      reason: "Se leyeron 1 de 3 páginas y en ellas no está la tabla de movimientos: el lector de imágenes falló en la página 2. Es una falla nuestra: envíen el archivo de nuevo y se vuelve a leer.",
+      header: null,
+      lines: [],
+      warnings: [],
+      checks: null,
+    });
+  });
+
+  it.each([
+    ["tiempo", "Se leyeron 2 de 5 páginas y en ellas no está la tabla de movimientos: se acabó el tiempo de la lectura. Es una falla nuestra: envíen el archivo de nuevo y se vuelve a leer. Si vuelve a cortarse, manden el extracto partido en archivos más chicos."],
+    ["render", "Se leyeron 2 de 5 páginas y en ellas no está la tabla de movimientos: la página 3 no se pudo preparar para leerla. Es una falla nuestra: envíen el archivo de nuevo y se vuelve a leer."],
+  ] as const)("cortada por %s: no disponible, con el motivo del corte", async (cut, reason) => {
+    expect(await cutAt([cover, cover], 5, cut)).toMatchObject({ verdict: "unavailable", reason, lines: [], warnings: [] });
+  });
+
+  it("cortada por nosotros, aunque lo leído traiga fechas sin año: no disponible, porque la fecha completa puede estar en lo que no se leyó", async () => {
+    expect(await cutAt([withoutYear], 3, "ocr")).toMatchObject({ verdict: "unavailable" });
+  });
+
+  it("cortada por el tope de páginas: sin lectura, y el motivo dice que se miraron solo las primeras", async () => {
+    const r = await readStatement(pdfConTexto([cover, cover, withYear]), { visual: { maxPages: 2 } });
+    expect(r).toMatchObject({
+      verdict: "abstained",
+      reason: "Se leyeron 2 de 3 páginas y en ellas no está la tabla de movimientos: el archivo pasa el tope de 2 páginas. Para leer el resto, manden el extracto partido en archivos más chicos.",
+      lines: [],
+      warnings: [],
+    });
+  });
+
+  it("cortada por el tope de páginas con fechas sin año: el motivo de las fechas, que dice qué mandar", async () => {
+    expect(await readStatement(pdfConTexto([withoutYear, cover]), { visual: { maxPages: 1 } })).toMatchObject({ verdict: "abstained", reason: NO_YEAR });
   });
 });
 
@@ -1273,16 +1431,20 @@ describe("un PDF que no se abre", () => {
     expect(r).toMatchObject({ verdict: "abstained", reason: "No se pudo abrir el PDF: está dañado o protegido con contraseña." });
   });
 
-  it("cifrado: vuelve con un motivo, sin lanzar", async () => {
+  it("cifrado: sin lectura, con el motivo, sin lanzar. No es no-disponible: el reenvío lo volvería a leer para siempre", async () => {
     const r = await readStatement(pdfCifrado());
-    expect(["abstained", "unavailable"]).toContain(r.verdict);
-    expect(r.reason).not.toBeNull();
+    expect(r).toMatchObject({ verdict: "abstained", reason: "No se pudo abrir el PDF: está dañado o protegido con contraseña." });
   });
 });
 
 it("una foto HEIC no se lee, con el motivo", async () => {
   const heic = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypheic"), Buffer.alloc(16)]);
   expect(await readStatement(heic)).toMatchObject({ verdict: "abstained", reason: "Las fotos HEIC no se leen: manden la foto en JPG o PNG, o el extracto en PDF." });
+});
+
+it("un TIFF de varias páginas no se lee a medias: sin lectura, con el motivo", async () => {
+  const r = await readStatement(await tiffDePaginas(30, 20, 2));
+  expect(r).toMatchObject({ verdict: "abstained", reason: "La imagen tiene 2 páginas: manden el extracto en PDF.", lines: [], warnings: [] });
 });
 
 describe("readStatement: el saldo solo al cierre del día", () => {

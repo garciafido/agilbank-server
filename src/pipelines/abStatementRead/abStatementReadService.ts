@@ -173,6 +173,8 @@ export class AbStatementReadPipelineService {
   /**
    * Método standalone para ejecutar read.
    * Llamado por el worker de forma asíncrona.
+   * NOTA: Este stage NO usa transacción envolvente (.transactional(false)).
+   * El stage es responsable de manejar sus propias transacciones.
    */
   async executeRead(
     input: {
@@ -182,30 +184,18 @@ export class AbStatementReadPipelineService {
     },
     apolloContext: MyApolloContext
   ): Promise<{ status: string }> {
-    // Lo que este bloque despache sale al commitear. Ver common/services/transactionScope.
-    return await runWithTransactionScope(() =>
-      this.prisma.$transaction(
-        async (txPrisma) => {
-          const stageContext: StageContext = {
-            ...apolloContext,
-            txPrisma: txPrisma as PrismaClient,
-            schemaMetaStore: this.schemaMetaStore,
-            simulation: input.simulation,
-          };
+    const stageContext: StageContext = {
+      ...apolloContext,
+      txPrisma: this.prisma,
+      schemaMetaStore: this.schemaMetaStore,
+    };
 
-          const result = await read(
-            stageContext,
-            input.statementId,
-            input.workerEventId
-          );
-
-          return result;
-        },
-        {
-          maxWait: 10000,
-          timeout: 300000,
-        }
-      )
+    const result = await read(
+      stageContext,
+      input.statementId,
+      input.workerEventId
     );
+
+    return result;
   }
 }

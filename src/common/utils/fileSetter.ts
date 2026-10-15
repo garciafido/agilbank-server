@@ -35,8 +35,8 @@ export const fileServerDataSetter = (
   if (!uploadedFile.ticket || uploadedFile.ticket.trim() === "") {
     throw new ValidationError(
       uploadedFile.filename
-        ? `El archivo "${uploadedFile.filename}" no llegó al servidor: su subida no terminó. Vuelva a adjuntarlo y guarde nuevamente.`
-        : "Falta un archivo obligatorio, o su subida no terminó. Adjúntelo y guarde nuevamente.",
+        ? `El archivo "${uploadedFile.filename}" no llegó al servidor: su subida no terminó. Vuelve a adjuntarlo y guarda nuevamente.`
+        : "Falta un archivo obligatorio, o su subida no terminó. Adjúntalo y guarda nuevamente.",
       {
         code: "FILE_UPLOAD_EMPTY_TICKET",
         field: baseName,

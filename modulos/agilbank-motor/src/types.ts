@@ -11,6 +11,11 @@ export interface Place {
   page: number;
   line: number;
   origin: "pdf" | "ocr";
+  /**
+   * El blanco entre la línea anterior de la página y esta, en altos de renglón de la página. No está
+   * en la primera línea de cada página.
+   */
+  gap?: number;
 }
 
 /** Cualquier formato llevado a filas y celdas. La fila 0 es la fila 1 del archivo. */

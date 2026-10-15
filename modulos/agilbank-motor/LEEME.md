@@ -76,14 +76,24 @@ Un PDF o una foto se lee en `src/sources/visual.ts`, con poppler y PP-OCR del m�
 - **PDF:** cada página se lee por su texto si el texto sirve; la que no, por OCR. Si alguna página
   necesita OCR y el OCR no está, la lectura sale `unavailable`: no se lee a medias. Un PDF dañado o
   con contraseña sale `abstained`.
-- **Fotos JPG y PNG:** hasta 4.000.000 de píxeles, enderezadas por su EXIF. Si no aparecen
+- **Fotos JPG, PNG, TIFF y WebP:** hasta 4.000.000 de píxeles, enderezadas por su EXIF. Si no aparecen
   movimientos, se prueban giradas. Las fotos HEIC salen `abstained`, con el pedido de mandarlas en
-  JPG, PNG o PDF.
-- **Techos** (`VISUAL_LIMITS`): 240 s de lectura y 60 páginas. Pasado cualquiera, se devuelve lo leído
-  hasta la última página entera, con el aviso `lectura-parcial`, que frena las propuestas.
+  JPG, PNG o PDF. Un TIFF de varias páginas, también: sharp abre solo la primera, y el pedido es
+  mandarlo en PDF.
+- **Techos** (`VISUAL_LIMITS`): 600 s de lectura y 60 páginas. Pasado cualquiera, se devuelve lo leído
+  hasta la última página entera, con el aviso `lectura-parcial`, que frena las propuestas. El aviso
+  trae la causa en `datos.causa`: `tiempo`, `render` (una página que no salió del render), `ocr` (una
+  página en la que el OCR falló) o `paginas`. Las tres primeras son fallas nuestras de un momento, y el
+  reenvío del archivo lo lee de nuevo; el tope de páginas es del archivo y queda. A unos 5,6 s por
+  página, las 60 páginas entran en los 600 s salvo con la máquina muy cargada; si se corta dos veces, el
+  aviso por tiempo pide mandarlo partido en archivos más chicos. El techo vale
+  porque el paso corre sin la transacción de 5 minutos del andamiaje (`.transactional(false)` en el
+  DSL del producto); el evento del worker vence a los 30. Si en lo leído no está la tabla, el
+  resultado dice cuántas páginas se leyeron y por qué se cortó: con un corte nuestro sale `unavailable`,
+  porque la tabla puede estar en lo que falta; con el tope de páginas, `abstained`.
 - **Resolución:** el OCR renderiza a **150 dpi**. A 200 dpi no lee mejor en conjunto y tarda entre
   1,24 y 1,34 veces más. El Credicoop 06, de 38 páginas, tardó 213 s a 150 dpi con carga de 4 a 6, en
-  una corrida anterior a los arreglos de columnas: por 1,24, a 200 serían unos 264 s, fuera del techo.
+  una corrida anterior a los arreglos de columnas: por 1,24, a 200 serían unos 264 s.
 - **Meta de 180 s:** no se alcanza. El Credicoop 06 a 150 dpi tarda 213 s con la mejor carga medida y
   340 s con carga 8 a 10. Repartir el OCR en paralelo dentro de un proceso no rinde: lo mostró la
   medición de la enmienda de la spec de la lectura
@@ -109,7 +119,7 @@ El Credicoop 06 no trae saldos por renglón: las dos lecturas coinciden en 950 r
 (`bench:visual`). En una sonda aparte, que no está en el repo, la suma de sus importes quedó 4,4
 veces más lejos del cierre de `cuenta.json` a 200 que a 150.
 Con esta carga, el Credicoop 06 pasó los 240 s también a 150 dpi (340 s): con el techo de
-producción se habría cortado con `lectura-parcial`.
+entonces se habría cortado con `lectura-parcial`.
 
 Para correr:
 

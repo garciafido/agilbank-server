@@ -14,6 +14,9 @@ const ROOT = process.env.AB_IEB_DIR ?? "/Volumes/Warehouse/agilerp-datasets/Agil
 // Con la máquina cargada, el techo de tiempo de producción corta la lectura y la calidad se mezcla con
 // la velocidad: AB_BENCH_BUDGET_MS lo sube para medir solo la lectura. maxSeconds se chequea igual.
 const BUDGET_MS = process.env.AB_BENCH_BUDGET_MS ? Number(process.env.AB_BENCH_BUDGET_MS) : undefined;
+// Producción lee con los modelos latinos (los Dockerfiles fijan la variable); sin ella PP-OCR carga los
+// de fábrica y el banco mide otra lectura.
+process.env.AP_PADDLE_MODELS_DIR ??= path.join(__dirname, "../node_modules/@agilmind/lectura/modelos/paddle-latin-v5");
 
 const money = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const amount = (cents: number | null | undefined): string => (cents === null || cents === undefined ? "-" : money.format(cents / 100));
@@ -37,7 +40,7 @@ const main = async (): Promise<void> => {
   const pending = new Map<PendingConcept, number>();
   const timeWarnings: string[] = [];
   const load = os.loadavg()[0];
-  console.log(`carga: ${load.toFixed(2)} · techo de la lectura visual: ${BUDGET_MS === undefined ? "el de producción" : `${BUDGET_MS} ms`}`);
+  console.log(`carga: ${load.toFixed(2)} · techo de la lectura visual: ${BUDGET_MS === undefined ? "el de producción" : `${BUDGET_MS} ms`} · modelos: ${process.env.AP_PADDLE_MODELS_DIR}`);
   console.log("consulta | renglones (esperados) | encadenan | con CUIT | páginas | veredicto | avisos | ms");
   for (const f of files) {
     const file = fs.readFileSync(f.path);

@@ -24,6 +24,19 @@ export async function prepararFoto(buffer: Buffer, maxPixeles = MAX_PIXELES): Pr
   }
 }
 
+/**
+ * Cuántas páginas tiene una imagen: un TIFF de un escáner con alimentador trae varias, y sharp abre
+ * solo la primera. La que no lo dice, como un JPG o un PNG, tiene 1. `null` si no es una imagen que
+ * sharp sepa abrir.
+ */
+export async function paginasDeImagen(buffer: Buffer): Promise<number | null> {
+  try {
+    return (await sharp(buffer).metadata()).pages ?? 1;
+  } catch {
+    return null;
+  }
+}
+
 /** El PNG girado en sentido horario. */
 export async function girarPng(png: Buffer, grados: 90 | 180 | 270): Promise<Buffer> {
   return sharp(png).rotate(grados).png().toBuffer();

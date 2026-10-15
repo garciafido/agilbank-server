@@ -107,10 +107,21 @@ export async function paddleDisponible(): Promise<boolean> {
 }
 
 /**
+ * Lo que dio PP-OCR sobre una página: sus palabras, una página sin texto (el detector corrió y no vio
+ * nada) o una falla (el runtime lanzó, el motor no está, o `detect()` no tiene la forma fijada). Una
+ * página vacía dice algo de la página; una falla, solo que no se pudo mirar.
+ */
+export type LecturaPaddle =
+  | { palabras: { text: string; words: PaddleWord[] } }
+  | { vacia: true }
+  | { fallo: string };
+
+/**
  * Corre PP-OCR sobre un PNG y devuelve el texto en orden de lectura con
  * "palabras" sintéticas: cada caja se reparte horizontalmente entre sus
  * tokens en proporción a los caracteres — cajas aproximadas pero útiles para
- * los recortes de evidencia.
+ * los recortes de evidencia. `null` tanto si la página no tiene texto como si
+ * la lectura falló: para distinguirlos, `leerConPaddleDetallado`.
  *
  * De a una página por proceso. La memoria de PP-OCR crece con los píxeles de
  * la página (~1,9 GB con el tope de 4 MP), y el worker lee varios documentos a
@@ -118,6 +129,11 @@ export async function paddleDisponible(): Promise<boolean> {
  * se coordinan, y entre ellos el límite es la memoria de la máquina.
  */
 export function runPaddleOcr(png: Buffer, scale = 1): Promise<{ text: string; words: PaddleWord[] } | null> {
+  return leerConPaddleDetallado(png, scale).then((r) => ("palabras" in r ? r.palabras : null));
+}
+
+/** Como `runPaddleOcr`, en el mismo turno, separando la página vacía de la falla. */
+export function leerConPaddleDetallado(png: Buffer, scale = 1): Promise<LecturaPaddle> {
   const esta = turno.then(() => leerConPaddle(png, scale));
   turno = esta.catch(() => undefined);
   return esta;
@@ -125,12 +141,11 @@ export function runPaddleOcr(png: Buffer, scale = 1): Promise<{ text: string; wo
 
 let turno: Promise<unknown> = Promise.resolve();
 
-async function leerConPaddle(
-  png: Buffer,
-  scale: number,
-): Promise<{ text: string; words: PaddleWord[] } | null> {
+const VACIA: LecturaPaddle = { vacia: true };
+
+async function leerConPaddle(png: Buffer, scale: number): Promise<LecturaPaddle> {
   const engine = await getEngine();
-  if (!engine) return null;
+  if (!engine) return { fallo: "PP-OCR no está disponible en este proceso." };
 
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ap-paddle-"));
   const imgPath = path.join(dir, "in.png");
@@ -138,8 +153,9 @@ async function leerConPaddle(
     await fs.writeFile(imgPath, png);
     const detectado: unknown = await engine.detect(imgPath);
     if (!Array.isArray(detectado)) {
-      console.warn("[paddleOcr] detect() no devolvió la lista de líneas: la versión de @gutenye/ocr-common no es la fijada");
-      return null;
+      const motivo = "detect() no devolvió la lista de líneas: la versión de @gutenye/ocr-common no es la fijada";
+      console.warn(`[paddleOcr] ${motivo}`);
+      return { fallo: motivo };
     }
     const lines = detectado as PaddleLine[];
     // Cero cajas NO es una excepción: el detector corrió y no vio texto. Es el
@@ -148,19 +164,20 @@ async function leerConPaddle(
     // leer», que es la diferencia que importa al diagnosticar.
     if (!lines?.length) {
       console.warn(`[paddleOcr] el detector no encontró texto (${png.length} bytes, escala ${scale})`);
-      return null;
+      return VACIA;
     }
     const flat = agruparEnOrdenDeLectura(lines, scale);
     if (!flat.text.trim().length) {
       console.warn(`[paddleOcr] ${lines.length} cajas detectadas pero el texto quedó vacío`);
-      return null;
+      return VACIA;
     }
-    return flat;
+    return { palabras: flat };
   } catch (error) {
     // Lo que lanza el runtime nativo no siempre es un Error: `.message` daba
     // «undefined» en 1.300 fallas de una campaña y nadie supo de qué morían.
-    console.warn("[paddleOcr] falló:", error instanceof Error ? error.message : String(error));
-    return null;
+    const motivo = error instanceof Error ? error.message : String(error);
+    console.warn("[paddleOcr] falló:", motivo);
+    return { fallo: motivo };
   } finally {
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }

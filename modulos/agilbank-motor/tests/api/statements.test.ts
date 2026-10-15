@@ -185,6 +185,58 @@ describe("receive", () => {
     expect(s.rows.abStatement[0].file_data.name).toBe(base);
   });
 
+  describe("una lectura parcial", () => {
+    const partial = (causa: unknown, verdict = "weak", over: Record<string, unknown> = {}) => ({
+      id: "s1", tenant_id_: "T1", contentHash: HASH, status: "read", verdict,
+      reading: {
+        fingerprint: HASH, verdict, reason: null, header: null, lines: [], checks: null,
+        warnings: [
+          { code: "no-encadena", detail: "x", blocksProposals: false, data: { causa: "tiempo" } },
+          { code: "lectura-parcial", detail: "x", blocksProposals: true, data: { paginas: 4, paginasLeidas: 2, causa } },
+        ],
+      },
+      ...over,
+    });
+
+    it.each(["tiempo", "render", "ocr"])("cortada por %s es una falla nuestra de un momento: el reenvío la vuelve a leer", async (causa) => {
+      const s = setup({ abStatement: [partial(causa)] });
+      const r = await s.api.receive({ headers: HEADERS, stream: multipart(FILE) });
+      expect(r).toEqual({ status: 202, body: { idExtracto: "s1", huella: HASH, estado: "en-proceso" } });
+      expect(s.enqueued).toEqual([["s1", "u1", "T1"]]);
+      expect(s.rows.abStatement[0]).toMatchObject({ status: "queued", verdict: null, readStarts: 0 });
+    });
+
+    it("también si el veredicto es verificada: lo que falta no se controló", async () => {
+      const s = setup({ abStatement: [partial("tiempo", "verified")] });
+      expect((await s.api.receive({ headers: HEADERS, stream: multipart(FILE) })).status).toBe(202);
+    });
+
+    it.each([["paginas"], [undefined], [null]])("cortada por %s no se vuelve a leer: el tope de páginas es del archivo", async (causa) => {
+      const s = setup({ abStatement: [partial(causa)] });
+      expect((await s.api.receive({ headers: HEADERS, stream: multipart(FILE) })).status).toBe(200);
+      expect(s.enqueued).toEqual([]);
+    });
+
+    it("la causa de otro aviso no cuenta: tiene que ser la de lectura-parcial", async () => {
+      const row = partial("paginas");
+      const s = setup({ abStatement: [row] });
+      expect((await s.api.receive({ headers: HEADERS, stream: multipart(FILE) })).status).toBe(200);
+    });
+
+    it("en cola o en proceso no se vuelve a leer aunque la lectura guardada sea parcial por tiempo", async () => {
+      const s = setup({ abStatement: [partial("tiempo", "weak", { status: "processing" })] });
+      expect((await s.api.receive({ headers: HEADERS, stream: multipart(FILE) })).status).toBe(200);
+      expect(s.enqueued).toEqual([]);
+    });
+
+    it("un aviso lectura-parcial sin datos no se vuelve a leer", async () => {
+      const row = partial("tiempo");
+      row.reading.warnings = [{ code: "lectura-parcial", detail: "x", blocksProposals: true } as never];
+      const s = setup({ abStatement: [row] });
+      expect((await s.api.receive({ headers: HEADERS, stream: multipart(FILE) })).status).toBe(200);
+    });
+  });
+
   it("un extracto leído con otro veredicto no se vuelve a leer", async () => {
     const s = setup({ abStatement: [{ id: "s1", tenant_id_: "T1", contentHash: HASH, status: "read", verdict: "weak", reading: { fingerprint: HASH, verdict: "weak", reason: null, header: null, lines: [], warnings: [], checks: null } }] });
     const r = await s.api.receive({ headers: HEADERS, stream: multipart(FILE) });

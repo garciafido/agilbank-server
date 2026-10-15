@@ -52,6 +52,17 @@ describe("formatOf", () => {
     expect(formatOf(Buffer.from("Fecha;Concepto\n"))).toBe("text");
   });
 
+  it("una foto TIFF o WebP es una imagen: hay escáneres que dan TIFF", () => {
+    expect(formatOf(Buffer.from([0x49, 0x49, 0x2a, 0x00, 0x08, 0, 0, 0]))).toBe("image");
+    expect(formatOf(Buffer.from([0x4d, 0x4d, 0x00, 0x2a, 0, 0, 0, 0x08]))).toBe("image");
+    expect(formatOf(Buffer.concat([Buffer.from("RIFF"), Buffer.from([0x34, 0, 0, 0]), Buffer.from("WEBPVP8 ")]))).toBe("image");
+    // Un RIFF que no es WebP (un WAV) y un texto que empieza como TIFF siguen siendo texto.
+    expect(formatOf(Buffer.concat([Buffer.from("RIFF"), Buffer.from([0x34, 0, 0, 0]), Buffer.from("WAVEfmt ")]))).toBe("text");
+    expect(formatOf(Buffer.concat([Buffer.from("RIFX"), Buffer.from([0x34, 0, 0, 0]), Buffer.from("WEBPVP8 ")]))).toBe("text");
+    expect(formatOf(Buffer.from("II*nada\n"))).toBe("text");
+    expect(formatOf(Buffer.from("MM*nada\n"))).toBe("text");
+  });
+
   it("una foto HEIC se reconoce por su caja ftyp", () => {
     const heic = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypheic"), Buffer.alloc(16)]);
     expect(formatOf(heic)).toBe("heic");

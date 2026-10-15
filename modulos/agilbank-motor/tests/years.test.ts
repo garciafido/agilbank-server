@@ -1,4 +1,4 @@
-import { completeYears } from "../src/years";
+import { completeYears, yearUnknown } from "../src/years";
 import type { Grid } from "../src/types";
 
 const g = (...rows: Array<Array<string | number | null>>): Grid => ({ origin: "text", sheet: null, rows });
@@ -15,7 +15,7 @@ describe("completeYears", () => {
   });
 
   it("sin período, el año sale de las fechas completas del archivo, aunque estén dentro de un texto", () => {
-    const out = completeYears(g(["Periodo al 03/08/2026"], ["01/07", "IMP.LEY 30/06/26"]));
+    const out = completeYears(g(["Periodo al 03/08/2026"], ["01/07", "PAGO 15/07/26"]));
     expect(out.rows[1][0]).toBe("01/07/2026");
   });
 
@@ -78,5 +78,22 @@ describe("completeYears", () => {
   it("con una sola punta de período, la cercanía se mide a esa punta", () => {
     expect(completeYears(g(["30/12"]), { from: "2026-12-20" }).rows).toEqual([["30/12/2026"]]);
     expect(completeYears(g(["02/01"]), { to: "2027-01-10" }).rows).toEqual([["02/01/2027"]]);
+  });
+});
+
+describe("yearUnknown", () => {
+  it("fechas sin año, sin período ni fechas completas: no se sabe el año", () => {
+    expect(yearUnknown(g(["03/07", "x"], [" 04/07 ", 3]))).toBe(true);
+    expect(yearUnknown(g(["03/07", "x"]), { from: null, to: null })).toBe(true);
+  });
+
+  it("con el período, un extremo o una fecha completa en el archivo, sí se sabe", () => {
+    expect(yearUnknown(g(["03/07"]), { from: "2026-07-01" })).toBe(false);
+    expect(yearUnknown(g(["03/07"]), { to: "2026-07-31" })).toBe(false);
+    expect(yearUnknown(g(["03/07"], ["Periodo al 31/07/2026"]))).toBe(false);
+  });
+
+  it("sin fechas sin año, no falta nada", () => {
+    expect(yearUnknown(g(["x", "pago 03/07", 3]))).toBe(false);
   });
 });

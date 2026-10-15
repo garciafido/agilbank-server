@@ -104,12 +104,6 @@ export interface PendingConcept {
 export const PENDING_CONCEPTS: PendingConcept[] = [
   {
     bank: "017",
-    text: "imp ley",
-    reason:
-      "El impuesto 25.413 del día, sin decir si es sobre débitos o sobre créditos. En las cuentas medidas es el 0,6 % de los débitos del día, pero en una cuenta con créditos gravados la misma línea puede traer los dos.",
-  },
-  {
-    bank: "017",
     text: "honorarios",
     reason: "Es el texto que escribió quien transfirió, no la fórmula del banco: por el texto no hay tipo.",
   },

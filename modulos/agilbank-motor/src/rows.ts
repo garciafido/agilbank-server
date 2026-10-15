@@ -60,8 +60,16 @@ const amountOf = (row: Cell[], i: Interpretation): number | null => {
 /** Dos rótulos de encabezado o más: el encabezado que cada página repite, no el concepto que sigue. */
 const isHeaderRow = (row: Cell[]): boolean => row.filter((v) => typeof v === "string" && roleOf(v) !== null).length >= 2;
 
-/** En una fuente visual, una fila de otra página no sigue a la anterior aunque quede pegada en la grilla. */
-const samePage = (grid: Grid, a: number, b: number): boolean => grid.places === undefined || grid.places[a]?.page === grid.places[b]?.page;
+/**
+ * En una fuente visual cada línea impresa es una fila, aunque la separen treinta renglones en blanco de
+ * la anterior: sigue al movimiento solo si está en su página y con un blanco de `MAX_GAP` altos de
+ * renglón como mucho. El Credicoop pone el CUIT y el nombre de la contraparte en la línea de abajo, sin
+ * blanco de por medio; un pie de página o una leyenda debajo del último movimiento quedan más lejos, y
+ * el CUIT del banco que traen no es una contraparte. Sin el blanco medido, no sigue.
+ */
+const MAX_GAP = 2;
+const follows = (grid: Grid, a: number, b: number): boolean =>
+  grid.places === undefined || (grid.places[a]?.page === grid.places[b]?.page && (grid.places[b]?.gap ?? Infinity) <= MAX_GAP);
 
 const optional = (v: Cell): string | null => {
   const t = textOf(v);
@@ -73,7 +81,8 @@ const optional = (v: Cell): string | null => {
  *
  * Un movimiento empieza en una fila con fecha e importe. Una fila siguiente sin fecha ni importe, y
  * pegada a la anterior, completa su concepto: ahí ponen algunos bancos el CUIT y el nombre de la
- * contraparte, salvo que sea un encabezado o que, en una fuente visual, esté en otra página. Una fila
+ * contraparte, salvo que sea un encabezado o que, en una fuente visual, esté en otra página o lejos de la
+ * anterior (ver `follows`). Una fila
  * con importe y sin fecha es un total: queda afuera. Las filas que la tabla de
  * sinónimos nombra como no-movimientos (saldo anterior, transporte, totales) tampoco son renglones,
  * pero el saldo que traen sirve de control.
@@ -128,7 +137,7 @@ export const buildRows = (grid: Grid, table: Table, i: Interpretation, nonMoveme
       continue;
     }
     const m = movements[movements.length - 1];
-    if (date === null && amount === null && concept !== "" && m !== undefined && r === lastAttached + 1 && !isHeaderRow(row) && samePage(grid, m.fromRow, r)) {
+    if (date === null && amount === null && concept !== "" && m !== undefined && r === lastAttached + 1 && !isHeaderRow(row) && follows(grid, m.fromRow, r)) {
       m.concept = `${m.concept} ${concept}`.trim();
       m.toRow = r;
       for (const c of i.extras) {
