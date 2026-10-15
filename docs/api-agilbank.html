@@ -348,6 +348,7 @@ queda <code>fallido</code>: enviar el mismo archivo otra vez lo lee de nuevo.</p
 <tr><td>PDF con texto</td><td>Se lee</td></tr>
 <tr><td>PDF escaneado</td><td>Se lee. Puede tardar varios minutos (abajo)</td></tr>
 <tr><td>Foto JPG, PNG, TIFF o WebP</td><td>Se lee como una página escaneada</td></tr>
+<tr><td>TIFF de varias páginas</td><td>No se lee. Vuelve <code>leido</code> con el veredicto <code>sin-lectura</code> y el motivo «La imagen tiene N páginas: manden el extracto en PDF.», con la cantidad de páginas en lugar de N</td></tr>
 <tr><td>Foto HEIC</td><td>No se lee. Vuelve <code>leido</code> con el veredicto <code>sin-lectura</code> y el motivo «Las fotos HEIC no se leen: manden la foto en JPG o PNG, o el extracto en PDF.»</td></tr>
 </tbody>
 </table></div>
@@ -379,7 +380,13 @@ leyeron y por qué se cortó (<code>datos.causa</code>). Los renglones de las ot
 esa lectura. Un aviso <code>lectura-parcial</code> frena las propuestas. Para tener el resto: si se
 cortó por el tope de páginas, manden el extracto partido en archivos más cortos; si se cortó por
 tiempo o por una página que no se pudo leer, es una falla nuestra, y enviarlo de nuevo lo lee de
-nuevo.</p>
+nuevo. Un PDF escaneado largo puede pasar los 4 minutos cada vez: si se vuelve a cortar por tiempo,
+manden el extracto partido en archivos más chicos.</p>
+
+<p>Si en las páginas que se leyeron no está la tabla de movimientos, el <code>motivo</code> dice
+cuántas se leyeron y por qué se cortó. Si se cortó por una falla nuestra, el veredicto es
+<code>no-disponible</code>, porque la tabla puede estar en las páginas que faltan, y enviarlo de nuevo
+lo lee de nuevo. Si se cortó por el tope de páginas, el veredicto es <code>sin-lectura</code>.</p>
 
 <p>Si la lectura se corta antes de leer la primera página, por cualquiera de esas causas salvo el
 tope de páginas, o si al servidor le falta un lector, la lectura vuelve con el veredicto
@@ -523,7 +530,8 @@ pedidos (sección 09): respeten el encabezado <code>Retry-After</code> de un 429
 le falta el lector de PDF, sea cual sea el PDF; o le falta el lector de imágenes y alguna página
 no tiene texto que sirva, o el archivo es una foto. Un PDF con texto en todas sus páginas se lee
 aunque falte el lector de imágenes. El último sale si el lector de imágenes falla en la primera
-página que lo necesita, o en una foto.</p>
+página del archivo, o en una foto. Una lectura que se cortó por una falla nuestra, sin la tabla en
+las páginas leídas, trae su propio motivo (ver «Cuánto tarda la lectura»).</p>
 
 <p>Los cuatro motivos:</p>
 
@@ -739,7 +747,7 @@ problema es del cuerpo entero.</p>
 <tr><td><code>alicuota</code></td><td>De 0 a 100</td></tr>
 <tr><td>Pedidos a la API</td><td>Un cupo por instalación, por dirección IP, en ventanas de 15 minutos. El valor lo informamos al dar de alta la credencial. Al pasarlo, la respuesta es 429 con <code>Retry-After</code></td></tr>
 <tr><td>Páginas que se leen de un PDF</td><td>60. Si tiene más, se lee hasta la 60 y vuelve <code>lectura-parcial</code></td></tr>
-<tr><td>Tiempo de lectura de las páginas de un PDF</td><td>4 minutos. Si se pasa, vuelve <code>lectura-parcial</code> con la causa <code>tiempo</code>, y el reenvío lo lee de nuevo; si no leyó ninguna página, <code>no-disponible</code>. Una foto no tiene techo de tiempo</td></tr>
+<tr><td>Tiempo de lectura de las páginas de un PDF</td><td>4 minutos. Si se pasa, vuelve <code>lectura-parcial</code> con la causa <code>tiempo</code>, y el reenvío lo lee de nuevo; si vuelve a cortarse, hay que mandarlo partido en archivos más chicos. Si no leyó ninguna página, <code>no-disponible</code>. Una foto no tiene techo de tiempo</td></tr>
 <tr><td>Renglones por extracto</td><td>No hay un tope en la cantidad. Un archivo que pasa los topes de tamaño de abajo vuelve <code>leido</code> con el veredicto <code>sin-lectura</code> y su motivo; no hay un rechazo HTTP</td></tr>
 </tbody>
 </table></div>
