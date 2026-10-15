@@ -351,8 +351,9 @@ queda <code>fallido</code>: enviar el mismo archivo otra vez lo lee de nuevo.</p
 </table></div>
 
 <p>Un PDF se lee página por página. Una página con texto se lee por su texto. Una página escaneada
-se lee como imagen, y esa lectura puede equivocar una cifra. Los controles de saldos lo
-muestran: un renglón que no encadena sale marcado (<code>encadena</code> en <code>false</code>).
+se lee como imagen, y esa lectura puede equivocar una cifra. Si el archivo trae saldos,
+los controles lo muestran: un renglón que no encadena sale marcado (<code>encadena</code> en
+<code>false</code>). Si no trae saldos, la única señal es el aviso <code>sin-saldos</code>.
 Un PDF puede mezclar los dos tipos de página.</p>
 
 <p>Un PDF dañado o protegido con contraseña vuelve con el veredicto <code>sin-lectura</code> y el
@@ -368,15 +369,17 @@ páginas puede tardar varios minutos; no es un plazo.</p>
 <p>Consulten hasta que el estado deje de ser <code>en-proceso</code>. Si sigue <code>en-proceso</code>
 más de 30 minutos, envíenlo de nuevo (sección 05).</p>
 
-<p>La lectura tiene un techo: se corta a los 4 minutos o al llegar a las 60 páginas. Lo leído hasta
-ahí vuelve con el aviso <code>lectura-parcial</code>, que dice cuántas páginas tenía el archivo y
-cuántas se leyeron. Los renglones de las otras páginas no están en esa lectura. Un aviso
+<p>La lectura de las páginas de un PDF tiene un techo: se corta a los 4 minutos o al llegar a las 60
+páginas. También se corta en una página que no se puede preparar para leerla. Una foto es una sola
+página y no tiene techo de tiempo. Lo leído hasta ahí vuelve con el aviso
+<code>lectura-parcial</code>, que dice cuántas páginas tenía el archivo y cuántas se leyeron. Los renglones de las otras páginas no están en esa lectura. Un aviso
 <code>lectura-parcial</code> frena las propuestas: para tener el resto, manden el extracto partido
 en archivos más cortos.</p>
 
-<p>Si el techo llega antes de leer la primera página, o el servidor no tiene el lector de imágenes,
-la lectura vuelve con el veredicto <code>no-disponible</code>. Es una falla nuestra, no del
-archivo: enviarlo de nuevo lo lee de nuevo (tabla de arriba). El <code>motivo</code> dice cuál fue.</p>
+<p>Si el techo llega antes de leer la primera página, si esa página no se puede preparar, o si el
+servidor no tiene el lector, la lectura vuelve con el veredicto <code>no-disponible</code>. Es una
+falla nuestra, no del archivo: enviarlo de nuevo lo lee de nuevo (ver «El reenvío de un archivo»).
+El <code>motivo</code> dice cuál fue.</p>
 
 <h4>Los controles del envío</h4>
 
@@ -510,8 +513,8 @@ pedidos (sección 09): respeten el encabezado <code>Retry-After</code> de un 429
 <p>Un aviso que no frena las propuestas, como <code>concepto-nuevo</code>, puede venir con
 <code>verificada</code>.</p>
 
-<p>Estos son los motivos de <code>no-disponible</code>, que solo pueden aparecer con un PDF
-escaneado o una foto:</p>
+<p>Estos son los motivos de <code>no-disponible</code>. El primero también sale con un PDF con
+texto:</p>
 
 <ul>
 <li>«No se pudo leer el archivo: el servidor no tiene el lector de imágenes. Avísennos; mientras tanto, manden el extracto en Excel, CSV o texto.»</li>
@@ -539,7 +542,7 @@ escaneado o una foto:</p>
 <tbody>
 <tr><td><code>id</code></td><td>Identificador estable: el mismo movimiento tiene el mismo id en el extracto del día y en el del mes, aunque el texto del concepto cambie o un canal no traiga la referencia. Sale de la cuenta, la fecha y el importe, con un ordinal entre los renglones que comparten los tres (por su referencia si el archivo la trae; si no, por su orden). La cuenta es la que mandaron, su CBU o si no su número, y si no mandaron ninguno, el CBU del archivo: manden siempre la misma identificación de la cuenta. Descarten los repetidos por este id, dentro de la cuenta</td></tr>
 <tr><td><code>orden</code></td><td>La posición en el archivo, desde 1</td></tr>
-<tr><td><code>fecha</code>, <code>fechaValor</code></td><td>Con formato <code>AAAA-MM-DD</code>. <code>fechaValor</code> solo si el banco la informa. Si el archivo imprime fechas sin año, con dos cifras de día y dos de mes (<code>03/07</code>), toman el año del período que mandaron en la <code>cuenta</code>. Sin período, toman el de las fechas completas del archivo. Otras fechas sin año no se completan</td></tr>
+<tr><td><code>fecha</code>, <code>fechaValor</code></td><td>Con formato <code>AAAA-MM-DD</code>. <code>fechaValor</code> solo si el banco la informa. Si el archivo imprime fechas sin año, con dos cifras de día y dos de mes (<code>03/07</code>), toman el año que deja la fecha más cerca del medio del período que mandaron en la <code>cuenta</code>: con un período que cruza el fin de año, un <code>05/01</code> va al año siguiente. Con un solo extremo del período, se usa ese. Sin período, se usa el medio de las fechas completas del archivo. Si ningún año deja la fecha a menos de unos 200 días, queda sin completar. Otras fechas sin año tampoco se completan</td></tr>
 <tr><td><code>tipo.codigo</code></td><td>El tipo canónico (anexo)</td></tr>
 <tr><td><code>tipo.segun</code></td><td>De dónde salió: <code>empresa</code> (una corrección de la empresa), <code>tabla</code> (la tabla común), <code>regla</code> (una regla general: viene con el aviso <code>concepto-nuevo</code>) o <code>ninguna</code> (quedó <code>sin-clasificar</code>)</td></tr>
 <tr><td><code>importe</code></td><td>Número con signo: positivo es dinero que entra a la cuenta, negativo es dinero que sale, como en ProntoNet</td></tr>
@@ -579,7 +582,7 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <tr><td><code>sin-saldos</code></td><td>Ningún renglón se pudo controlar contra el saldo anterior: el archivo no trae saldos, trae solo los saldos inicial y final, trae un solo saldo, tiene una columna de saldo que no encadena con los importes, o sus saldos no se controlan entre sí. También sale cuando solo se pudo controlar un renglón, con el detalle «El archivo trae un solo saldo con qué controlar: se controla el total, no cada renglón.». <code>verificada</code> pide al menos dos renglones controlados. En los demás casos, <code>detalle</code> dice cuál</td><td>No</td></tr>
 <tr><td><code>no-encadena</code></td><td>Hay renglones cuyo saldo no encadena con el anterior</td><td>No</td></tr>
 <tr><td><code>concepto-nuevo</code></td><td>Un concepto que no está en la tabla. <code>datos.texto</code> trae el texto del banco, <code>datos.codigo</code> su código de operación (o <code>null</code>) y <code>datos.tipo</code> lo que se propuso</td><td>No</td></tr>
-<tr><td><code>lectura-parcial</code></td><td>La lectura de un PDF se cortó a mitad: pasaron 4 minutos o el archivo tiene más de 60 páginas. <code>datos.paginas</code> es la cantidad de páginas del archivo y <code>datos.paginasLeidas</code>, las que se leyeron. Los renglones de las otras páginas no están en la lectura</td><td>Sí</td></tr>
+<tr><td><code>lectura-parcial</code></td><td>La lectura de un PDF se cortó a mitad: pasaron 4 minutos, el archivo tiene más de 60 páginas o una página no se pudo preparar para leerla. <code>datos.paginas</code> es la cantidad de páginas del archivo y <code>datos.paginasLeidas</code>, las que se leyeron. Los renglones de las otras páginas no están en la lectura</td><td>Sí</td></tr>
 </tbody>
 </table></div>
 
@@ -724,7 +727,7 @@ problema es del cuerpo entero.</p>
 <tr><td><code>alicuota</code></td><td>De 0 a 100</td></tr>
 <tr><td>Pedidos a la API</td><td>Un cupo por instalación, por dirección IP, en ventanas de 15 minutos. El valor lo informamos al dar de alta la credencial. Al pasarlo, la respuesta es 429 con <code>Retry-After</code></td></tr>
 <tr><td>Páginas que se leen de un PDF</td><td>60. Si tiene más, se lee hasta la 60 y vuelve <code>lectura-parcial</code></td></tr>
-<tr><td>Tiempo de lectura de un PDF escaneado o una foto</td><td>4 minutos. Si se pasa, vuelve <code>lectura-parcial</code>; si no leyó ninguna página, <code>no-disponible</code></td></tr>
+<tr><td>Tiempo de lectura de las páginas de un PDF</td><td>4 minutos. Si se pasa, vuelve <code>lectura-parcial</code>; si no leyó ninguna página, <code>no-disponible</code>. Una foto no tiene techo de tiempo</td></tr>
 <tr><td>Renglones por extracto</td><td>No hay un tope en la cantidad. Un archivo que pasa los topes de tamaño de abajo vuelve <code>leido</code> con el veredicto <code>sin-lectura</code> y su motivo; no hay un rechazo HTTP</td></tr>
 </tbody>
 </table></div>
