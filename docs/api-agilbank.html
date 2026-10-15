@@ -339,8 +339,44 @@ queda <code>fallido</code>: enviar el mismo archivo otra vez lo lee de nuevo.</p
 
 <h4>Formatos</h4>
 
-<p>XLSX, XLS, CSV y TXT. También el «XLS» que en realidad es una tabla HTML o una planilla XML 2003.
-PDF, JPG y PNG vuelven <code>leido</code> con el veredicto <code>sin-lectura</code> y su motivo.</p>
+<div class="desborde"><table>
+<thead><tr><th>Formato</th><th>Qué pasa</th></tr></thead>
+<tbody>
+<tr><td>XLSX, XLS, CSV y TXT</td><td>Se leen. También el «XLS» que en realidad es una tabla HTML o una planilla XML 2003</td></tr>
+<tr><td>PDF con texto</td><td>Se lee</td></tr>
+<tr><td>PDF escaneado</td><td>Se lee. Puede tardar varios minutos (abajo)</td></tr>
+<tr><td>Foto JPG o PNG</td><td>Se lee como una página escaneada</td></tr>
+<tr><td>Foto HEIC</td><td>No se lee. Vuelve <code>leido</code> con el veredicto <code>sin-lectura</code> y el motivo «Las fotos HEIC no se leen: manden la foto en JPG o PNG, o el extracto en PDF.»</td></tr>
+</tbody>
+</table></div>
+
+<p>Un PDF se lee página por página. Una página con texto se lee por su texto. Una página escaneada
+se lee como imagen, y esa lectura puede equivocar una cifra. Los controles de saldos lo
+muestran: un renglón que no encadena sale marcado (<code>encadena</code> en <code>false</code>).
+Un PDF puede mezclar los dos tipos de página.</p>
+
+<p>Un PDF dañado o protegido con contraseña vuelve con el veredicto <code>sin-lectura</code> y el
+motivo «No se pudo abrir el PDF: está dañado o protegido con contraseña.». Una foto dañada, también
+<code>sin-lectura</code>.</p>
+
+<h4>Cuánto tarda la lectura</h4>
+
+<p>Una planilla o un texto suelen leerse en menos de un minuto. Un PDF escaneado o una foto tardan
+más, porque cada página se lee como imagen. Un resumen mensual escaneado de unas 40
+páginas puede tardar varios minutos; no es un plazo.</p>
+
+<p>Consulten hasta que el estado deje de ser <code>en-proceso</code>. Si sigue <code>en-proceso</code>
+más de 30 minutos, envíenlo de nuevo (sección 05).</p>
+
+<p>La lectura tiene un techo: se corta a los 4 minutos o al llegar a las 60 páginas. Lo leído hasta
+ahí vuelve con el aviso <code>lectura-parcial</code>, que dice cuántas páginas tenía el archivo y
+cuántas se leyeron. Los renglones de las otras páginas no están en esa lectura. Un aviso
+<code>lectura-parcial</code> frena las propuestas: para tener el resto, manden el extracto partido
+en archivos más cortos.</p>
+
+<p>Si el techo llega antes de leer la primera página, o el servidor no tiene el lector de imágenes,
+la lectura vuelve con el veredicto <code>no-disponible</code>. Es una falla nuestra, no del
+archivo: enviarlo de nuevo lo lee de nuevo (tabla de arriba). El <code>motivo</code> dice cuál fue.</p>
 
 <h4>Los controles del envío</h4>
 
@@ -391,7 +427,7 @@ guardó el <code>idExtracto</code>. La huella son 64 caracteres hexadecimales; a
 </table></div>
 
 <p>Pregunten cada <code>reintentarEn</code> segundos hasta que el estado deje de ser
-<code>en-proceso</code>. Si envían muchos extractos a la vez, conviene espaciar las consultas: por
+<code>en-proceso</code>. Si envían muchos extractos a la vez, o PDF escaneados, conviene espaciar las consultas: por
 ejemplo, cada 30 segundos después de los primeros dos minutos. La instalación tiene un cupo de
 pedidos (sección 09): respeten el encabezado <code>Retry-After</code> de un 429.</p>
 
@@ -443,6 +479,7 @@ pedidos (sección 09): respeten el encabezado <code>Retry-After</code> de un 429
       "encadena": null,
       "procedencia": {
         "origen": "celda", "hoja": "saldos_y_movimientos",
+        "pagina": null, "paginaHasta": null,
         "filaDesde": 66, "filaHasta": 67
       }
     }
@@ -466,12 +503,21 @@ pedidos (sección 09): respeten el encabezado <code>Retry-After</code> de un 429
 <tr><td><code>verificada</code></td><td>Los saldos encadenan renglón a renglón, de punta a punta, y no hay ningún aviso que frene las propuestas. Es una regla aritmética: vale como la confirmación de un tercero</td></tr>
 <tr><td><code>a-revisar</code></td><td>Se leyó, pero algo no cierra: hay saltos de saldo, el archivo no trae saldos, o hay un aviso que frene las propuestas</td></tr>
 <tr><td><code>sin-lectura</code></td><td>No se pudo armar la tabla de movimientos. <code>motivo</code> dice por qué, en castellano</td></tr>
-<tr><td><code>no-disponible</code></td><td>No pudimos mirar el archivo por una falla nuestra. No dice nada del archivo. Enviarlo de nuevo lo lee de nuevo</td></tr>
+<tr><td><code>no-disponible</code></td><td>No pudimos mirar el archivo por una falla nuestra. No dice nada del archivo. <code>motivo</code> dice por qué, en castellano. Enviarlo de nuevo lo lee de nuevo</td></tr>
 </tbody>
 </table></div>
 
 <p>Un aviso que no frena las propuestas, como <code>concepto-nuevo</code>, puede venir con
 <code>verificada</code>.</p>
+
+<p>Estos son los motivos de <code>no-disponible</code>, que solo pueden aparecer con un PDF
+escaneado o una foto:</p>
+
+<ul>
+<li>«No se pudo leer el archivo: el servidor no tiene el lector de imágenes. Avísennos; mientras tanto, manden el extracto en Excel, CSV o texto.»</li>
+<li>«La lectura no llegó a leer ninguna página en el tiempo disponible: vuelvan a enviarlo más tarde.»</li>
+<li>«No se pudo leer el archivo: no se pudieron preparar sus páginas para el OCR. Vuelvan a enviarlo más tarde.»</li>
+</ul>
 
 <h3>El encabezado</h3>
 
@@ -493,16 +539,28 @@ pedidos (sección 09): respeten el encabezado <code>Retry-After</code> de un 429
 <tbody>
 <tr><td><code>id</code></td><td>Identificador estable: el mismo movimiento tiene el mismo id en el extracto del día y en el del mes, aunque el texto del concepto cambie o un canal no traiga la referencia. Sale de la cuenta, la fecha y el importe, con un ordinal entre los renglones que comparten los tres (por su referencia si el archivo la trae; si no, por su orden). La cuenta es la que mandaron, su CBU o si no su número, y si no mandaron ninguno, el CBU del archivo: manden siempre la misma identificación de la cuenta. Descarten los repetidos por este id, dentro de la cuenta</td></tr>
 <tr><td><code>orden</code></td><td>La posición en el archivo, desde 1</td></tr>
-<tr><td><code>fecha</code>, <code>fechaValor</code></td><td>Con formato <code>AAAA-MM-DD</code>. <code>fechaValor</code> solo si el banco la informa</td></tr>
+<tr><td><code>fecha</code>, <code>fechaValor</code></td><td>Con formato <code>AAAA-MM-DD</code>. <code>fechaValor</code> solo si el banco la informa. Si el archivo imprime fechas sin año, con dos cifras de día y dos de mes (<code>03/07</code>), toman el año del período que mandaron en la <code>cuenta</code>. Sin período, toman el de las fechas completas del archivo. Otras fechas sin año no se completan</td></tr>
 <tr><td><code>tipo.codigo</code></td><td>El tipo canónico (anexo)</td></tr>
 <tr><td><code>tipo.segun</code></td><td>De dónde salió: <code>empresa</code> (una corrección de la empresa), <code>tabla</code> (la tabla común), <code>regla</code> (una regla general: viene con el aviso <code>concepto-nuevo</code>) o <code>ninguna</code> (quedó <code>sin-clasificar</code>)</td></tr>
 <tr><td><code>importe</code></td><td>Número con signo: positivo es dinero que entra a la cuenta, negativo es dinero que sale, como en ProntoNet</td></tr>
 <tr><td><code>saldo</code></td><td>El saldo de la fila, si el archivo lo trae</td></tr>
 <tr><td><code>referencia</code></td><td>El número de comprobante, de cheque o de operación, tal como lo trae el banco</td></tr>
-<tr><td><code>contraparte</code></td><td>CUIT, nombre y CBU de la otra parte, cuando el extracto los trae. El nombre puede venir cortado por el banco</td></tr>
+<tr><td><code>contraparte</code></td><td>CUIT, nombre y CBU de la otra parte, cuando el extracto los trae. El nombre puede venir cortado por el banco. Algunos extractos traen aparte una sección con su propio encabezado, por ejemplo las transferencias recibidas. Esa sección nunca da renglones. AgilBank toma de ella el CUIT y el nombre del renglón con la misma fecha e importe, si hay uno solo, o si la referencia desempata. No cambia un CUIT que el renglón ya trae</td></tr>
 <tr><td><code>delBanco</code></td><td>Lo que dice el banco, tal cual: su código de operación, su texto y las otras columnas de la fila</td></tr>
-<tr><td><code>encadena</code></td><td><code>true</code> si el saldo anterior más el importe da su saldo; <code>false</code> si no; <code>null</code> si no hay con qué controlarlo: los renglones sin saldo y el primer renglón con saldo cuando el archivo no imprime el saldo inicial (es el punto de partida)</td></tr>
-<tr><td><code>procedencia</code></td><td>De dónde salió el renglón: <code>celda</code> (una planilla, con su hoja) o <code>texto</code> (un CSV o TXT), y sus filas, numeradas desde 1 como en la planilla</td></tr>
+<tr><td><code>encadena</code></td><td><code>true</code> si el saldo anterior más el importe da su saldo; <code>false</code> si no; <code>null</code> si no hay con qué controlarlo: los renglones sin saldo y el primer renglón con saldo cuando el archivo no imprime el saldo inicial (es el punto de partida). Cuando el banco imprime el saldo cada varios renglones, por ejemplo al cierre del día, el control se hace por tramos: el renglón que trae el saldo dice si todo el tramo encadena, y los otros quedan en <code>null</code></td></tr>
+<tr><td><code>procedencia</code></td><td>De dónde salió el renglón. Ver abajo</td></tr>
+</tbody>
+</table></div>
+
+<h4>La procedencia</h4>
+
+<div class="desborde"><table>
+<thead><tr><th>Campo</th><th>Qué es</th></tr></thead>
+<tbody>
+<tr><td><code>origen</code></td><td><code>celda</code> (una planilla), <code>texto</code> (un CSV o TXT), <code>pdf</code> (una página de PDF leída por su texto) u <code>ocr</code> (una página escaneada o una foto, leída como imagen). En un PDF con páginas de los dos tipos, cada renglón trae el de su página</td></tr>
+<tr><td><code>hoja</code></td><td>La hoja de la planilla. <code>null</code> en el resto</td></tr>
+<tr><td><code>pagina</code>, <code>paginaHasta</code></td><td>La página donde empieza el renglón y la página donde termina, desde 1. <code>null</code> en planillas y textos. Una foto es la página 1</td></tr>
+<tr><td><code>filaDesde</code>, <code>filaHasta</code></td><td>En una planilla o un texto, las filas del renglón, numeradas desde 1 como en la planilla. En un PDF o una foto, las líneas dentro de su página, también desde 1: <code>filaDesde</code> en <code>pagina</code> y <code>filaHasta</code> en <code>paginaHasta</code></td></tr>
 </tbody>
 </table></div>
 
@@ -518,10 +576,10 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <tr><td><code>no-cierra</code></td><td>El saldo inicial más los renglones no da el saldo final, o los saldos del archivo no son los que mandaron (solo si mandaron el período y el archivo lo cubre). Si el archivo no trae saldos, mandaron el período y los dos saldos, y el archivo lo cubre, se parte del saldo inicial que mandaron y se suman los renglones: si no da el saldo final que mandaron, también sale <code>no-cierra</code>. Puede venir más de una vez</td><td>Sí</td></tr>
 <tr><td><code>varias-cuentas</code></td><td>El archivo trae movimientos de más de una cuenta. <code>datos.cuentas</code> las identifica</td><td>Sí</td></tr>
 <tr><td><code>cuenta-distinta</code></td><td>El CBU del archivo no es el que mandaron. <code>datos.cbuDelArchivo</code> y <code>datos.cbuDeProntoNet</code> dicen cuáles son</td><td>Sí</td></tr>
-<tr><td><code>sin-saldos</code></td><td>Ningún renglón se pudo controlar contra el saldo anterior: el archivo no trae saldos, trae solo los saldos inicial y final, trae un solo saldo, tiene una columna de saldo que no encadena con los importes, o sus saldos no se controlan entre sí. <code>detalle</code> dice cuál</td><td>No</td></tr>
+<tr><td><code>sin-saldos</code></td><td>Ningún renglón se pudo controlar contra el saldo anterior: el archivo no trae saldos, trae solo los saldos inicial y final, trae un solo saldo, tiene una columna de saldo que no encadena con los importes, o sus saldos no se controlan entre sí. También sale cuando solo se pudo controlar un renglón, con el detalle «El archivo trae un solo saldo con qué controlar: se controla el total, no cada renglón.». <code>verificada</code> pide al menos dos renglones controlados. En los demás casos, <code>detalle</code> dice cuál</td><td>No</td></tr>
 <tr><td><code>no-encadena</code></td><td>Hay renglones cuyo saldo no encadena con el anterior</td><td>No</td></tr>
 <tr><td><code>concepto-nuevo</code></td><td>Un concepto que no está en la tabla. <code>datos.texto</code> trae el texto del banco, <code>datos.codigo</code> su código de operación (o <code>null</code>) y <code>datos.tipo</code> lo que se propuso</td><td>No</td></tr>
-<tr><td><code>lectura-parcial</code></td><td>La lectura se cortó a mitad (por tiempo o por páginas)</td><td>No</td></tr>
+<tr><td><code>lectura-parcial</code></td><td>La lectura de un PDF se cortó a mitad: pasaron 4 minutos o el archivo tiene más de 60 páginas. <code>datos.paginas</code> es la cantidad de páginas del archivo y <code>datos.paginasLeidas</code>, las que se leyeron. Los renglones de las otras páginas no están en la lectura</td><td>Sí</td></tr>
 </tbody>
 </table></div>
 
@@ -544,7 +602,7 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <li><code>controles.saldoDeLaFila</code> es <code>null</code> cuando el archivo no trae saldos.</li>
 <li><code>banco.codigo</code> y <code>banco.nombre</code> son <code>null</code> cuando no se pudo identificar el banco (arriba).</li>
 <li><code>contraparte</code> es <code>null</code> cuando el renglón no trae ni CUIT ni CBU. Cuando viene, <code>nombre</code> puede ser <code>null</code>.</li>
-<li><code>motivo</code> viene siempre con <code>sin-lectura</code>. Con <code>verificada</code> y <code>a-revisar</code> es <code>null</code>.</li>
+<li><code>motivo</code> viene siempre con <code>sin-lectura</code> y con <code>no-disponible</code>. Con <code>verificada</code> y <code>a-revisar</code> es <code>null</code>.</li>
 </ul>
 
 <h2><span class="nro">07</span> Las correcciones</h2>
@@ -665,6 +723,8 @@ problema es del cuerpo entero.</p>
 <tr><td>El nombre del archivo que se guarda</td><td>200 bytes en UTF-8</td></tr>
 <tr><td><code>alicuota</code></td><td>De 0 a 100</td></tr>
 <tr><td>Pedidos a la API</td><td>Un cupo por instalación, por dirección IP, en ventanas de 15 minutos. El valor lo informamos al dar de alta la credencial. Al pasarlo, la respuesta es 429 con <code>Retry-After</code></td></tr>
+<tr><td>Páginas que se leen de un PDF</td><td>60. Si tiene más, se lee hasta la 60 y vuelve <code>lectura-parcial</code></td></tr>
+<tr><td>Tiempo de lectura de un PDF escaneado o una foto</td><td>4 minutos. Si se pasa, vuelve <code>lectura-parcial</code>; si no leyó ninguna página, <code>no-disponible</code></td></tr>
 <tr><td>Renglones por extracto</td><td>No hay un tope en la cantidad. Un archivo que pasa los topes de tamaño de abajo vuelve <code>leido</code> con el veredicto <code>sin-lectura</code> y su motivo; no hay un rechazo HTTP</td></tr>
 </tbody>
 </table></div>
@@ -679,7 +739,7 @@ problema es del cuerpo entero.</p>
 <li>un «XLS» de HTML o XML 2003 con más de 20 MB, 100.000 celdas o 2.000 celdas combinadas.</li>
 </ul>
 
-<p>Un extracto diario suele leerse en menos de un minuto. No es un plazo: consulten hasta que el estado deje de ser <code>en-proceso</code>. Si sigue <code>en-proceso</code> más de 30 minutos, envíenlo de nuevo; si la respuesta es 200 con <code>en-proceso</code>, sigan consultando y vuelvan a enviarlo más tarde.</p>
+<p>Un extracto diario en planilla o texto suele leerse en menos de un minuto. Un resumen mensual escaneado de unas 40 páginas puede tardar varios minutos. No es un plazo: consulten hasta que el estado deje de ser <code>en-proceso</code>. Si sigue <code>en-proceso</code> más de 30 minutos, envíenlo de nuevo; si la respuesta es 200 con <code>en-proceso</code>, sigan consultando y vuelvan a enviarlo más tarde.</p>
 
 <h2><span class="nro">10</span> Anexo: los tipos canónicos</h2>
 
