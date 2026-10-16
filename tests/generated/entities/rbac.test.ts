@@ -14,6 +14,8 @@ import { AbReconciliationOneService } from "../../../src/entities/abReconciliati
 import { AbReconciliationDeleteService } from "../../../src/entities/abReconciliation/services/abReconciliationDeleteService";
 import { AbPaymentBatchOneService } from "../../../src/entities/abPaymentBatch/services/abPaymentBatchOneService";
 import { AbPaymentBatchDeleteService } from "../../../src/entities/abPaymentBatch/services/abPaymentBatchDeleteService";
+import { AbDecisionOneService } from "../../../src/entities/abDecision/services/abDecisionOneService";
+import { AbDecisionDeleteService } from "../../../src/entities/abDecision/services/abDecisionDeleteService";
 import { UserOneService } from "../../../src/entities/user/services/userOneService";
 import { UserCreateService } from "../../../src/entities/user/services/userCreateService";
 import { UserUpdateService } from "../../../src/entities/user/services/userUpdateService";
@@ -180,6 +182,23 @@ const ENTIDADES = [
     permiso: "abPaymentBatch_delete",
     ejecutar: (c: any, p: any, s: any) =>
       new AbPaymentBatchDeleteService(c, p, s).deleteAbPaymentBatch(
+        { id: "x" } as any,
+        undefined
+      ),
+  },
+  {
+    entidad: "AbDecision",
+    accion: "retrieve",
+    permiso: "abDecision_retrieve",
+    ejecutar: (c: any, p: any, s: any) =>
+      new AbDecisionOneService(c, p, s).getOne({ id: "x" } as any, undefined),
+  },
+  {
+    entidad: "AbDecision",
+    accion: "delete",
+    permiso: "abDecision_delete",
+    ejecutar: (c: any, p: any, s: any) =>
+      new AbDecisionDeleteService(c, p, s).deleteAbDecision(
         { id: "x" } as any,
         undefined
       ),

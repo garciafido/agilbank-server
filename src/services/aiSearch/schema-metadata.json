@@ -475,6 +475,17 @@
           "groupable": false
         },
         {
+          "name": "bankCode",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Banco",
+              "p": "El código del banco del extracto"
+            }
+          },
+          "groupable": false
+        },
+        {
           "name": "request",
           "type": "Json",
           "labels": {
@@ -664,6 +675,236 @@
         "originalName",
         "transferCount",
         "failedCount"
+      ]
+    },
+    {
+      "name": "AbDecision",
+      "labels": {
+        "es": {
+          "s": "Decisión",
+          "p": "Decisiones",
+          "d": "Lo que el usuario aceptó, corrigió o rechazó de una propuesta, y lo que eligió."
+        }
+      },
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "ID"
+            },
+            "en": {
+              "s": "ID"
+            },
+            "pt": {
+              "s": "ID"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "decisionKey",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Clave",
+              "p": "La conciliación y el renglón decidido (el cargo, si es un DBG)"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "reconciliationId",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Conciliación",
+              "p": "El id de la conciliación"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "proposalId",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Propuesta",
+              "p": "El id de la propuesta decidida"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "statementId",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Extracto",
+              "p": "El id del extracto"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "lineId",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Renglón",
+              "p": "El id del renglón del extracto"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "bankCode",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Banco",
+              "p": "Código de entidad del extracto"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "conceptKey",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Concepto",
+              "p": "Banco, código de operación y texto normalizado"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "canonicalType",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Tipo Canónico",
+              "p": "El tipo del renglón"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "result",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Resultado",
+              "p": "accepted, corrected o rejected"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "proposedKind",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Propuesto",
+              "p": "match, dbg o pending"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "proposedPair",
+          "type": "Json",
+          "labels": {
+            "es": {
+              "s": "Par Propuesto",
+              "p": "Tipo y cuenta propuestos"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "chosenKind",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Elegido",
+              "p": "match, dbg o pending"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "chosenPair",
+          "type": "Json",
+          "labels": {
+            "es": {
+              "s": "Par Elegido",
+              "p": "Tipo y cuenta elegidos"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "chosen",
+          "type": "Json",
+          "labels": {
+            "es": {
+              "s": "Lo Elegido",
+              "p": "La decisión tal como llegó"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "decidedAt",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Decidida el",
+              "p": "Cuándo se registró"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "createdAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de creación"
+            },
+            "en": {
+              "s": "Created at"
+            },
+            "pt": {
+              "s": "Data de criação"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "updatedAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de actualización"
+            },
+            "en": {
+              "s": "Updated at"
+            },
+            "pt": {
+              "s": "Data de atualização"
+            }
+          },
+          "groupable": false
+        }
+      ],
+      "displayFields": [
+        "bankCode",
+        "conceptKey",
+        "result"
       ]
     },
     {

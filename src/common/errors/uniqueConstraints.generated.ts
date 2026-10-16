@@ -78,6 +78,30 @@ export const UNIQUE_CONSTRAINTS: UniqueConstraintsData = {
         },
       },
     },
+    ab_decision: {
+      model: "AbDecision",
+      labels: {
+        es: {
+          s: "Decisión",
+          g: "F",
+        },
+      },
+      columns: {
+        tenant__id__: null,
+        decision_key: ["decisionKey"],
+      },
+      constraints: {
+        ab_decision_tenant__id___decision_key_key: ["decisionKey"],
+      },
+      fieldLabels: {
+        decisionKey: {
+          es: {
+            s: "Clave",
+            g: "F",
+          },
+        },
+      },
+    },
     user: {
       model: "User",
       labels: {

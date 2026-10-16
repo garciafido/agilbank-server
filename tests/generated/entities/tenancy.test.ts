@@ -11,6 +11,8 @@ import { AbReconciliationOneService } from "../../../src/entities/abReconciliati
 import { AbReconciliationListWithOffsetService } from "../../../src/entities/abReconciliation/services/abReconciliationListWithOffsetService";
 import { AbPaymentBatchOneService } from "../../../src/entities/abPaymentBatch/services/abPaymentBatchOneService";
 import { AbPaymentBatchListWithOffsetService } from "../../../src/entities/abPaymentBatch/services/abPaymentBatchListWithOffsetService";
+import { AbDecisionOneService } from "../../../src/entities/abDecision/services/abDecisionOneService";
+import { AbDecisionListWithOffsetService } from "../../../src/entities/abDecision/services/abDecisionListWithOffsetService";
 import { UserOneService } from "../../../src/entities/user/services/userOneService";
 import { UserListWithOffsetService } from "../../../src/entities/user/services/userListWithOffsetService";
 import { RoleOneService } from "../../../src/entities/role/services/roleOneService";
@@ -136,6 +138,15 @@ const ENTIDADES = [
       new AbPaymentBatchListWithOffsetService(c, p, s).listWithOffset(
         {} as any
       ),
+  },
+  {
+    entidad: "AbDecision",
+    permiso: "abDecision_retrieve",
+    compartida: false,
+    leerUno: (c: any, p: any, s: any) =>
+      new AbDecisionOneService(c, p, s).getOne({ id: "x" } as any, undefined),
+    listar: (c: any, p: any, s: any) =>
+      new AbDecisionListWithOffsetService(c, p, s).listWithOffset({} as any),
   },
   {
     entidad: "User",

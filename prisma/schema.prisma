@@ -246,6 +246,7 @@ model AbReconciliation {
   tenant_id_          String    @map("tenant__id__")
   requestKey String @map("request_key")
   statementId String @map("statement_id")
+  bankCode String? @map("bank_code")
   request Json
   result Json
   proposalCount Int @map("proposal_count")
@@ -277,6 +278,39 @@ model AbPaymentBatch {
   @@index([tenant_id_, createdAt_])
 
   @@map(name: "ab_payment_batch")
+}
+
+model AbDecision {
+  id                  String     @id @default(uuid())
+  version_            String     @map("version__")
+  createdAt_          DateTime   @map("created_at__")
+  createdBy_          User      @relation("AbDecision_createdBy_", fields: [createdBy_id_], references: [id])
+  createdBy_id_       String    @map("created_by__id__")
+  lastUpdatedAt_      DateTime?  @map("last_updated_at__")
+  lastUpdatedBy_      User?      @relation("AbDecision_lastUpdatedBy_", fields: [lastUpdatedBy_id_], references: [id])
+  lastUpdatedBy_id_   String?    @map("last_updated_by__id__")
+  tenant_             Tenant     @relation("AbDecision_tenant_", fields: [tenant_id_], references: [id])
+  tenant_id_          String    @map("tenant__id__")
+  decisionKey String @map("decision_key")
+  reconciliationId String @map("reconciliation_id")
+  proposalId String @map("proposal_id")
+  statementId String @map("statement_id")
+  lineId String @map("line_id")
+  bankCode String? @map("bank_code")
+  conceptKey String @map("concept_key")
+  canonicalType String @map("canonical_type")
+  result String
+  proposedKind String @map("proposed_kind")
+  proposedPair Json? @map("proposed_pair")
+  chosenKind String @map("chosen_kind")
+  chosenPair Json? @map("chosen_pair")
+  chosen Json
+  decidedAt DateTime @map("decided_at")
+
+  @@unique([tenant_id_, decisionKey])
+  @@index([tenant_id_, decidedAt])
+
+  @@map(name: "ab_decision")
 }
 
 model User {
@@ -321,6 +355,8 @@ model User {
   AbReconciliation_lastUpdatedBy_ AbReconciliation[]  @relation("AbReconciliation_lastUpdatedBy_")
   AbPaymentBatch_createdBy_ AbPaymentBatch[] @relation("AbPaymentBatch_createdBy_")
   AbPaymentBatch_lastUpdatedBy_ AbPaymentBatch[]  @relation("AbPaymentBatch_lastUpdatedBy_")
+  AbDecision_createdBy_ AbDecision[] @relation("AbDecision_createdBy_")
+  AbDecision_lastUpdatedBy_ AbDecision[]  @relation("AbDecision_lastUpdatedBy_")
   User_createdBy_ User[] @relation("User_createdBy_")
   User_lastUpdatedBy_ User[]  @relation("User_lastUpdatedBy_")
   Role_createdBy_ Role[] @relation("Role_createdBy_")
@@ -408,6 +444,7 @@ model Tenant {
   AbConceptCorrection_tenant_ AbConceptCorrection[]  @relation("AbConceptCorrection_tenant_")
   AbReconciliation_tenant_ AbReconciliation[]  @relation("AbReconciliation_tenant_")
   AbPaymentBatch_tenant_ AbPaymentBatch[]  @relation("AbPaymentBatch_tenant_")
+  AbDecision_tenant_ AbDecision[]  @relation("AbDecision_tenant_")
   User_tenant_ User[]  @relation("User_tenant_")
   Role_tenant_ Role[]  @relation("Role_tenant_")
   WorkerEvent_tenant_ WorkerEvent[]  @relation("WorkerEvent_tenant_")

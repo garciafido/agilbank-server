@@ -11,6 +11,7 @@ import * as abStatementDisplayIdModule from "../../src/entities/abStatement/reso
 import * as abConceptCorrectionDisplayIdModule from "../../src/entities/abConceptCorrection/resolvers/displayId";
 import * as abReconciliationDisplayIdModule from "../../src/entities/abReconciliation/resolvers/displayId";
 import * as abPaymentBatchDisplayIdModule from "../../src/entities/abPaymentBatch/resolvers/displayId";
+import * as abDecisionDisplayIdModule from "../../src/entities/abDecision/resolvers/displayId";
 import * as userDisplayIdModule from "../../src/entities/user/resolvers/displayId";
 import * as roleDisplayIdModule from "../../src/entities/role/resolvers/displayId";
 import * as permissionDisplayIdModule from "../../src/entities/permission/resolvers/displayId";
@@ -79,6 +80,7 @@ const MODEL: Record<
       id: { type: "Id", nullable: false },
       requestKey: { type: "String", nullable: false },
       statementId: { type: "String", nullable: false },
+      bankCode: { type: "String", nullable: true },
       request: { type: "Json", nullable: false },
       result: { type: "Json", nullable: false },
       proposalCount: { type: "Int", nullable: false },
@@ -93,6 +95,27 @@ const MODEL: Record<
       transfers: { type: "Json", nullable: false },
       transferCount: { type: "Int", nullable: false },
       failedCount: { type: "Int", nullable: false },
+    },
+    relations: {},
+  },
+  AbDecision: {
+    columns: {
+      id: { type: "Id", nullable: false },
+      decisionKey: { type: "String", nullable: false },
+      reconciliationId: { type: "String", nullable: false },
+      proposalId: { type: "String", nullable: false },
+      statementId: { type: "String", nullable: false },
+      lineId: { type: "String", nullable: false },
+      bankCode: { type: "String", nullable: true },
+      conceptKey: { type: "String", nullable: false },
+      canonicalType: { type: "String", nullable: false },
+      result: { type: "String", nullable: false },
+      proposedKind: { type: "String", nullable: false },
+      proposedPair: { type: "Json", nullable: true },
+      chosenKind: { type: "String", nullable: false },
+      chosenPair: { type: "Json", nullable: true },
+      chosen: { type: "Json", nullable: false },
+      decidedAt: { type: "DateTime", nullable: false },
     },
     relations: {},
   },
@@ -297,6 +320,15 @@ const COMPARED: Compared[] = [
     byLanguage: false,
     hops: 0,
     client: displayNameClient.abPaymentBatchDisplayId,
+  },
+  {
+    entity: "AbDecision",
+    fragments: abDecisionDisplayIdModule.abDecisionDisplayIdFragments,
+    name: abDecisionDisplayIdModule.abDecisionDisplayName,
+    text: abDecisionDisplayIdModule.abDecisionDisplayId,
+    byLanguage: false,
+    hops: 0,
+    client: displayNameClient.abDecisionDisplayId,
   },
   {
     entity: "User",
@@ -618,6 +650,7 @@ describe("<entidad>DisplayId sigue siendo texto", () => {
     "AbConceptCorrection",
     "AbReconciliation",
     "AbPaymentBatch",
+    "AbDecision",
     "User",
     "Role",
     "Permission",

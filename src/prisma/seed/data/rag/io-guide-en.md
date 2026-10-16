@@ -40,7 +40,7 @@ iO is the query engine for this system. It allows querying internal data and ind
 #### AbReconciliation
 
 
-**Queryable fields:** requestKey, statementId, request, result, proposalCount
+**Queryable fields:** requestKey, statementId, bankCode, request, result, proposalCount
 
 **Relations:** N/A
 
@@ -48,6 +48,13 @@ iO is the query engine for this system. It allows querying internal data and ind
 
 
 **Queryable fields:** originalName, contentHash, transfers, transferCount, failedCount
+
+**Relations:** N/A
+
+#### AbDecision
+
+
+**Queryable fields:** decisionKey, reconciliationId, proposalId, statementId, lineId, bankCode, conceptKey, canonicalType, result, proposedKind, proposedPair, chosenKind, chosenPair, chosen, decidedAt
 
 **Relations:** N/A
 
@@ -112,6 +119,9 @@ Query content from PDFs and indexed documents.
 - "How many AbPaymentBatch are there?"
   - "Total AbPaymentBatch"
   - "Number of AbPaymentBatch"
+- "How many AbDecision are there?"
+  - "Total AbDecision"
+  - "Number of AbDecision"
 - "How many Users are there?"
   - "Total Users"
   - "Number of Users"
@@ -136,6 +146,9 @@ Query content from PDFs and indexed documents.
 - "List of AbPaymentBatch"
   - "Show AbPaymentBatch"
   - "Give me the AbPaymentBatch"
+- "List of AbDecision"
+  - "Show AbDecision"
+  - "Give me the AbDecision"
 - "List of Users"
   - "Show Users"
   - "Give me the Users"

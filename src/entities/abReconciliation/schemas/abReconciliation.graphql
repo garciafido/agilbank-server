@@ -8,6 +8,7 @@ type AbReconciliation {
   lastUpdatedBy_: User
   requestKey: String!
   statementId: String!
+  bankCode: String
   request: Json!
   result: Json!
   proposalCount: Int!
@@ -43,6 +44,7 @@ input AbReconciliation_Filter {
   displayId: FilterString
   requestKey: FilterString
   statementId: FilterString
+  bankCode: FilterString
   request: FilterJson
   result: FilterJson
   proposalCount: FilterInt
@@ -60,6 +62,7 @@ input AbReconciliation_OrderBy {
   lastUpdatedBy_: User_OrderBy
   requestKey: SortOrder
   statementId: SortOrder
+  bankCode: SortOrder
   request: SortOrder
   result: SortOrder
   proposalCount: SortOrder
