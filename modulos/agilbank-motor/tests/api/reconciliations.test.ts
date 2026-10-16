@@ -4,6 +4,7 @@ import { MAX_BATCH_BYTES, MAX_RECONCILE_JSON_BYTES, reconciliationsApi, SCOPE_RE
 import type { Authorize } from "../../src/api/http";
 import { DEFAULT_RECONCILE_OPTIONS } from "../../src/reconcile/types";
 import { fakeDb } from "./fakeDb";
+import * as learning from "../../src/dbg/learning";
 import { line } from "../reconcile/fixtures";
 
 const allow = (tenantId: string | null = "T1", serviceUserId: string | null = "u1"): Authorize => async () => ({ ok: true, client: { id: "c1", name: "PN", tenantId, serviceUserId } });
@@ -43,12 +44,13 @@ describe("POST /v1/extractos/:id/conciliacion", () => {
     expect(rows.abReconciliation).toHaveLength(1);
     expect(rows.abReconciliation[0]).toEqual(expect.objectContaining({ tenant_id_: "T1", statementId: "S1", proposalCount: 2 }));
     expect(out.idConciliacion).toBe(rows.abReconciliation[0].id);
+    expect(rows.abReconciliation[0].result.accountCodes).toStrictEqual({});
   });
   it("guarda el pedido tal cual, la clave del extracto y la huella, el autor, y las propuestas con sus ids", async () => {
     const { api, rows } = setup();
     const out = (await post(api)).body as any;
     const row = rows.abReconciliation[0];
-    expect(row.requestKey).toMatch(new RegExp(`^S1:[0-9a-f]{64}:${BODY_HASH}$`));
+    expect(row.requestKey).toMatch(new RegExp(`^S1:[0-9a-f]{64}:${BODY_HASH}:0:$`));
     expect(row).toEqual(expect.objectContaining({ request: body, createdBy_id_: "u1", tenant_id_: "T1" }));
     expect(typeof row.version_).toBe("string");
     expect(row.createdAt_).toBeInstanceOf(Date);
@@ -446,5 +448,167 @@ describe("POST /v1/lotes", () => {
     await api.uploadBatch(upload());
     expect(wheres).toHaveLength(2);
     expect(wheres.every((w) => w.tenant_id_ === "T1")).toBe(true);
+  });
+});
+
+describe("la conciliación con catálogos y decisiones", () => {
+  const catalogs = { tiposGastoBancario: [{ id: 7, descripcion: "Débito Bancario Gtos", coeficiente: 1 }], cuentasImputables: [{ id: 100, codigo: 9900102, descripcion: "COMISIONES DEL BANCO" }], cuentasIvaYPercepciones: [] };
+  const charge = { id: "S2", tenant_id_: "T1", status: "read", verdict: "verified", reading: reading({ header: { bankCode: "191", bankName: null, account: null, cbu: null, currency: null, periodFrom: null, periodTo: null, openingBalanceCents: null, closingBalanceCents: null }, lines: [line({ id: "c", type: { code: "comision", source: "table" }, amountCents: -100000, bank: { code: null, text: "COMISION", extras: [] } })] }) };
+  const decision = (decidedAt: Date) => ({ id: `d${+decidedAt}`, tenant_id_: "T1", statementId: "S0", lineId: `l${+decidedAt}`, bankCode: "191", conceptKey: "191||comision", result: "corrected", proposedKind: "dbg", proposedPair: null, chosenKind: "dbg", chosenPair: { movementTypeId: "7", accountId: "100", vatAccountId: null, perceptionAccountId: null }, decidedAt });
+  it("sin decisiones, la comisión sale dbg con la cuenta del catálogo; con una decisión de la empresa, con la de la decisión", async () => {
+    const { api } = setup({ abStatement: [charge] });
+    const a = (await post(api, { valores: [], ...catalogs }, "S2")).body as any;
+    expect(a.propuestas[0]).toEqual(expect.objectContaining({ tipo: "dbg", cuenta: { id: "100", codigo: "9900102" }, origen: "catalogo" }));
+    const withDecision = setup({ abStatement: [charge], abDecision: [decision(new Date("2026-07-01"))] });
+    const b = (await post(withDecision.api, { valores: [], ...catalogs }, "S2")).body as any;
+    expect(b.propuestas[0].origen).toBe("decision");
+  });
+  it("la misma conciliación después de una decisión nueva se vuelve a calcular; sin cambios, se devuelve la guardada", async () => {
+    const { api, rows } = setup({ abStatement: [charge] });
+    const a = (await post(api, { valores: [], ...catalogs }, "S2")).body as any;
+    expect(((await post(api, { valores: [], ...catalogs }, "S2")).body as any).idConciliacion).toBe(a.idConciliacion);
+    rows.abDecision.push(decision(new Date("2026-07-02")));
+    const b = (await post(api, { valores: [], ...catalogs }, "S2")).body as any;
+    expect(b.idConciliacion).not.toBe(a.idConciliacion);
+    expect(b.propuestas[0].origen).toBe("decision");
+  });
+  it("las decisiones de otra empresa o de otro banco no cuentan", async () => {
+    const { api, wheres } = setup({ abStatement: [charge], abDecision: [{ ...decision(new Date("2026-07-01")), tenant_id_: "T2" }, { ...decision(new Date("2026-07-01")), id: "x", bankCode: "072" }] });
+    const a = (await post(api, { valores: [], ...catalogs }, "S2")).body as any;
+    expect(a.propuestas[0].origen).toBe("catalogo");
+    expect(wheres.filter((w) => "bankCode" in w).every((w) => w.tenant_id_ === "T1")).toBe(true);
+  });
+  it("guarda el banco, los códigos de cuenta del pedido y, por renglón, la clave del concepto y el tipo canónico", async () => {
+    const { api, rows } = setup({ abStatement: [charge] });
+    await post(api, { valores: [], ...catalogs, cuentasIvaYPercepciones: [{ id: 200, codigo: 9900201, descripcion: "IVA CREDITO COMPRAS" }] }, "S2");
+    const row = rows.abReconciliation[0];
+    expect(row.bankCode).toBe("191");
+    expect(row.result.accountCodes).toEqual({ "100": "9900102", "200": "9900201" });
+    expect(row.result.lines).toEqual({ c: { conceptKey: "191||comision", canonicalType: "comision" } });
+  });
+  it("un id que está en los dos catálogos con códigos distintos no lleva código; con el mismo código, sí", async () => {
+    const { api, rows } = setup({ abStatement: [charge] });
+    await post(api, { valores: [], ...catalogs, cuentasIvaYPercepciones: [{ id: 100, codigo: 9900201, descripcion: "IVA" }, { id: 300, codigo: 9, descripcion: "OTRA" }] }, "S2");
+    expect(rows.abReconciliation[0].result.accountCodes).toEqual({ "300": "9" });
+    const same = setup({ abStatement: [charge] });
+    await post(same.api, { valores: [], ...catalogs, cuentasIvaYPercepciones: [{ id: 100, codigo: 9900102, descripcion: "IGUAL" }] }, "S2");
+    expect(same.rows.abReconciliation[0].result.accountCodes).toEqual({ "100": "9900102" });
+  });
+  it("lee las decisiones más recientes primero y con el tope", async () => {
+    const seen: unknown[] = [];
+    const { api, db } = setup({ abStatement: [charge], abDecision: [decision(new Date("2026-07-01T15:00:00Z")), decision(new Date("2026-07-03T02:00:00Z"))] });
+    const findMany = db.abDecision.findMany;
+    db.abDecision.findMany = (async (args: any) => { seen.push(args); return findMany(args as never); }) as never;
+    await post(api, { valores: [], ...catalogs }, "S2");
+    expect(seen).toEqual([expect.objectContaining({ where: { tenant_id_: "T1", bankCode: "191", conceptKey: { in: ["191||comision"] } }, orderBy: { decidedAt: "desc" }, take: 5000 })]);
+  });
+  it("lee solo las decisiones de los conceptos del extracto, una vez cada uno: el tope no lo llena un concepto de mucho volumen", async () => {
+    const day = (n: number) => new Date(Date.now() - n * 86_400_000);
+    const busy = Array.from({ length: 5000 }, (_, i) => ({ ...decision(day(1)), id: `b${i}`, lineId: `b${i}`, conceptKey: "191||impuesto debitos", chosenPair: { movementTypeId: "7", accountId: "999", vatAccountId: null, perceptionAccountId: null } }));
+    const rare = [30, 60, 90].map((n) => decision(day(n)));
+    const twice = { ...charge, reading: { ...charge.reading, lines: [...charge.reading.lines, { ...charge.reading.lines[0], id: "c2" }] } };
+    const seen: any[] = [];
+    const { api, db } = setup({ abStatement: [twice], abDecision: [...busy, ...rare] });
+    const findMany = db.abDecision.findMany;
+    db.abDecision.findMany = (async (args: any) => { seen.push(args); return findMany(args as never); }) as never;
+    const out = (await post(api, { valores: [], ...catalogs }, "S2")).body as any;
+    expect(seen[0].where.conceptKey).toEqual({ in: ["191||comision"] });
+    expect(out.propuestas[0]).toEqual(expect.objectContaining({ origen: "decision", confianza: "grounded" }));
+  });
+  it("una decisión nueva de otro concepto no cambia la huella; una del concepto del extracto, sí", async () => {
+    const { api, rows } = setup({ abStatement: [charge], abDecision: [decision(new Date("2026-07-01T10:00:00Z"))] });
+    const ask = async () => ((await post(api, { valores: [], ...catalogs }, "S2")).body as any).idConciliacion as string;
+    const first = await ask();
+    rows.abDecision.push({ ...decision(new Date("2026-07-02T10:00:00Z")), conceptKey: "191||otro" });
+    expect(await ask()).toBe(first);
+    rows.abDecision.push(decision(new Date("2026-07-03T10:00:00Z")));
+    expect(await ask()).not.toBe(first);
+  });
+  it("un extracto sin renglones no consulta las decisiones", async () => {
+    const empty = { ...charge, reading: { ...charge.reading, lines: [] } };
+    const { api, db, rows } = setup({ abStatement: [empty] });
+    let asked = 0;
+    const findMany = db.abDecision.findMany;
+    db.abDecision.findMany = (async (args: any) => { asked += 1; return findMany(args as never); }) as never;
+    expect((await post(api, { valores: [], ...catalogs }, "S2")).status).toBe(200);
+    expect(asked).toBe(0);
+    expect(rows.abReconciliation[0].requestKey).toMatch(/:0:$/); // sin decisiones: ni cantidad, ni instante, ni día
+  });
+  it("al aprendizaje le llegan las decisiones por renglón (extracto:renglón) y con el día, de la más reciente a la más vieja", async () => {
+    const spy = jest.spyOn(learning, "learnFromDecisions");
+    try {
+      const { api } = setup({ abStatement: [charge], abDecision: [decision(new Date("2026-07-01T15:00:00Z")), decision(new Date("2026-07-03T02:30:00Z"))] });
+      await post(api, { valores: [], ...catalogs }, "S2");
+      const rows = spy.mock.calls[0][0];
+      expect(rows.map((r) => [r.lineRef, r.decidedAt])).toEqual([[`S0:l${+new Date("2026-07-03T02:30:00Z")}`, "2026-07-03"], [`S0:l${+new Date("2026-07-01T15:00:00Z")}`, "2026-07-01"]]);
+    } finally { spy.mockRestore(); }
+  });
+  it("la huella cambia con una decisión nueva, con una corregida el mismo día (otro instante) y con el día en que se pide", async () => {
+    let today = Date.parse("2026-10-16T12:00:00Z");
+    const options = { ...DEFAULT_RECONCILE_OPTIONS, now: () => today };
+    const { api, rows } = setup({ abStatement: [charge], abDecision: [decision(new Date("2026-07-01T10:00:00Z"))] }, allow(), options);
+    const ask = async () => ((await post(api, { valores: [], ...catalogs }, "S2")).body as any).idConciliacion as string;
+    const first = await ask();
+    expect(await ask()).toBe(first);
+    const [key] = rows.abReconciliation.map((r) => r.requestKey);
+    expect(key).toMatch(/:1:2026-07-01T10:00:00\.000Z:2026-10-16$/);
+    today = Date.parse("2026-10-16T23:59:00Z");
+    expect(await ask()).toBe(first);
+    rows.abDecision[0].decidedAt = new Date("2026-07-01T18:30:00Z");
+    const corrected = await ask();
+    expect(corrected).not.toBe(first);
+    today = Date.parse("2026-10-17T00:01:00Z");
+    expect(await ask()).not.toBe(corrected);
+  });
+  it("sin decisiones la huella no depende del día", async () => {
+    let today = Date.parse("2026-10-16T12:00:00Z");
+    const { api } = setup({ abStatement: [charge] }, allow(), { ...DEFAULT_RECONCILE_OPTIONS, now: () => today });
+    const first = ((await post(api, { valores: [], ...catalogs }, "S2")).body as any).idConciliacion;
+    today = Date.parse("2026-10-20T12:00:00Z");
+    expect(((await post(api, { valores: [], ...catalogs }, "S2")).body as any).idConciliacion).toBe(first);
+  });
+  it("una decisión guardada sobre un a-revisar le llega al aprendizaje como review y no enseña", async () => {
+    const spy = jest.spyOn(learning, "learnFromDecisions");
+    try {
+      const day = (n: number) => new Date(Date.now() - n * 86_400_000);
+      const reviews = [1, 2, 3].map((n) => ({ ...decision(day(n)), proposedKind: "review" }));
+      const { api } = setup({ abStatement: [charge], abDecision: reviews });
+      const out = (await post(api, { valores: [], ...catalogs }, "S2")).body as any;
+      expect(spy.mock.calls[0][0].map((r) => r.proposedKind)).toEqual(["review", "review", "review"]);
+      expect(out.propuestas[0].origen).toBe("catalogo");
+    } finally { spy.mockRestore(); }
+  });
+  it("pide de cada decisión todo lo que el aprendizaje usa", async () => {
+    const seen: any[] = [];
+    const { api, db } = setup({ abStatement: [charge] });
+    const findMany = db.abDecision.findMany;
+    db.abDecision.findMany = (async (args: any) => { seen.push(args); return findMany(args as never); }) as never;
+    await post(api, { valores: [], ...catalogs }, "S2");
+    expect(seen[0].select).toStrictEqual({ statementId: true, lineId: true, conceptKey: true, result: true, proposedKind: true, proposedPair: true, chosenKind: true, chosenPair: true, decidedAt: true });
+  });
+  it("una decisión vale por renglón del extracto (extracto:renglón): tres sobre el mismo renglón no alcanzan, tres renglones sí", async () => {
+    const day = (n: number) => new Date(Date.now() - n * 86_400_000);
+    const onLine = (n: number, over = {}) => ({ ...decision(day(n)), ...over });
+    const grounded = async (decisions: unknown[]) => {
+      const { api } = setup({ abStatement: [charge], abDecision: decisions as never[] });
+      return ((await post(api, { valores: [], ...catalogs }, "S2")).body as any).propuestas[0];
+    };
+    const distinct = await grounded([1, 2, 3].map((n) => onLine(n)));
+    const sameLine = await grounded([1, 2, 3].map((n) => onLine(n, { lineId: "l1" })));
+    const otherStatement = await grounded([1, 2, 3].map((n) => onLine(n, { lineId: "l1", statementId: `S${n}` })));
+    expect([distinct.confianza, sameLine.confianza, otherStatement.confianza]).toEqual(["grounded", "weak", "grounded"]);
+  });
+  it("sin banco en el encabezado, se leen las decisiones sin banco", async () => {
+    const noBank = { ...charge, reading: { ...charge.reading, header: null } };
+    const { api, wheres, rows } = setup({ abStatement: [noBank] });
+    await post(api, { valores: [], ...catalogs }, "S2");
+    expect(wheres).toContainEqual({ tenant_id_: "T1", bankCode: null, conceptKey: { in: ["||comision"] } });
+    expect(rows.abReconciliation[0].bankCode).toBeNull();
+  });
+  it("las conciliaciones guardadas antes (sin códigos de cuenta) se responden igual", async () => {
+    const old = { id: "R0", tenant_id_: "T1", requestKey: "k", result: { proposals: [{ id: "p", proposal: { kind: "pending", lineId: "l", reason: "x", marks: [] } }], originalIds: {} } };
+    const { api } = setup({ abReconciliation: [old] });
+    const r = await api.byId({ headers: H, body: null, params: { idConciliacion: "R0" } });
+    expect(r.status).toBe(200);
   });
 });

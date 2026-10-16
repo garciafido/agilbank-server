@@ -28,6 +28,12 @@ AbReconciliation: entity
     .labels(es=["Extracto", "El id del extracto conciliado", "M"])
     .index
 
+  # El banco del encabezado de la lectura: las decisiones de DBG se aprenden por empresa y banco.
+  bankCode: maybe(string)
+    .fillingOnServer
+    .labels(es=["Banco", "El código del banco del extracto", "M"])
+    .index
+
   # El pedido tal como llegó: los valores, las contrapartes y las cuentas propias.
   request: json
     .fillingOnServer

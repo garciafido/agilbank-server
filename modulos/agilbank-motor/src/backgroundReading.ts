@@ -1,8 +1,8 @@
 import { randomUUID } from "crypto";
 import type { Db } from "./api/http";
+import { conceptKeyOf } from "./dbg/conceptKey";
 import { readStatement } from "./readStatement";
 import type { Correction, KnownAccount } from "./types";
-import { normalizeConcept } from "./values";
 
 export interface BackgroundStorage {
   downloadBuffer(key: string): Promise<Buffer>;
@@ -28,7 +28,7 @@ export const latestCorrections = (rows: CorrectionRow[]): Correction[] => {
   const seen = new Set<string>();
   const out: Correction[] = [];
   for (const row of rows) {
-    const key = [row.bankCode ?? "", row.operationCode ?? "", normalizeConcept(row.bankText)].join("|");
+    const key = conceptKeyOf(row.bankCode, row.operationCode, row.bankText);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({ bankCode: row.bankCode, operationCode: row.operationCode, text: row.bankText, type: row.canonicalType });

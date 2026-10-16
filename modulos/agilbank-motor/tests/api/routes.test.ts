@@ -46,6 +46,7 @@ it("monta cada camino con su verbo, su parser y su techo; por-huella antes que e
     ["post", "/v1/extractos/:idExtracto/conciliacion", [expect.any(Function), expect.any(Function), { parser: "json", options: { limit: MAX_RECONCILE_JSON_BYTES } }]],
     ["get", "/v1/conciliaciones/:idConciliacion", []],
     ["post", "/v1/lotes", []],
+    ["post", "/v1/decisiones", [expect.any(Function), expect.any(Function), { parser: "json", options: { limit: MAX_RECONCILE_JSON_BYTES } }]],
     ["use", "*", []],
   ]);
   expect(MAX_JSON_BYTES).toBe(64 * 1024);
@@ -156,6 +157,55 @@ describe("las rutas de la conciliación", () => {
     agilbankRoutes(t.transport, pieces({ db: { abStatement: { findFirst: async () => { throw new Error("secreto"); } } } }));
     const r = await call(t.routes, "post", "/v1/extractos/:idExtracto/conciliacion", { params: { idExtracto: "s1" }, body: {} });
     expect(r).toEqual({ status: 500, body: { codigo: "ERROR_INTERNO", error: "No se pudo completar el pedido." } });
+    errors.mockRestore();
+  });
+});
+
+describe("la ruta de decisiones", () => {
+  const rec = {
+    id: "C1", tenant_id_: "T1", statementId: "S1", bankCode: "191",
+    result: { proposals: [{ id: "p1", proposal: { kind: "pending", lineId: "l1", reason: "x", marks: [] } }], originalIds: {}, lines: { l1: { conceptKey: "191||x", canonicalType: "comision" } } },
+  };
+  const decisiones = [{ idConciliacion: "C1", idPropuesta: "p1", resultado: "aceptada", elegido: { tipo: "pendiente" } }];
+  /** Corre la cadena de la ruta como express: cada paso sigue al siguiente solo si llama a next; el parser falso no hace nada. */
+  const chain = async (headers: Record<string, unknown>, body: unknown, over: Partial<ProductPieces> = {}) => {
+    const t = fakeTransport();
+    const db = fakeDb({ abReconciliation: [rec] });
+    agilbankRoutes(t.transport, pieces({ db: db.db, ...over }));
+    const handlers = t.routes.find((x) => x.path === "/v1/decisiones")!.handlers;
+    const out: { status?: number; body?: any } = {};
+    const res = { status: (n: number) => ({ json: (b: unknown) => { out.status = n; out.body = b; } }) };
+    const req = { headers, params: {}, body };
+    const step = async (i: number): Promise<void> => {
+      const h = handlers[i];
+      if (typeof h !== "function") return step(i + 1);
+      await h(req, res, () => step(i + 1));
+    };
+    await step(0);
+    return { out, saved: db.rows.abDecision };
+  };
+  const JSON_H = { authorization: "Bearer t", "content-type": "application/json" };
+  it("llega al manejador con el cuerpo ya parseado y registra", async () => {
+    expect(await chain(JSON_H, { decisiones })).toEqual({ out: { status: 200, body: { registradas: ["p1"], rechazadas: [] } }, saved: [expect.objectContaining({ proposalId: "p1", tenant_id_: "T1" })] });
+  });
+  it.each([[{}], [{ authorization: "Basic abc", "content-type": "application/json" }], [{ authorization: "Bearer ", "content-type": "application/json" }]])("%j: 401 NO_AUTORIZADO sin parsear ni guardar", async (headers) => {
+    expect(await chain(headers, { decisiones })).toEqual({ out: { status: 401, body: { codigo: "NO_AUTORIZADO", error: "Falta la credencial: el pedido lleva Authorization: Bearer y el token." } }, saved: [] });
+  });
+  it.each([[{}], [{ "content-type": "text/plain" }], [{ "content-type": "application/jsonx" }]])("%j: 415 CUERPO_NO_SOPORTADO, con el mensaje de las decisiones", async (headers) => {
+    expect(await chain({ authorization: "Bearer t", ...headers }, { decisiones })).toEqual({
+      out: { status: 415, body: { codigo: "CUERPO_NO_SOPORTADO", error: "Las decisiones se envían como JSON: el pedido lleva Content-Type: application/json." } }, saved: [],
+    });
+  });
+  it("pide el ámbito ab:decidir", async () => {
+    const scopes: string[] = [];
+    const r = await chain(JSON_H, { decisiones }, { authorizeClient: async (_token, scope) => { scopes.push(scope); throw Object.assign(new Error("m"), { name: "AmbitoInsuficienteError" }); } });
+    expect(r).toEqual({ out: { status: 403, body: { codigo: "AMBITO_INSUFICIENTE", error: "m" } }, saved: [] });
+    expect(scopes).toEqual(["ab:decidir"]);
+  });
+  it("un error inesperado responde 500 ERROR_INTERNO", async () => {
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const r = await chain(JSON_H, { decisiones }, { db: { abReconciliation: { findFirst: async () => { throw new Error("secreto"); } } } });
+    expect(r.out).toEqual({ status: 500, body: { codigo: "ERROR_INTERNO", error: "No se pudo completar el pedido." } });
     errors.mockRestore();
   });
 });
@@ -287,6 +337,12 @@ describe("los errores del parser de JSON", () => {
     });
     it("bajo el prefijo donde se monta, también", () => {
       expect(run({ type: "entity.parse.failed" }, { path: "/api/v1/extractos/S1/conciliacion" }).body.codigo).toBe("PEDIDO_INVALIDO");
+    });
+    it("en las decisiones, DECISION_INVALIDA y el tope de 16 MB", () => {
+      expect(run({ type: "entity.too.large" }, { path: "/v1/decisiones" })).toEqual({ status: 413, body: { codigo: "CUERPO_DEMASIADO_GRANDE", error: "El cuerpo pesa más de 16 MB." } });
+      expect(run({ type: "entity.parse.failed" }, { path: "/api/v1/decisiones" })).toEqual({ status: 400, body: { codigo: "DECISION_INVALIDA", error: "El cuerpo no es un JSON válido.", campo: null } });
+      expect(run({ type: "request.aborted" }, { path: "/v1/decisiones" }).body.codigo).toBe("DECISION_INVALIDA");
+      expect(run({ type: "entity.parse.failed" }, { path: "/v1/decisiones/x" }).body.codigo).toBe("CORRECCION_INVALIDA");
     });
     it("en las correcciones sigue el suyo", () => {
       expect(run({ type: "entity.too.large" }, { path: "/v1/correcciones" }).body.error).toBe("El cuerpo pesa más de 64 KB.");

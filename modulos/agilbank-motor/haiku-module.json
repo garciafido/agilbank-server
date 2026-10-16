@@ -1,6 +1,6 @@
 {
   "description": "Lee un extracto bancario tal como lo entrega el banco y lo lleva al resumen bancario canónico, con sus controles.",
-  "sources": ["model/statement.hk", "model/reconciliation.hk"],
+  "sources": ["model/statement.hk", "model/reconciliation.hk", "model/decision.hk"],
   "requires": {
     "entities": ["Tenant", "User"],
     "modules": ["../agilmind-lectura"]

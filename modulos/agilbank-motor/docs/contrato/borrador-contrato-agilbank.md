@@ -1,9 +1,9 @@
 # AgilBank: borrador del contrato
 
-> **Reemplazado** para la lectura (§1 a §6, §8 y el anexo) y para la conciliación (§7) por la referencia de la API, `agilbank-server/docs/api-agilbank.html`.
-> Del §7 solo siguen como boceto las decisiones, hasta el sub-proyecto 3.
+> **Reemplazado** por la referencia de la API, `agilbank-server/docs/api-agilbank.html`: la lectura (§1 a §6, §8 y el anexo), la conciliación y las decisiones (§7).
+> Lo firme es lo que dice la referencia. Este borrador queda como antecedente.
 
-*Para BDL · borrador del 10-10-2026 · lo firme es la lectura y la conciliación; las decisiones son un boceto*
+*Para BDL · borrador del 10-10-2026 · lo firme es la lectura, la conciliación y las decisiones: están en la referencia*
 
 Este borrador es para que puedan desarrollar en paralelo la carga del extracto en el Resumen de
 Conciliación, la pantalla de propuestas y el aviso de las decisiones. Sigue la misma lógica que
@@ -14,7 +14,7 @@ Pronto IAC: envío del documento, consulta del estado, pedido con contexto y avi
 | Enviar un extracto, consultarlo y el objeto de la lectura (§1 a §5) | Firme para la etapa de lectura. Puede sumar campos, no cambiar los que hay |
 | Las correcciones de las tablas (§6) | Firme en la forma |
 | Pedir la conciliación (§7) | Firme: está en la referencia de la API |
-| Informar las decisiones (§7) | Boceto: se define en el sub-proyecto 3 |
+| Informar las decisiones (§7) | Firme: está en la referencia de la API |
 
 ## 1. El circuito
 
@@ -216,11 +216,14 @@ La conciliación de un extracto con los valores de ProntoNet está definida en l
 `agilbank-server/docs/api-agilbank.html` (secciones 08 a 12): conciliar un extracto
 (`POST /api/v1/extractos/{idExtracto}/conciliacion`), consultar una conciliación
 (`GET /api/v1/conciliaciones/{idConciliacion}`) y subir el detalle de un pago masivo
-(`POST /api/v1/lotes`). Lo firme es lo que dice la referencia; este párrafo no la repite.
+(`POST /api/v1/lotes`). La propuesta de crear un DBG para un renglón sin apareo, con sus catálogos y su
+historia, y el aviso de lo que aceptó, corrigió o rechazó el tesorero
+(`POST /api/v1/decisiones`), también están definidos en la referencia (secciones 08, 09, 13 y 14).
+Lo firme es lo que dice la referencia; este párrafo no la repite.
 
-Siguen para el sub-proyecto 3: qué proponer crear para un renglón sin apareo (`dbg`, `op`,
-`inversion`: hoy esos renglones vuelven `pendiente`, y la forma de la propuesta no cambia), y
-`POST /api/v1/decisiones`, con el aviso de lo que aceptó, corrigió o rechazó el tesorero.
+Sigue para una etapa posterior: qué proponer crear para un renglón sin apareo que no es un gasto del
+banco (`op`, `inversion`: hoy esos renglones vuelven `pendiente`, y la forma de la propuesta no
+cambia).
 
 ## 8. Límites
 

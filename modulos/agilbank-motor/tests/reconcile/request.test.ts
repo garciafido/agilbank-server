@@ -162,7 +162,7 @@ describe("parseReconcileRequest", () => {
     });
     it("sin valores ni contrapartes ni cuentas ni lotes, todo vacío", () => {
       const r = ok({});
-      expect(r.context).toStrictEqual({ lineIds: null, values: [], parties: [], ownAccounts: [], batchIds: [], windowDays: 5 });
+      expect(r.context).toStrictEqual({ lineIds: null, values: [], parties: [], ownAccounts: [], batchIds: [], windowDays: 5, catalogs: null, history: [] });
       expect(r.originalIds.size).toBe(0);
       expect(ok({ contrapartes: {} }).context.parties).toStrictEqual([]);
     });

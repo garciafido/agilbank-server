@@ -1,10 +1,13 @@
+import { openPending } from "../dbg/open";
+import type { DecisionRow } from "../dbg/types";
 import type { StatementLine } from "../types";
 import { confidenceOf, type Basis } from "./confidence";
 import { daysBetween, inReferenceWindow, inWindow, isOwnAccount, lineNumber, MIN_NUMBER_DIGITS, numberMatches, ownAccountCbus, partyConflict, partyKey, partyMatch, partyOf, referenceDate, valueDates } from "./match";
 import { exactSubsets } from "./sums";
 import { DEFAULT_RECONCILE_OPTIONS, type Batch, type BatchTransfer, type Coincidence, type Mark, type Party, type PendingValue, type Proposal, type ReconcileContext, type ReconcileOptions, type Reconciliation } from "./types";
 
-export interface ReconcileInput { lines: StatementLine[]; context: ReconcileContext; batches: Batch[]; readingWarning: boolean }
+/** `bankCode` y `decisions` (las de la empresa con ese banco) son para abrir los pendientes en DBG. */
+export interface ReconcileInput { lines: StatementLine[]; context: ReconcileContext; batches: Batch[]; readingWarning: boolean; bankCode: string | null; decisions: DecisionRow[] }
 
 const NO_VALUE = "No hay un valor pendiente que coincida.";
 // Un pendiente afirma que no hay valor: con varios en la ventana que ninguna pasada pudo separar, eso sería falso.
@@ -39,6 +42,11 @@ class Deadline {
   /** Cuenta un paso de trabajo y dice si el plazo ya pasó. */
   step(): boolean {
     if (!this.passed && (++this.steps & CLOCK_EVERY) === 0 && this.now() > this.at) this.passed = true;
+    return this.passed;
+  }
+  /** Mira el reloj sin esperar los pasos: al terminar, un apareo que se pasó del plazo no puede dar nada por concluido. */
+  check(): boolean {
+    if (!this.passed && this.now() > this.at) this.passed = true;
     return this.passed;
   }
 }
@@ -685,6 +693,7 @@ export const reconcile = (input: ReconcileInput, options: ReconcileOptions = DEF
   // Importe único en el período, sin ventana: al final, para que la evidencia más débil no desarme una más fuerte.
   singleAmount(ledger, excluded, thirdParty, (line, v) => ({ amount: true, ...daysOf(line, v), ...partyMatch(line, v, parties) }), readingWarning, deadline);
 
+  deadline.check();
   // Cuentas propias (RF-20): la marca en lo apareado, y el motivo en lo que queda sin valor.
   const wanted = context.lineIds ? new Set(context.lineIds) : null;
   const ownCbus = ownAccountCbus(context.ownAccounts);
@@ -700,5 +709,10 @@ export const reconcile = (input: ReconcileInput, options: ReconcileOptions = DEF
     if (candidates.length > 0) return { kind: "review", lineId: l.id, reason: SEVERAL_VALUES, candidates: candidates.map((v) => [v.id]) };
     return own ? { kind: "pending", lineId: l.id, reason: OWN, marks: ["own-accounts", ...warning()] } : { kind: "pending", lineId: l.id, reason: NO_VALUE, marks: warning() };
   };
-  return { proposals: input.lines.filter((l) => !wanted || wanted.has(l.id)).map(proposalOf) };
+  const all = input.lines.map(proposalOf);
+  // Con el plazo vencido todo lo no resuelto ya va a revisar por tiempo: no queda pendiente que abrir.
+  const opened = deadline.passed
+    ? all
+    : openPending({ lines: input.lines, proposals: all, bankCode: input.bankCode, catalogs: context.catalogs, history: context.history, decisions: input.decisions, readingWarning, now: new Date(options.now()).toISOString().slice(0, 10) });
+  return { proposals: opened.filter((p) => !wanted || wanted.has(p.lineId)) };
 };
