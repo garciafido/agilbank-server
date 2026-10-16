@@ -110,6 +110,88 @@ export const AbCorrectionReview = {
 } as const;
 
 export type AbCorrectionReview = typeof AbCorrectionReview[keyof typeof AbCorrectionReview];
+export type AbDecision = {
+  __typename?: 'AbDecision';
+  bankCode?: Maybe<Scalars['String']['output']>;
+  canonicalType: Scalars['String']['output'];
+  chosen: Scalars['Json']['output'];
+  chosenKind: Scalars['String']['output'];
+  chosenPair?: Maybe<Scalars['Json']['output']>;
+  conceptKey: Scalars['String']['output'];
+  createdAt_: Scalars['DateTime']['output'];
+  createdBy_: User;
+  decidedAt: Scalars['DateTime']['output'];
+  decisionKey: Scalars['String']['output'];
+  displayId: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  lastUpdatedAt_?: Maybe<Scalars['DateTime']['output']>;
+  lastUpdatedBy_?: Maybe<User>;
+  lineId: Scalars['String']['output'];
+  proposalId: Scalars['String']['output'];
+  proposedKind: Scalars['String']['output'];
+  proposedPair?: Maybe<Scalars['Json']['output']>;
+  reconciliationId: Scalars['String']['output'];
+  result: Scalars['String']['output'];
+  statementId: Scalars['String']['output'];
+  version_: Scalars['String']['output'];
+};
+
+export type AbDecision_Filter = {
+  AND?: InputMaybe<Array<AbDecision_Filter>>;
+  NOT?: InputMaybe<Array<AbDecision_Filter>>;
+  OR?: InputMaybe<Array<AbDecision_Filter>>;
+  bankCode?: InputMaybe<FilterString>;
+  canonicalType?: InputMaybe<FilterString>;
+  chosen?: InputMaybe<FilterJson>;
+  chosenKind?: InputMaybe<FilterString>;
+  chosenPair?: InputMaybe<FilterJson>;
+  conceptKey?: InputMaybe<FilterString>;
+  createdAt_?: InputMaybe<FilterDateTime>;
+  createdBy_?: InputMaybe<User_Filter>;
+  decidedAt?: InputMaybe<FilterDateTime>;
+  decisionKey?: InputMaybe<FilterString>;
+  displayId?: InputMaybe<FilterString>;
+  id?: InputMaybe<FilterString>;
+  lastUpdatedAt_?: InputMaybe<FilterDateTime>;
+  lastUpdatedBy_?: InputMaybe<User_Filter>;
+  lineId?: InputMaybe<FilterString>;
+  proposalId?: InputMaybe<FilterString>;
+  proposedKind?: InputMaybe<FilterString>;
+  proposedPair?: InputMaybe<FilterJson>;
+  reconciliationId?: InputMaybe<FilterString>;
+  result?: InputMaybe<FilterString>;
+  statementId?: InputMaybe<FilterString>;
+  version_?: InputMaybe<FilterString>;
+};
+
+export type AbDecision_OrderBy = {
+  bankCode?: InputMaybe<SortOrder>;
+  canonicalType?: InputMaybe<SortOrder>;
+  chosen?: InputMaybe<SortOrder>;
+  chosenKind?: InputMaybe<SortOrder>;
+  chosenPair?: InputMaybe<SortOrder>;
+  conceptKey?: InputMaybe<SortOrder>;
+  createdAt_?: InputMaybe<SortOrder>;
+  createdBy_?: InputMaybe<User_OrderBy>;
+  decidedAt?: InputMaybe<SortOrder>;
+  decisionKey?: InputMaybe<SortOrder>;
+  id?: InputMaybe<SortOrder>;
+  lastUpdatedAt_?: InputMaybe<SortOrder>;
+  lastUpdatedBy_?: InputMaybe<User_OrderBy>;
+  lineId?: InputMaybe<SortOrder>;
+  proposalId?: InputMaybe<SortOrder>;
+  proposedKind?: InputMaybe<SortOrder>;
+  proposedPair?: InputMaybe<SortOrder>;
+  reconciliationId?: InputMaybe<SortOrder>;
+  result?: InputMaybe<SortOrder>;
+  statementId?: InputMaybe<SortOrder>;
+  version_?: InputMaybe<SortOrder>;
+};
+
+export type AbDecision_OrderByCursor = {
+  id?: InputMaybe<SortOrder>;
+};
+
 export type AbPaymentBatch = {
   __typename?: 'AbPaymentBatch';
   contentHash: Scalars['String']['output'];
@@ -164,6 +246,7 @@ export type AbPaymentBatch_OrderByCursor = {
 
 export type AbReconciliation = {
   __typename?: 'AbReconciliation';
+  bankCode?: Maybe<Scalars['String']['output']>;
   createdAt_: Scalars['DateTime']['output'];
   createdBy_: User;
   displayId: Scalars['String']['output'];
@@ -182,6 +265,7 @@ export type AbReconciliation_Filter = {
   AND?: InputMaybe<Array<AbReconciliation_Filter>>;
   NOT?: InputMaybe<Array<AbReconciliation_Filter>>;
   OR?: InputMaybe<Array<AbReconciliation_Filter>>;
+  bankCode?: InputMaybe<FilterString>;
   createdAt_?: InputMaybe<FilterDateTime>;
   createdBy_?: InputMaybe<User_Filter>;
   displayId?: InputMaybe<FilterString>;
@@ -197,6 +281,7 @@ export type AbReconciliation_Filter = {
 };
 
 export type AbReconciliation_OrderBy = {
+  bankCode?: InputMaybe<SortOrder>;
   createdAt_?: InputMaybe<SortOrder>;
   createdBy_?: InputMaybe<User_OrderBy>;
   id?: InputMaybe<SortOrder>;
@@ -770,6 +855,7 @@ export type Mutation = {
   abConceptCorrectionCreate: AbConceptCorrection;
   abConceptCorrectionDelete: AbConceptCorrection;
   abConceptCorrectionUpdate: AbConceptCorrection;
+  abDecisionDelete: AbDecision;
   abPaymentBatchDelete: AbPaymentBatch;
   abReconciliationDelete: AbReconciliation;
   abStatementDelete: AbStatement;
@@ -858,6 +944,11 @@ export type MutationAbConceptCorrectionUpdateArgs = {
   review?: InputMaybe<AbCorrectionReview>;
   reviewedAt?: InputMaybe<Scalars['DateTime']['input']>;
   version_: Scalars['String']['input'];
+};
+
+
+export type MutationAbDecisionDeleteArgs = {
+  id: Scalars['String']['input'];
 };
 
 
@@ -1291,6 +1382,9 @@ export type Query = {
   abConceptCorrectionListWithCursor: Array<Maybe<AbConceptCorrection>>;
   abConceptCorrectionListWithOffset: Array<Maybe<AbConceptCorrection>>;
   abConceptCorrectionOne: AbConceptCorrection;
+  abDecisionListWithCursor: Array<Maybe<AbDecision>>;
+  abDecisionListWithOffset: Array<Maybe<AbDecision>>;
+  abDecisionOne: AbDecision;
   abPaymentBatchListWithCursor: Array<Maybe<AbPaymentBatch>>;
   abPaymentBatchListWithOffset: Array<Maybe<AbPaymentBatch>>;
   abPaymentBatchOne: AbPaymentBatch;
@@ -1362,6 +1456,27 @@ export type QueryAbConceptCorrectionListWithOffsetArgs = {
 
 export type QueryAbConceptCorrectionOneArgs = {
   allTenants?: InputMaybe<Scalars['Boolean']['input']>;
+  id: Scalars['String']['input'];
+};
+
+
+export type QueryAbDecisionListWithCursorArgs = {
+  cursorKey?: InputMaybe<Scalars['String']['input']>;
+  orderBy: AbDecision_OrderByCursor;
+  take: Scalars['Int']['input'];
+  where?: InputMaybe<AbDecision_Filter>;
+};
+
+
+export type QueryAbDecisionListWithOffsetArgs = {
+  offset: Scalars['Int']['input'];
+  orderBy?: InputMaybe<Array<AbDecision_OrderBy>>;
+  take: Scalars['Int']['input'];
+  where?: InputMaybe<AbDecision_Filter>;
+};
+
+
+export type QueryAbDecisionOneArgs = {
   id: Scalars['String']['input'];
 };
 
@@ -2353,6 +2468,10 @@ export type ResolversTypes = {
   AbConceptCorrection_OrderByCursor: AbConceptCorrection_OrderByCursor;
   AbConceptCorrection_UpdateInput: AbConceptCorrection_UpdateInput;
   AbCorrectionReview: AbCorrectionReview;
+  AbDecision: ResolverTypeWrapper<AbDecision>;
+  AbDecision_Filter: AbDecision_Filter;
+  AbDecision_OrderBy: AbDecision_OrderBy;
+  AbDecision_OrderByCursor: AbDecision_OrderByCursor;
   AbPaymentBatch: ResolverTypeWrapper<AbPaymentBatch>;
   AbPaymentBatch_Filter: AbPaymentBatch_Filter;
   AbPaymentBatch_OrderBy: AbPaymentBatch_OrderBy;
@@ -2493,6 +2612,10 @@ export type ResolversParentTypes = {
   AbConceptCorrection_OrderBy: AbConceptCorrection_OrderBy;
   AbConceptCorrection_OrderByCursor: AbConceptCorrection_OrderByCursor;
   AbConceptCorrection_UpdateInput: AbConceptCorrection_UpdateInput;
+  AbDecision: AbDecision;
+  AbDecision_Filter: AbDecision_Filter;
+  AbDecision_OrderBy: AbDecision_OrderBy;
+  AbDecision_OrderByCursor: AbDecision_OrderByCursor;
   AbPaymentBatch: AbPaymentBatch;
   AbPaymentBatch_Filter: AbPaymentBatch_Filter;
   AbPaymentBatch_OrderBy: AbPaymentBatch_OrderBy;
@@ -2636,6 +2759,32 @@ export type AbConceptCorrectionResolvers<ContextType = MyApolloContext, ParentTy
   __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
 };
 
+export type AbDecisionResolvers<ContextType = MyApolloContext, ParentType extends ResolversParentTypes['AbDecision'] = ResolversParentTypes['AbDecision']> = {
+  bankCode?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  canonicalType?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  chosen?: Resolver<ResolversTypes['Json'], ParentType, ContextType>;
+  chosenKind?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  chosenPair?: Resolver<Maybe<ResolversTypes['Json']>, ParentType, ContextType>;
+  conceptKey?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  createdAt_?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  createdBy_?: Resolver<ResolversTypes['User'], ParentType, ContextType>;
+  decidedAt?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
+  decisionKey?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  displayId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  lastUpdatedAt_?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+  lastUpdatedBy_?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
+  lineId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  proposalId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  proposedKind?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  proposedPair?: Resolver<Maybe<ResolversTypes['Json']>, ParentType, ContextType>;
+  reconciliationId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  result?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  statementId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  version_?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  __isTypeOf?: IsTypeOfResolverFn<ParentType, ContextType>;
+};
+
 export type AbPaymentBatchResolvers<ContextType = MyApolloContext, ParentType extends ResolversParentTypes['AbPaymentBatch'] = ResolversParentTypes['AbPaymentBatch']> = {
   contentHash?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   createdAt_?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
@@ -2653,6 +2802,7 @@ export type AbPaymentBatchResolvers<ContextType = MyApolloContext, ParentType ex
 };
 
 export type AbReconciliationResolvers<ContextType = MyApolloContext, ParentType extends ResolversParentTypes['AbReconciliation'] = ResolversParentTypes['AbReconciliation']> = {
+  bankCode?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   createdAt_?: Resolver<ResolversTypes['DateTime'], ParentType, ContextType>;
   createdBy_?: Resolver<ResolversTypes['User'], ParentType, ContextType>;
   displayId?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
@@ -2851,6 +3001,7 @@ export type MutationResolvers<ContextType = MyApolloContext, ParentType extends 
   abConceptCorrectionCreate?: Resolver<ResolversTypes['AbConceptCorrection'], ParentType, ContextType, RequireFields<MutationAbConceptCorrectionCreateArgs, 'bankText' | 'canonicalType' | 'review'>>;
   abConceptCorrectionDelete?: Resolver<ResolversTypes['AbConceptCorrection'], ParentType, ContextType, RequireFields<MutationAbConceptCorrectionDeleteArgs, 'id'>>;
   abConceptCorrectionUpdate?: Resolver<ResolversTypes['AbConceptCorrection'], ParentType, ContextType, RequireFields<MutationAbConceptCorrectionUpdateArgs, 'id' | 'version_'>>;
+  abDecisionDelete?: Resolver<ResolversTypes['AbDecision'], ParentType, ContextType, RequireFields<MutationAbDecisionDeleteArgs, 'id'>>;
   abPaymentBatchDelete?: Resolver<ResolversTypes['AbPaymentBatch'], ParentType, ContextType, RequireFields<MutationAbPaymentBatchDeleteArgs, 'id'>>;
   abReconciliationDelete?: Resolver<ResolversTypes['AbReconciliation'], ParentType, ContextType, RequireFields<MutationAbReconciliationDeleteArgs, 'id'>>;
   abStatementDelete?: Resolver<ResolversTypes['AbStatement'], ParentType, ContextType, RequireFields<MutationAbStatementDeleteArgs, 'id'>>;
@@ -2935,6 +3086,9 @@ export type QueryResolvers<ContextType = MyApolloContext, ParentType extends Res
   abConceptCorrectionListWithCursor?: Resolver<Array<Maybe<ResolversTypes['AbConceptCorrection']>>, ParentType, ContextType, RequireFields<QueryAbConceptCorrectionListWithCursorArgs, 'orderBy' | 'take'>>;
   abConceptCorrectionListWithOffset?: Resolver<Array<Maybe<ResolversTypes['AbConceptCorrection']>>, ParentType, ContextType, RequireFields<QueryAbConceptCorrectionListWithOffsetArgs, 'offset' | 'take'>>;
   abConceptCorrectionOne?: Resolver<ResolversTypes['AbConceptCorrection'], ParentType, ContextType, RequireFields<QueryAbConceptCorrectionOneArgs, 'id'>>;
+  abDecisionListWithCursor?: Resolver<Array<Maybe<ResolversTypes['AbDecision']>>, ParentType, ContextType, RequireFields<QueryAbDecisionListWithCursorArgs, 'orderBy' | 'take'>>;
+  abDecisionListWithOffset?: Resolver<Array<Maybe<ResolversTypes['AbDecision']>>, ParentType, ContextType, RequireFields<QueryAbDecisionListWithOffsetArgs, 'offset' | 'take'>>;
+  abDecisionOne?: Resolver<ResolversTypes['AbDecision'], ParentType, ContextType, RequireFields<QueryAbDecisionOneArgs, 'id'>>;
   abPaymentBatchListWithCursor?: Resolver<Array<Maybe<ResolversTypes['AbPaymentBatch']>>, ParentType, ContextType, RequireFields<QueryAbPaymentBatchListWithCursorArgs, 'orderBy' | 'take'>>;
   abPaymentBatchListWithOffset?: Resolver<Array<Maybe<ResolversTypes['AbPaymentBatch']>>, ParentType, ContextType, RequireFields<QueryAbPaymentBatchListWithOffsetArgs, 'offset' | 'take'>>;
   abPaymentBatchOne?: Resolver<ResolversTypes['AbPaymentBatch'], ParentType, ContextType, RequireFields<QueryAbPaymentBatchOneArgs, 'id'>>;
@@ -3213,6 +3367,7 @@ export type WorkerEventRetryResultResolvers<ContextType = MyApolloContext, Paren
 
 export type Resolvers<ContextType = MyApolloContext> = {
   AbConceptCorrection?: AbConceptCorrectionResolvers<ContextType>;
+  AbDecision?: AbDecisionResolvers<ContextType>;
   AbPaymentBatch?: AbPaymentBatchResolvers<ContextType>;
   AbReconciliation?: AbReconciliationResolvers<ContextType>;
   AbStatement?: AbStatementResolvers<ContextType>;
