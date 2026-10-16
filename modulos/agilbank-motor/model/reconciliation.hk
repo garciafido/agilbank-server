@@ -1,0 +1,79 @@
+#################
+# reconciliation.hk — La conciliación de un extracto y los lotes de pagos
+#
+# Lo que ProntoNet pidió conciliar y lo que el motor propuso, por empresa. Las decisiones del
+# sub-proyecto 3 apuntan a las propuestas guardadas acá.
+# Spec: agilbank-motor/docs/superpowers/specs/2026-10-15-agilbank-apareo-design.md
+#################
+
+AbReconciliation: entity
+  # La clave (extracto + huella del pedido) es única POR EMPRESA: repetir el mismo pedido devuelve la
+  # conciliación guardada, también con dos pedidos simultáneos.
+  .unique(requestKey)
+  .labels(es=["Conciliación", "Conciliaciones", "F"])
+  .description(es=["Lo que se pidió conciliar de un extracto y la propuesta del motor para cada renglón."])
+  .displayId(requestKey)
+  .listDisplay(statementId, proposalCount, createdAt_)
+  .defaultOrderBy(createdAt_, Desc)
+  .skipCreate
+  .skipUpdate
+{
+  requestKey: string
+    .fillingOnServer
+    .labels(es=["Clave del Pedido", "El extracto y el SHA-256 del pedido", "F"])
+    .index
+
+  statementId: string
+    .fillingOnServer
+    .labels(es=["Extracto", "El id del extracto conciliado", "M"])
+    .index
+
+  # El pedido tal como llegó: los valores, las contrapartes y las cuentas propias.
+  request: json
+    .fillingOnServer
+    .labels(es=["Pedido", "Lo que mandó ProntoNet", "M"])
+    .editor(json)
+
+  # Las propuestas con su id, y los ids originales de los valores (número o texto, como llegaron).
+  result: json
+    .fillingOnServer
+    .labels(es=["Propuestas", "Una por renglón pedido", "F"])
+    .editor(json)
+
+  proposalCount: integer
+    .fillingOnServer
+    .labels(es=["Propuestas", "Cantidad de propuestas", "F"])
+}
+
+AbPaymentBatch: entity
+  .unique(contentHash)
+  .labels(es=["Lote de Pagos", "Lotes de Pagos", "M"])
+  .description(es=["El detalle de un pago masivo tal como lo da el banco: las transferencias del lote y su estado."])
+  .displayId(originalName)
+  .listDisplay(originalName, transferCount, failedCount, createdAt_)
+  .defaultOrderBy(createdAt_, Desc)
+  .skipCreate
+  .skipUpdate
+{
+  originalName: string
+    .fillingOnServer
+    .labels(es=["Nombre", "Nombre original del archivo", "M"])
+
+  contentHash: string
+    .fillingOnServer
+    .labels(es=["Huella del Archivo", "SHA-256 del contenido", "F"])
+    .index
+
+  transfers: json
+    .fillingOnServer
+    .labels(es=["Transferencias", "Las transferencias del lote", "F"])
+    .editor(json)
+
+  transferCount: integer
+    .fillingOnServer
+    .labels(es=["Transferencias", "Cantidad", "F"])
+
+  failedCount: integer
+    .fillingOnServer
+    .labels(es=["Con Error", "Transferencias en estado de error", "F"])
+}

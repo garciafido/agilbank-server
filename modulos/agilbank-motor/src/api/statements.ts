@@ -35,9 +35,9 @@ const upToBytes = (text: string, max: number): string => {
 };
 
 /** El nombre base, sin caracteres de control y acotado: con un NUL, «..» o 64 KB, la subida o el alta darían un 500 que se repite. */
-const safeFileName = (originalName: string): string => {
+export const safeFileName = (originalName: string, fallback = "extracto"): string => {
   const base = path.posix.basename(originalName.replace(/\p{Cc}/gu, "").replace(/\\/g, "/")).trim();
-  return base === "" || base === "." || base === ".." ? "extracto" : upToBytes(base, MAX_FILE_NAME_BYTES);
+  return base === "" || base === "." || base === ".." ? fallback : upToBytes(base, MAX_FILE_NAME_BYTES);
 };
 
 /** La clave del archivo en el almacenamiento: solo el nombre base, para que nunca salga de su carpeta. */

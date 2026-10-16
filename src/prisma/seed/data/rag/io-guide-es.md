@@ -37,6 +37,20 @@ Lo que un usuario de la empresa marcó para un concepto del banco: su tipo canó
 
 **Relaciones:** N/A
 
+#### Conciliación
+Lo que se pidió conciliar de un extracto y la propuesta del motor para cada renglón.
+
+**Campos consultables:** Clave del Pedido, Extracto, Pedido, Propuestas, Propuestas
+
+**Relaciones:** N/A
+
+#### Lote de Pagos
+El detalle de un pago masivo tal como lo da el banco: las transferencias del lote y su estado.
+
+**Campos consultables:** Nombre, Huella del Archivo, Transferencias, Transferencias, Con Error
+
+**Relaciones:** N/A
+
 #### Usuario
 
 
@@ -92,6 +106,12 @@ Consultar contenido de PDFs y documentos indexados.
 - "¿Cuántos/as Correcciones de Concepto hay?"
   - "Total de Correcciones de Concepto"
   - "Número de Correcciones de Concepto"
+- "¿Cuántos/as Conciliaciones hay?"
+  - "Total de Conciliaciones"
+  - "Número de Conciliaciones"
+- "¿Cuántos/as Lotes de Pagos hay?"
+  - "Total de Lotes de Pagos"
+  - "Número de Lotes de Pagos"
 - "¿Cuántos/as Usuarios hay?"
   - "Total de Usuarios"
   - "Número de Usuarios"
@@ -110,6 +130,12 @@ Consultar contenido de PDFs y documentos indexados.
 - "Lista de Correcciones de Concepto"
   - "Mostrar Correcciones de Concepto"
   - "Dame los/las Correcciones de Concepto"
+- "Lista de Conciliaciones"
+  - "Mostrar Conciliaciones"
+  - "Dame los/las Conciliaciones"
+- "Lista de Lotes de Pagos"
+  - "Mostrar Lotes de Pagos"
+  - "Dame los/las Lotes de Pagos"
 - "Lista de Usuarios"
   - "Mostrar Usuarios"
   - "Dame los/las Usuarios"

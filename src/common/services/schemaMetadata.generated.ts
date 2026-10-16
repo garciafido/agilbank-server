@@ -332,6 +332,148 @@ export const generatedSchemaMetadata: SchemaMetadataMap = new Map([
   ],
 
   [
+    "AbReconciliation" as Prisma.ModelName,
+    {
+      modelName: "AbReconciliation" as Prisma.ModelName,
+      tenantIdField: "tenant_id_",
+      relations: new Map([]),
+      fields: new Map([
+        [
+          "requestKey",
+          {
+            name: "requestKey",
+            type: "String",
+            kind: "scalar",
+            isList: false,
+            isRequired: true,
+            isId: false,
+            hasDefaultValue: true,
+          },
+        ],
+        [
+          "statementId",
+          {
+            name: "statementId",
+            type: "String",
+            kind: "scalar",
+            isList: false,
+            isRequired: true,
+            isId: false,
+            hasDefaultValue: true,
+          },
+        ],
+        [
+          "request",
+          {
+            name: "request",
+            type: "Json",
+            kind: "scalar",
+            isList: false,
+            isRequired: true,
+            isId: false,
+            hasDefaultValue: true,
+          },
+        ],
+        [
+          "result",
+          {
+            name: "result",
+            type: "Json",
+            kind: "scalar",
+            isList: false,
+            isRequired: true,
+            isId: false,
+            hasDefaultValue: true,
+          },
+        ],
+        [
+          "proposalCount",
+          {
+            name: "proposalCount",
+            type: "Int",
+            kind: "scalar",
+            isList: false,
+            isRequired: true,
+            isId: false,
+            hasDefaultValue: true,
+          },
+        ],
+      ]),
+    },
+  ],
+
+  [
+    "AbPaymentBatch" as Prisma.ModelName,
+    {
+      modelName: "AbPaymentBatch" as Prisma.ModelName,
+      tenantIdField: "tenant_id_",
+      relations: new Map([]),
+      fields: new Map([
+        [
+          "originalName",
+          {
+            name: "originalName",
+            type: "String",
+            kind: "scalar",
+            isList: false,
+            isRequired: true,
+            isId: false,
+            hasDefaultValue: true,
+          },
+        ],
+        [
+          "contentHash",
+          {
+            name: "contentHash",
+            type: "String",
+            kind: "scalar",
+            isList: false,
+            isRequired: true,
+            isId: false,
+            hasDefaultValue: true,
+          },
+        ],
+        [
+          "transfers",
+          {
+            name: "transfers",
+            type: "Json",
+            kind: "scalar",
+            isList: false,
+            isRequired: true,
+            isId: false,
+            hasDefaultValue: true,
+          },
+        ],
+        [
+          "transferCount",
+          {
+            name: "transferCount",
+            type: "Int",
+            kind: "scalar",
+            isList: false,
+            isRequired: true,
+            isId: false,
+            hasDefaultValue: true,
+          },
+        ],
+        [
+          "failedCount",
+          {
+            name: "failedCount",
+            type: "Int",
+            kind: "scalar",
+            isList: false,
+            isRequired: true,
+            isId: false,
+            hasDefaultValue: true,
+          },
+        ],
+      ]),
+    },
+  ],
+
+  [
     "User" as Prisma.ModelName,
     {
       modelName: "User" as Prisma.ModelName,

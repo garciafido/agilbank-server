@@ -29,7 +29,9 @@ cosas:
 
 - `agilbankRoutes(transport, pieces)`: devuelve el router de express con las rutas del contrato:
   `POST /v1/extractos`, `GET /v1/extractos/:idExtracto`, `GET /v1/extractos/por-huella/:huella` y
-  `POST /v1/correcciones`. Se monta bajo `/api`. El `transport` es `{ Router, json }` de express.
+  `POST /v1/correcciones`, y las del apareo (abajo): `POST /v1/extractos/:idExtracto/conciliacion`,
+  `GET /v1/conciliaciones/:idConciliacion` y `POST /v1/lotes`. Se monta bajo `/api`. El `transport`
+  es `{ Router, json }` de express.
 - `readStatementStage`: el paso `read` del pipeline `AbStatementRead`. Baja el archivo, lo lee con
   las correcciones de la empresa y guarda la lectura. No toca un extracto ya leído: un trabajo
   tardío sobre él devuelve `read` sin leer. Cuenta en `readStarts` los arranques que no terminaron
@@ -62,11 +64,38 @@ cambios: el reenvío del mismo archivo lo vuelve a leer cuando pasaron más de `
 `version_` nueva. El reenvío de uno terminado (`failed`, o `read` con `unavailable`) vuelve
 `readStarts` a cero; el de uno en proceso perdido lo conserva.
 
-Los ámbitos de la credencial son `ab:leer` (enviar y consultar extractos) y `ab:corregir`
-(correcciones). Se comparan exactos. Una credencial sin empresa no pasa, y para enviar o corregir
-tiene que traer usuario de servicio.
+Los ámbitos de la credencial son `ab:leer` (enviar y consultar extractos), `ab:corregir`
+(correcciones) y `ab:conciliar` (las tres rutas del apareo). Se comparan exactos. Una credencial sin
+empresa no pasa, y para enviar, corregir, conciliar o subir un lote tiene que traer usuario de
+servicio; las consultas no lo piden.
 
 La referencia para BDL es `agilbank-server/docs/api-agilbank.html`.
+
+## El apareo
+
+`reconcile` (`src/reconcile/`) es una función pura: toma los renglones de una lectura y los valores
+pendientes de ProntoNet, y devuelve una propuesta por renglón: `apareo` (con los valores que le
+corresponden), `a-revisar` (con sus candidatos) o `pendiente`. Va de lo más firme a lo más débil:
+número e importe, importe único en la ventana, contraparte, intercambiables, un renglón contra varios
+valores, varios renglones contra un valor, e importe único en el período. La traducción del contrato
+(en castellano) a los nombres del motor está solo en `src/reconcile/request.ts` (entrada) y
+`src/reconcile/publicReconciliation.ts` (salida). Las rutas están en `src/api/reconciliations.ts`. La
+referencia para BDL, con las reglas en llano, es `agilbank-server/docs/api-agilbank.html`
+(secciones 08 a 12); el diseño, `docs/superpowers/specs/2026-10-15-agilbank-apareo-design.md`.
+
+- `npm run bench:apareo`: el banco del apareo. Lee el extracto de cada caso de BDL (`AB_IEB_DIR`),
+  concilia con sus datos y compara por conjunto: cobertura de los valores que el usuario concilió,
+  precisión, y que ningún apareo lleve un valor «no reflejado». Falla si algún caso baja de su piso.
+- **La regla de los avisos:** una lectura con `no-cierra` o `lectura-parcial` se concilia igual, pero
+  todo sale `weak` con la marca `lectura-con-aviso`; con `varias-cuentas` o `cuenta-distinta` no se
+  concilia (409 `OTRA_CUENTA`), porque los valores son de otra cuenta. La confianza de una propuesta
+  nunca supera la del renglón en que se apoya.
+- Un techo de tiempo cubre todo el apareo (6 s por pedido) y cada búsqueda de una suma (2 s): lo que no se
+  terminó de buscar vuelve `a-revisar` con un motivo que dice por qué, nunca un apareo ni un `pendiente`.
+  Lo mismo un renglón que no se buscó por un tope (más de 50 valores del mismo importe, una suma con más de
+  200 valores, un día con más de 40 renglones del grupo). `pendiente` queda para «se buscó y no hay»: un
+  renglón con varios valores en la ventana que ningún paso pudo separar vuelve `a-revisar` con ellos.
+- Ningún dato de un caso de BDL va al código, a las pruebas ni a los informes: se inventan.
 
 ## La lectura visual
 

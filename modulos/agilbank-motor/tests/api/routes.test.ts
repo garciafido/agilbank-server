@@ -1,5 +1,7 @@
 import { Readable } from "stream";
+import { MAX_RECONCILE_JSON_BYTES } from "../../src/api/reconciliations";
 import { agilbankRoutes, authorizationAsResult, MAX_JSON_BYTES, type ProductPieces } from "../../src/api/routes";
+import { line } from "../reconcile/fixtures";
 import { fakeDb } from "./fakeDb";
 
 type Route = { verb: string; path: string; handlers: any[] };
@@ -35,14 +37,127 @@ const call = async (routes: Route[], verb: string, path: string, req: Record<str
 it("monta cada camino con su verbo, su parser y su techo; por-huella antes que el id", () => {
   const t = fakeTransport();
   agilbankRoutes(t.transport, pieces());
-  expect(t.routes.map((r) => [r.verb, r.path, r.handlers.length > 1 ? r.handlers[0] : null])).toEqual([
-    ["post", "/v1/extractos", null],
-    ["get", "/v1/extractos/por-huella/:huella", null],
-    ["get", "/v1/extractos/:idExtracto", null],
-    ["post", "/v1/correcciones", { parser: "json", options: { limit: MAX_JSON_BYTES } }],
-    ["use", "*", null],
+  // Lo que corre antes del manejador: el corte sin credencial (una función) y el parser.
+  expect(t.routes.map((r) => [r.verb, r.path, r.handlers.slice(0, -1)])).toEqual([
+    ["post", "/v1/extractos", []],
+    ["get", "/v1/extractos/por-huella/:huella", []],
+    ["get", "/v1/extractos/:idExtracto", []],
+    ["post", "/v1/correcciones", [{ parser: "json", options: { limit: MAX_JSON_BYTES } }]],
+    ["post", "/v1/extractos/:idExtracto/conciliacion", [expect.any(Function), expect.any(Function), { parser: "json", options: { limit: MAX_RECONCILE_JSON_BYTES } }]],
+    ["get", "/v1/conciliaciones/:idConciliacion", []],
+    ["post", "/v1/lotes", []],
+    ["use", "*", []],
   ]);
   expect(MAX_JSON_BYTES).toBe(64 * 1024);
+});
+
+describe("las rutas de la conciliación", () => {
+  const read = { id: "s2", tenant_id_: "T1", status: "read", verdict: "verified", reading: { warnings: [], lines: [line({ id: "l1", amountCents: 1000 })] } };
+  it("la conciliación recibe el cuerpo ya parseado y el id del extracto", async () => {
+    const t = fakeTransport();
+    const db = fakeDb({ abStatement: [read] });
+    agilbankRoutes(t.transport, pieces({ db: db.db }));
+    const r = await call(t.routes, "post", "/v1/extractos/:idExtracto/conciliacion", { params: { idExtracto: "s2" }, body: { valores: [{ idValor: 9, importe: 10, fechaComprobante: "2026-07-10" }] } });
+    expect(r.status).toBe(200);
+    expect(r.body.propuestas).toEqual([expect.objectContaining({ idRenglon: "l1", tipo: "apareo", valores: [9] })]);
+    expect(db.rows.abReconciliation).toHaveLength(1);
+  });
+  it("la consulta de una conciliación responde por el router", async () => {
+    const t = fakeTransport();
+    agilbankRoutes(t.transport, pieces({ db: fakeDb({ abReconciliation: [{ id: "c1", tenant_id_: "T1", result: { proposals: [], originalIds: {} } }] }).db }));
+    expect(await call(t.routes, "get", "/v1/conciliaciones/:idConciliacion", { params: { idConciliacion: "c1" } })).toEqual({ status: 200, body: { idConciliacion: "c1", propuestas: [] } });
+  });
+  it("la subida de un lote lee el cuerpo del propio pedido", async () => {
+    const t = fakeTransport();
+    const db = fakeDb();
+    agilbankRoutes(t.transport, pieces({ db: db.db }));
+    const csv = "Monto;Estado\n100,00;OK\n";
+    const body = Buffer.from(`--b\r\nContent-Disposition: form-data; name="archivo"; filename="pagos.csv"\r\nContent-Type: text/csv\r\n\r\n${csv}\r\n--b--\r\n`);
+    const req = Object.assign(Readable.from([body]), { headers: { authorization: "Bearer t", "content-type": "multipart/form-data; boundary=b" }, params: {} });
+    const route = t.routes.find((x) => x.verb === "post" && x.path === "/v1/lotes")!;
+    const out: { status?: number; body?: any } = {};
+    await route.handlers[0](req, { status: (n: number) => ({ json: (b: unknown) => { out.status = n; out.body = b; } }) });
+    expect(out).toEqual({ status: 201, body: { idLote: db.rows.abPaymentBatch[0].id, transferencias: 1, conError: 0 } });
+  });
+  describe("la conciliación sin credencial corta antes de parsear el cuerpo", () => {
+    const gate = () => {
+      const t = fakeTransport();
+      agilbankRoutes(t.transport, pieces());
+      return t.routes.find((x) => x.path === "/v1/extractos/:idExtracto/conciliacion")!.handlers[0];
+    };
+    const run = (headers: Record<string, unknown>) => {
+      const out: { status?: number; body?: unknown; next: number } = { next: 0 };
+      gate()({ headers }, { status: (n: number) => ({ json: (b: unknown) => { out.status = n; out.body = b; } }) }, () => { out.next++; });
+      return out;
+    };
+    it.each([[{}], [{ authorization: "Basic abc" }], [{ authorization: "Bearer" }], [{ authorization: "Bearer " }], [{ authorization: ["Bearer t"] }]])("%j: 401 NO_AUTORIZADO, y el parser no corre", (headers) => {
+      expect(run(headers)).toEqual({ status: 401, body: { codigo: "NO_AUTORIZADO", error: "Falta la credencial: el pedido lleva Authorization: Bearer y el token." }, next: 0 });
+    });
+    it("con un Bearer sigue al parser, sin responder: la autorización completa es del manejador", () => {
+      expect(run({ authorization: "Bearer t" })).toEqual({ next: 1 });
+      expect(run({ authorization: "bearer t" })).toEqual({ next: 1 });
+    });
+  });
+  describe("la conciliación sin Content-Type JSON corta antes de parsear el cuerpo", () => {
+    const UNSUPPORTED = { codigo: "CUERPO_NO_SOPORTADO", error: "La conciliación se envía como JSON: el pedido lleva Content-Type: application/json." };
+    /** Corre la cadena de la ruta como express: cada paso sigue al siguiente solo si llama a next; el parser falso no hace nada. */
+    const chain = async (headers: Record<string, unknown>, body: unknown) => {
+      const t = fakeTransport();
+      const db = fakeDb({ abStatement: [read] });
+      agilbankRoutes(t.transport, pieces({ db: db.db }));
+      const handlers = t.routes.find((x) => x.path === "/v1/extractos/:idExtracto/conciliacion")!.handlers;
+      const out: { status?: number; body?: any } = {};
+      const res = { status: (n: number) => ({ json: (b: unknown) => { out.status = n; out.body = b; } }) };
+      const req = { headers: { authorization: "Bearer t", ...headers }, params: { idExtracto: "s2" }, body };
+      const step = async (i: number): Promise<void> => {
+        const h = handlers[i];
+        if (typeof h !== "function") return step(i + 1);
+        await h(req, res, () => step(i + 1));
+      };
+      await step(0);
+      return { out, saved: db.rows.abReconciliation ?? [] };
+    };
+    const valores = { valores: [{ idValor: 9, importe: 10, fechaComprobante: "2026-07-10" }] };
+    it.each([[{}], [{ "content-type": "text/plain" }], [{ "content-type": "application/x-www-form-urlencoded" }], [{ "content-type": "application/jsonx" }], [{ "content-type": ["application/json"] }]])(
+      "%j: 415 CUERPO_NO_SOPORTADO y no guarda nada",
+      async (headers) => {
+        expect(await chain(headers, {})).toEqual({ out: { status: 415, body: UNSUPPORTED }, saved: [] });
+      },
+    );
+    it.each(["application/json", "application/json; charset=utf-8", "Application/JSON;charset=UTF-8", " application/json "])("%s: concilia", async (type) => {
+      const r = await chain({ "content-type": type }, valores);
+      expect(r.out.status).toBe(200);
+      expect(r.saved).toHaveLength(1);
+    });
+    it("sin credencial manda el 401 aunque tampoco haya Content-Type", async () => {
+      const t = fakeTransport();
+      agilbankRoutes(t.transport, pieces());
+      const out: { status?: number } = {};
+      const [bearer] = t.routes.find((x) => x.path === "/v1/extractos/:idExtracto/conciliacion")!.handlers;
+      bearer({ headers: {} }, { status: (n: number) => ({ json: () => { out.status = n; } }) }, () => undefined);
+      expect(out.status).toBe(401);
+    });
+  });
+  it("las tres piden el ámbito ab:conciliar", async () => {
+    const t = fakeTransport();
+    const scopes: string[] = [];
+    agilbankRoutes(t.transport, pieces({ authorizeClient: async (_token, scope) => { scopes.push(scope); throw Object.assign(new Error("m"), { name: "AmbitoInsuficienteError" }); } }));
+    expect((await call(t.routes, "post", "/v1/extractos/:idExtracto/conciliacion", { params: { idExtracto: "s1" }, body: {} })).status).toBe(403);
+    expect((await call(t.routes, "get", "/v1/conciliaciones/:idConciliacion", { params: { idConciliacion: "c1" } })).status).toBe(403);
+    const req = Object.assign(Readable.from([Buffer.from("x")]), { headers: {}, params: {} });
+    const out: { status?: number } = {};
+    await t.routes.find((x) => x.path === "/v1/lotes")!.handlers[0](req, { status: (n: number) => ({ json: () => { out.status = n; } }) });
+    expect(out.status).toBe(403);
+    expect(scopes).toEqual(["ab:conciliar", "ab:conciliar", "ab:conciliar"]);
+  });
+  it("un error inesperado en la conciliación responde 500 ERROR_INTERNO", async () => {
+    const t = fakeTransport();
+    const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    agilbankRoutes(t.transport, pieces({ db: { abStatement: { findFirst: async () => { throw new Error("secreto"); } } } }));
+    const r = await call(t.routes, "post", "/v1/extractos/:idExtracto/conciliacion", { params: { idExtracto: "s1" }, body: {} });
+    expect(r).toEqual({ status: 500, body: { codigo: "ERROR_INTERNO", error: "No se pudo completar el pedido." } });
+    errors.mockRestore();
+  });
 });
 
 it("la consulta por id responde por el router", async () => {
@@ -139,9 +254,9 @@ describe("los errores del parser de JSON", () => {
     agilbankRoutes(t.transport, pieces());
     return t.routes.find((r) => r.verb === "use")!.handlers[0];
   };
-  const run = (err: unknown) => {
+  const run = (err: unknown, req: unknown = {}) => {
     const out: { status?: number; body?: any; next?: unknown } = {};
-    middleware()(err, {}, { status: (n: number) => ({ json: (b: unknown) => { out.status = n; out.body = b; } }) }, (e: unknown) => { out.next = e; });
+    middleware()(err, req, { status: (n: number) => ({ json: (b: unknown) => { out.status = n; out.body = b; } }) }, (e: unknown) => { out.next = e; });
     return out;
   };
   it("tiene cuatro argumentos, como pide express para un manejador de errores", () => {
@@ -158,6 +273,27 @@ describe("los errores del parser de JSON", () => {
   });
   it.each(["request.aborted", "request.size.invalid"])("%s: 400 CORRECCION_INVALIDA, cuerpo incompleto", (type) => {
     expect(run({ type })).toEqual({ status: 400, body: { codigo: "CORRECCION_INVALIDA", error: "El cuerpo llegó incompleto.", campo: null } });
+  });
+  describe("en la conciliación, con el código y el tope de esa ruta", () => {
+    const conciliacion = { path: "/v1/extractos/S1/conciliacion" };
+    it("un cuerpo de más de 16 MB: 413 CUERPO_DEMASIADO_GRANDE", () => {
+      expect(run({ type: "entity.too.large" }, conciliacion)).toEqual({ status: 413, body: { codigo: "CUERPO_DEMASIADO_GRANDE", error: "El cuerpo pesa más de 16 MB." } });
+    });
+    it("un JSON roto: 400 PEDIDO_INVALIDO con campo null", () => {
+      expect(run({ type: "entity.parse.failed" }, conciliacion)).toEqual({ status: 400, body: { codigo: "PEDIDO_INVALIDO", error: "El cuerpo no es un JSON válido.", campo: null } });
+    });
+    it.each(["request.aborted", "request.size.invalid"])("%s: 400 PEDIDO_INVALIDO, cuerpo incompleto", (type) => {
+      expect(run({ type }, conciliacion)).toEqual({ status: 400, body: { codigo: "PEDIDO_INVALIDO", error: "El cuerpo llegó incompleto.", campo: null } });
+    });
+    it("bajo el prefijo donde se monta, también", () => {
+      expect(run({ type: "entity.parse.failed" }, { path: "/api/v1/extractos/S1/conciliacion" }).body.codigo).toBe("PEDIDO_INVALIDO");
+    });
+    it("en las correcciones sigue el suyo", () => {
+      expect(run({ type: "entity.too.large" }, { path: "/v1/correcciones" }).body.error).toBe("El cuerpo pesa más de 64 KB.");
+      expect(run({ type: "entity.parse.failed" }, { path: "/v1/correcciones" }).body.codigo).toBe("CORRECCION_INVALIDA");
+      expect(run({ type: "entity.parse.failed" }, { path: "/v1/conciliacion/x" }).body.codigo).toBe("CORRECCION_INVALIDA");
+      expect(run({ type: "entity.parse.failed" }, null).body.codigo).toBe("CORRECCION_INVALIDA");
+    });
   });
   it("cualquier otro error: 500 ERROR_INTERNO, se registra y no sigue de largo", () => {
     const errors = jest.spyOn(console, "error").mockImplementation(() => undefined);

@@ -37,6 +37,20 @@ iO é o motor de consultas deste sistema. Permite consultar dados internos e doc
 
 **Relações:** N/A
 
+#### AbReconciliation
+
+
+**Campos consultáveis:** requestKey, statementId, request, result, proposalCount
+
+**Relações:** N/A
+
+#### AbPaymentBatch
+
+
+**Campos consultáveis:** originalName, contentHash, transfers, transferCount, failedCount
+
+**Relações:** N/A
+
 #### Usuário
 
 
@@ -92,6 +106,12 @@ Consultar conteúdo de PDFs e documentos indexados.
 - "Quantos/as AbConceptCorrection há?"
   - "Total de AbConceptCorrection"
   - "Número de AbConceptCorrection"
+- "Quantos/as AbReconciliation há?"
+  - "Total de AbReconciliation"
+  - "Número de AbReconciliation"
+- "Quantos/as AbPaymentBatch há?"
+  - "Total de AbPaymentBatch"
+  - "Número de AbPaymentBatch"
 - "Quantos/as Usuários há?"
   - "Total de Usuários"
   - "Número de Usuários"
@@ -110,6 +130,12 @@ Consultar conteúdo de PDFs e documentos indexados.
 - "Lista de AbConceptCorrection"
   - "Mostrar AbConceptCorrection"
   - "Me dê os/as AbConceptCorrection"
+- "Lista de AbReconciliation"
+  - "Mostrar AbReconciliation"
+  - "Me dê os/as AbReconciliation"
+- "Lista de AbPaymentBatch"
+  - "Mostrar AbPaymentBatch"
+  - "Me dê os/as AbPaymentBatch"
 - "Lista de Usuários"
   - "Mostrar Usuários"
   - "Me dê os/as Usuários"

@@ -30,6 +30,54 @@ export const UNIQUE_CONSTRAINTS: UniqueConstraintsData = {
         },
       },
     },
+    ab_reconciliation: {
+      model: "AbReconciliation",
+      labels: {
+        es: {
+          s: "Conciliación",
+          g: "F",
+        },
+      },
+      columns: {
+        tenant__id__: null,
+        request_key: ["requestKey"],
+      },
+      constraints: {
+        ab_reconciliation_tenant__id___request_key_key: ["requestKey"],
+      },
+      fieldLabels: {
+        requestKey: {
+          es: {
+            s: "Clave del Pedido",
+            g: "F",
+          },
+        },
+      },
+    },
+    ab_payment_batch: {
+      model: "AbPaymentBatch",
+      labels: {
+        es: {
+          s: "Lote de Pagos",
+          g: "M",
+        },
+      },
+      columns: {
+        tenant__id__: null,
+        content_hash: ["contentHash"],
+      },
+      constraints: {
+        ab_payment_batch_tenant__id___content_hash_key: ["contentHash"],
+      },
+      fieldLabels: {
+        contentHash: {
+          es: {
+            s: "Huella del Archivo",
+            g: "F",
+          },
+        },
+      },
+    },
     user: {
       model: "User",
       labels: {

@@ -41,6 +41,8 @@ export type DeletionBlockerRoot = {
 export const DELETION_BLOCKERS: Record<string, DeletionBlockerRelation[]> = {
   AbStatement: [],
   AbConceptCorrection: [],
+  AbReconciliation: [],
+  AbPaymentBatch: [],
   User: [
     {
       kind: "reference",
@@ -84,6 +86,28 @@ export const DELETION_BLOCKERS: Record<string, DeletionBlockerRelation[]> = {
       path: [],
       pathMany: [],
       rootEntity: "AbConceptCorrection",
+      rootGlobal: false,
+    },
+    {
+      kind: "audit",
+      model: "AbPaymentBatch",
+      field: "createdBy_",
+      fk: "createdBy_id_",
+      constraint: "ab_payment_batch_created_by__id___fkey",
+      path: [],
+      pathMany: [],
+      rootEntity: "AbPaymentBatch",
+      rootGlobal: false,
+    },
+    {
+      kind: "audit",
+      model: "AbReconciliation",
+      field: "createdBy_",
+      fk: "createdBy_id_",
+      constraint: "ab_reconciliation_created_by__id___fkey",
+      path: [],
+      pathMany: [],
+      rootEntity: "AbReconciliation",
       rootGlobal: false,
     },
     {
@@ -198,6 +222,28 @@ export const DELETION_BLOCKERS: Record<string, DeletionBlockerRelation[]> = {
       path: [],
       pathMany: [],
       rootEntity: "AbConceptCorrection",
+      rootGlobal: false,
+    },
+    {
+      kind: "audit",
+      model: "AbPaymentBatch",
+      field: "tenant_",
+      fk: "tenant_id_",
+      constraint: "ab_payment_batch_tenant__id___fkey",
+      path: [],
+      pathMany: [],
+      rootEntity: "AbPaymentBatch",
+      rootGlobal: false,
+    },
+    {
+      kind: "audit",
+      model: "AbReconciliation",
+      field: "tenant_",
+      fk: "tenant_id_",
+      constraint: "ab_reconciliation_tenant__id___fkey",
+      path: [],
+      pathMany: [],
+      rootEntity: "AbReconciliation",
       rootGlobal: false,
     },
     {
@@ -377,6 +423,38 @@ export const FK_CONSTRAINT_TO_RELATION: Record<
       },
     ],
   },
+  ab_payment_batch_created_by__id___fkey: {
+    target: "User",
+    relations: [
+      {
+        kind: "audit",
+        model: "AbPaymentBatch",
+        field: "createdBy_",
+        fk: "createdBy_id_",
+        constraint: "ab_payment_batch_created_by__id___fkey",
+        path: [],
+        pathMany: [],
+        rootEntity: "AbPaymentBatch",
+        rootGlobal: false,
+      },
+    ],
+  },
+  ab_reconciliation_created_by__id___fkey: {
+    target: "User",
+    relations: [
+      {
+        kind: "audit",
+        model: "AbReconciliation",
+        field: "createdBy_",
+        fk: "createdBy_id_",
+        constraint: "ab_reconciliation_created_by__id___fkey",
+        path: [],
+        pathMany: [],
+        rootEntity: "AbReconciliation",
+        rootGlobal: false,
+      },
+    ],
+  },
   ab_statement_created_by__id___fkey: {
     target: "User",
     relations: [
@@ -533,6 +611,38 @@ export const FK_CONSTRAINT_TO_RELATION: Record<
         path: [],
         pathMany: [],
         rootEntity: "AbConceptCorrection",
+        rootGlobal: false,
+      },
+    ],
+  },
+  ab_payment_batch_tenant__id___fkey: {
+    target: "Tenant",
+    relations: [
+      {
+        kind: "audit",
+        model: "AbPaymentBatch",
+        field: "tenant_",
+        fk: "tenant_id_",
+        constraint: "ab_payment_batch_tenant__id___fkey",
+        path: [],
+        pathMany: [],
+        rootEntity: "AbPaymentBatch",
+        rootGlobal: false,
+      },
+    ],
+  },
+  ab_reconciliation_tenant__id___fkey: {
+    target: "Tenant",
+    relations: [
+      {
+        kind: "audit",
+        model: "AbReconciliation",
+        field: "tenant_",
+        fk: "tenant_id_",
+        constraint: "ab_reconciliation_tenant__id___fkey",
+        path: [],
+        pathMany: [],
+        rootEntity: "AbReconciliation",
         rootGlobal: false,
       },
     ],
@@ -744,6 +854,8 @@ export const DELETION_REQUIRES_RETRIEVE: string[] = [
 export const DELETION_QUERYABLE: string[] = [
   "AbStatement",
   "AbConceptCorrection",
+  "AbReconciliation",
+  "AbPaymentBatch",
   "User",
   "Role",
   "Permission",

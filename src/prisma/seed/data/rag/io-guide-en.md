@@ -37,6 +37,20 @@ iO is the query engine for this system. It allows querying internal data and ind
 
 **Relations:** N/A
 
+#### AbReconciliation
+
+
+**Queryable fields:** requestKey, statementId, request, result, proposalCount
+
+**Relations:** N/A
+
+#### AbPaymentBatch
+
+
+**Queryable fields:** originalName, contentHash, transfers, transferCount, failedCount
+
+**Relations:** N/A
+
 #### User
 
 
@@ -92,6 +106,12 @@ Query content from PDFs and indexed documents.
 - "How many AbConceptCorrection are there?"
   - "Total AbConceptCorrection"
   - "Number of AbConceptCorrection"
+- "How many AbReconciliation are there?"
+  - "Total AbReconciliation"
+  - "Number of AbReconciliation"
+- "How many AbPaymentBatch are there?"
+  - "Total AbPaymentBatch"
+  - "Number of AbPaymentBatch"
 - "How many Users are there?"
   - "Total Users"
   - "Number of Users"
@@ -110,6 +130,12 @@ Query content from PDFs and indexed documents.
 - "List of AbConceptCorrection"
   - "Show AbConceptCorrection"
   - "Give me the AbConceptCorrection"
+- "List of AbReconciliation"
+  - "Show AbReconciliation"
+  - "Give me the AbReconciliation"
+- "List of AbPaymentBatch"
+  - "Show AbPaymentBatch"
+  - "Give me the AbPaymentBatch"
 - "List of Users"
   - "Show Users"
   - "Give me the Users"

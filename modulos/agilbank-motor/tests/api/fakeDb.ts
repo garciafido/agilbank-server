@@ -81,13 +81,18 @@ const model = (rows: Row[], wheres: Where[], unique?: (a: Row, b: Row) => boolea
   },
 });
 
-export const fakeDb = (seed: { abStatement?: Row[]; abConceptCorrection?: Row[]; workerEvent?: Row[] } = {}) => {
-  const rows = { abStatement: [...(seed.abStatement ?? [])], abConceptCorrection: [...(seed.abConceptCorrection ?? [])], workerEvent: [...(seed.workerEvent ?? [])] };
+export const fakeDb = (seed: { abStatement?: Row[]; abConceptCorrection?: Row[]; workerEvent?: Row[]; abReconciliation?: Row[]; abPaymentBatch?: Row[] } = {}) => {
+  const rows = {
+    abStatement: [...(seed.abStatement ?? [])], abConceptCorrection: [...(seed.abConceptCorrection ?? [])], workerEvent: [...(seed.workerEvent ?? [])],
+    abReconciliation: [...(seed.abReconciliation ?? [])], abPaymentBatch: [...(seed.abPaymentBatch ?? [])],
+  };
   const wheres: Where[] = [];
   const db = {
     abStatement: model(rows.abStatement, wheres, (a, b) => a.tenant_id_ === b.tenant_id_ && a.contentHash === b.contentHash),
     abConceptCorrection: model(rows.abConceptCorrection, wheres),
     workerEvent: model(rows.workerEvent, wheres),
+    abReconciliation: model(rows.abReconciliation, wheres, (a, b) => a.tenant_id_ === b.tenant_id_ && a.requestKey === b.requestKey),
+    abPaymentBatch: model(rows.abPaymentBatch, wheres, (a, b) => a.tenant_id_ === b.tenant_id_ && a.contentHash === b.contentHash),
   };
   return { db, rows, wheres };
 };

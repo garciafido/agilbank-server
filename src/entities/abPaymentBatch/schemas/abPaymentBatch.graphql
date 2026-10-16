@@ -1,0 +1,70 @@
+type AbPaymentBatch {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  originalName: String!
+  contentHash: String!
+  transfers: Json!
+  transferCount: Int!
+  failedCount: Int!
+}
+
+extend type Mutation {
+  abPaymentBatchDelete(id: String!): AbPaymentBatch!
+}
+
+extend type Query {
+  abPaymentBatchOne(id: String!): AbPaymentBatch!
+  abPaymentBatchListWithOffset(
+    where: AbPaymentBatch_Filter
+    orderBy: [AbPaymentBatch_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [AbPaymentBatch]!
+  abPaymentBatchListWithCursor(
+    where: AbPaymentBatch_Filter
+    orderBy: AbPaymentBatch_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [AbPaymentBatch]!
+}
+
+input AbPaymentBatch_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  originalName: FilterString
+  contentHash: FilterString
+  transfers: FilterJson
+  transferCount: FilterInt
+  failedCount: FilterInt
+  AND: [AbPaymentBatch_Filter!]
+  OR: [AbPaymentBatch_Filter!]
+  NOT: [AbPaymentBatch_Filter!]
+}
+
+input AbPaymentBatch_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  originalName: SortOrder
+  contentHash: SortOrder
+  transfers: SortOrder
+  transferCount: SortOrder
+  failedCount: SortOrder
+}
+
+input AbPaymentBatch_OrderByCursor {
+  id: SortOrder
+}
