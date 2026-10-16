@@ -178,11 +178,12 @@ hr { border: none; border-top: 1px solid var(--linea); margin: 3rem 0 0; }
 <div class="hoja">
 
 <header class="portada">
-<p class="rotulo">Para el área de sistemas de BDL · 15-10-2026</p>
+<p class="rotulo">Para el área de sistemas de BDL · 16-10-2026</p>
 <h1>API de AgilBank</h1>
 <p class="bajada">Referencia para enviar extractos bancarios a AgilBank, consultar su lectura,
-enviar las correcciones de tipos y conciliar los renglones con los valores de ProntoNet. Describe
-cada ruta, cada campo y cada error.</p>
+enviar las correcciones de tipos, conciliar los renglones con los valores de ProntoNet, recibir las
+propuestas de débitos y créditos bancarios (DBG) e informar las decisiones del usuario. Describe cada
+ruta, cada campo y cada error.</p>
 </header>
 
 <h2><span class="nro">01</span> En pocas palabras</h2>
@@ -190,7 +191,9 @@ cada ruta, cada campo y cada error.</p>
 <p>La API funciona de servidor a servidor. ProntoNet envía el extracto tal como lo entregó el
 banco. AgilBank lo lee y devuelve el resumen bancario canónico: el encabezado, cada renglón con su
 tipo y los controles de saldos. Con los valores pendientes de la cuenta, AgilBank propone con cuál
-se corresponde cada renglón (sección 08).</p>
+se corresponde cada renglón (sección 08). Lo que no tiene valor y es un gasto o un impuesto del banco
+vuelve como un DBG para crear (secciones 09 y 13). Lo que el usuario decide se informa a AgilBank, que
+aprende de eso para la próxima vez (sección 14).</p>
 
 <p>La empresa sale de la credencial. Ningún pedido lleva el identificador de la empresa, y lo de una
 empresa nunca se ve ni se usa desde otra. La única excepción es lo que se confirma en nuestra
@@ -206,6 +209,7 @@ revisión de las correcciones de tipos: pasa a la tabla común (sección 07).</p
 <tr><td><code>POST /api/v1/extractos/{idExtracto}/conciliacion</code></td><td>Concilia los renglones de un extracto con los valores de ProntoNet</td><td><code>ab:conciliar</code></td></tr>
 <tr><td><code>GET /api/v1/conciliaciones/{idConciliacion}</code></td><td>Consulta una conciliación guardada</td><td><code>ab:conciliar</code></td></tr>
 <tr><td><code>POST /api/v1/lotes</code></td><td>Sube el detalle de un pago masivo</td><td><code>ab:conciliar</code></td></tr>
+<tr><td><code>POST /api/v1/decisiones</code></td><td>Informa lo que el usuario aceptó, corrigió o rechazó</td><td><code>ab:decidir</code></td></tr>
 </tbody>
 </table></div>
 
@@ -224,6 +228,7 @@ están en castellano.</p>
 <tr><td><code>ab:leer</code></td><td>Enviar extractos y consultarlos</td></tr>
 <tr><td><code>ab:corregir</code></td><td>Enviar correcciones de tipos</td></tr>
 <tr><td><code>ab:conciliar</code></td><td>Conciliar un extracto, consultar la conciliación y subir el detalle de un pago masivo</td></tr>
+<tr><td><code>ab:decidir</code></td><td>Informar las decisiones del usuario sobre las propuestas</td></tr>
 </tbody>
 </table>
 
@@ -231,10 +236,10 @@ están en castellano.</p>
 nosotros traen las dos cosas. Si se da de baja el usuario de servicio de la credencial, la credencial
 deja de valer en todas las rutas (401).</p>
 
-<p>Una credencial con los tres ámbitos se emite desde la consola de la instalación:</p>
+<p>Una credencial con los cuatro ámbitos se emite desde la consola de la instalación:</p>
 
 <div class="desborde"><pre><code>node dist/admin/integrationCli.js issue --tenant "&lt;empresa&gt;" --user &lt;email&gt; \
-  --name "&lt;sistema&gt;" --scopes "ab:leer ab:corregir ab:conciliar" --expires AAAA-MM-DD</code></pre></div>
+  --name "&lt;sistema&gt;" --scopes "ab:leer ab:corregir ab:conciliar ab:decidir" --expires AAAA-MM-DD</code></pre></div>
 
 <p>El token se muestra una sola vez. Guárdenlo en una variable de entorno o en un gestor de
 secretos, no en el código.</p>
@@ -259,7 +264,11 @@ secretos, no en el código.</p>
      masivo (si lo tiene)
 
   6  Pide la conciliación con los   -->  Responde una propuesta por
-     valores pendientes                  renglón (sección 08)</code></pre></div>
+     valores pendientes, los             renglón (sección 08)
+     catálogos y la historia
+
+  7  Informa lo que el usuario      -->  Registra cada decisión y
+     aceptó, corrigió o rechazó          aprende de ella (sección 14)</code></pre></div>
 
 <p>El extracto se puede enviar todos los días. El identificador de cada renglón es estable, y
 con él ProntoNet descarta lo que ya tenía.</p>
@@ -459,7 +468,7 @@ guardó el <code>idExtracto</code>. La huella son 64 caracteres hexadecimales; a
 <p>Pregunten cada <code>reintentarEn</code> segundos hasta que el estado deje de ser
 <code>en-proceso</code>. Si envían muchos extractos a la vez, o PDF escaneados, conviene espaciar las consultas: por
 ejemplo, cada 30 segundos después de los primeros dos minutos. La instalación tiene un cupo de
-pedidos (sección 14): respeten el encabezado <code>Retry-After</code> de un 429.</p>
+pedidos (sección 16): respeten el encabezado <code>Retry-After</code> de un 429.</p>
 
 <p>Si un extracto sigue <code>en-proceso</code> más de 30 minutos, envíenlo de nuevo: si lleva 30 minutos sin cambios, se vuelve a leer. Si la respuesta es 200 con <code>en-proceso</code>, sigan consultando y vuelvan a enviarlo más tarde.</p>
 
@@ -718,8 +727,8 @@ de la lectura. El ámbito es <code>ab:conciliar</code>.</p>
 <code>charset</code>). Sin ese encabezado, AgilBank responde 415 <code>CUERPO_NO_SOPORTADO</code> sin leer el
 cuerpo y sin conciliar. Todas las claves son opcionales, pero sin <code>valores</code> no hay nada con qué aparear. Una clave que no se quiere
 enviar se omite: <code>null</code> no vale en <code>renglones</code>, <code>valores</code>,
-<code>contrapartes</code>, <code>cuentasPropias</code>, <code>lotes</code> ni <code>ventanaDias</code>, y
-responde 400. Dentro de cada valor, en cambio, los datos opcionales sí pueden ir en <code>null</code>.</p>
+<code>contrapartes</code>, <code>cuentasPropias</code>, <code>lotes</code>, <code>ventanaDias</code> ni
+las cuatro claves de los DBG (abajo), y responde 400. Dentro de cada valor, en cambio, los datos opcionales sí pueden ir en <code>null</code>.</p>
 
 <div class="desborde"><table>
 <thead><tr><th>Clave</th><th>Qué es</th></tr></thead>
@@ -730,6 +739,10 @@ responde 400. Dentro de cada valor, en cambio, los datos opcionales sí pueden i
 <tr><td><code>cuentasPropias</code></td><td>Las otras cuentas de la empresa. Se describe abajo</td></tr>
 <tr><td><code>lotes</code></td><td>Los <code>idLote</code> de los detalles de pagos masivos ya subidos (sección 12). Hasta 50. Un lote que no existe en la empresa responde 400</td></tr>
 <tr><td><code>ventanaDias</code></td><td>Entero de 0 a 31. Si falta, 5. Se explica en la sección 10</td></tr>
+<tr><td><code>tiposGastoBancario</code></td><td>Los tipos de gasto bancario de ProntoNet. Hasta 100. Se describe abajo</td></tr>
+<tr><td><code>cuentasImputables</code></td><td>Las cuentas contables donde se puede imputar un DBG. Hasta 10.000 entre esta lista y la siguiente. Se describe abajo</td></tr>
+<tr><td><code>cuentasIvaYPercepciones</code></td><td>Las cuentas contables del IVA y de las percepciones. Se describe abajo</td></tr>
+<tr><td><code>historiaDbg</code></td><td>Los DBG que la empresa ya registró. Hasta 5.000. Se describe abajo</td></tr>
 </tbody>
 </table></div>
 
@@ -766,6 +779,30 @@ Cualquier otra clave se ignora.</p>
 </tbody>
 </table></div>
 
+<h4>Los catálogos y la historia de los DBG</h4>
+
+<p>Con estas cuatro claves, AgilBank puede proponer el tipo de gasto y la cuenta de cada DBG (sección
+13). Todas son opcionales. Sin ellas, los DBG salen igual, pero sin tipo de gasto ni cuenta, salvo lo
+que enseñaron las decisiones de la empresa. Los catálogos son los de la empresa, tal como los tiene
+ProntoNet: AgilBank no trae los suyos. Si falta cualquiera de las tres listas de catálogo, se toma
+como vacía. Las cuatro entran en la huella del pedido (abajo).</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Lista</th><th>Claves</th></tr></thead>
+<tbody>
+<tr><td><code>tiposGastoBancario</code></td><td><code>id</code> (obligatoria), <code>descripcion</code> y <code>coeficiente</code> (obligatorio): <code>1</code> si el tipo es de un débito, el dinero que sale, y <code>-1</code> si es de un crédito. AgilBank busca estos tipos por el nombre de la descripción</td></tr>
+<tr><td><code>cuentasImputables</code>, <code>cuentasIvaYPercepciones</code></td><td><code>id</code> (obligatoria), <code>codigo</code> (obligatoria: texto o entero) y <code>descripcion</code>. AgilBank busca las cuentas por el nombre de la descripción y por el código</td></tr>
+<tr><td><code>historiaDbg</code></td><td><code>idValor</code> (obligatoria), <code>fecha</code> (obligatoria, <code>AAAA-MM-DD</code>), <code>tipoGasto</code> (el nombre de un tipo de <code>tiposGastoBancario</code>), <code>coeficiente</code> (obligatoria, <code>1</code> o <code>-1</code>), <code>importe</code>, <code>iva</code> y <code>percepcionIva</code> (pesos <b>sin signo</b>, de cero en adelante, con hasta dos decimales; si faltan, cero), <code>cuentaContableCodigo</code> (el <code>codigo</code> de una cuenta de <code>cuentasImputables</code>), <code>cuentaContable</code> (el nombre de la cuenta) y <code>detalle</code></td></tr>
+</tbody>
+</table></div>
+
+<p>En la historia, el signo lo da el <code>coeficiente</code>: <code>1</code> es un débito y equivale a un
+importe negativo en el extracto. Un DBG de la historia cuyo <code>tipoGasto</code>, con ese
+<code>coeficiente</code>, o cuya <code>cuentaContableCodigo</code> no estén en los catálogos del mismo
+pedido no cuenta. Un dato que no tiene la forma indicada corta el pedido con 400
+<code>PEDIDO_INVALIDO</code>, con el <code>campo</code> de la lista y, en la historia, el
+<code>idValor</code>.</p>
+
 <h4>Un pedido de ejemplo</h4>
 
 <div class="desborde"><pre><code>{
@@ -801,7 +838,30 @@ Cualquier otra clave se ignora.</p>
     { "id": 3, "banco": "Banco Ejemplo", "numero": "CC 123/4", "cbu": "0170099220000012345679", "moneda": "Pesos" }
   ],
   "lotes": [],
-  "ventanaDias": 5
+  "ventanaDias": 5,
+  "tiposGastoBancario": [
+    { "id": 7, "descripcion": "Débito bancario gastos", "coeficiente": 1 }
+  ],
+  "cuentasImputables": [
+    { "id": 310, "codigo": "5.1.01", "descripcion": "Comisiones y gastos bancarios" }
+  ],
+  "cuentasIvaYPercepciones": [
+    { "id": 520, "codigo": "1.3.02", "descripcion": "IVA crédito fiscal" },
+    { "id": 521, "codigo": "1.3.03", "descripcion": "Percepciones de IVA" }
+  ],
+  "historiaDbg": [
+    {
+      "idValor": "H-1001",
+      "fecha": "2026-05-31",
+      "tipoGasto": "Débito bancario gastos",
+      "coeficiente": 1,
+      "importe": 1210.00,
+      "iva": 210.00,
+      "percepcionIva": 0,
+      "cuentaContableCodigo": "5.1.01",
+      "cuentaContable": "Comisiones y gastos bancarios"
+    }
+  ]
 }</code></pre></div>
 
 <h4>La respuesta</h4>
@@ -844,9 +904,17 @@ describe en la sección 09.</p>
 <p>AgilBank guarda cada conciliación por empresa. Un pedido repetido responde <b>200</b> con la
 conciliación guardada: el mismo <code>idConciliacion</code> y los mismos <code>idPropuesta</code>.
 El pedido es el mismo si trae los mismos datos, aunque las claves vayan en otro orden (el orden de
-las listas sí cuenta), sobre el mismo extracto y con la misma lectura. Si la lectura del extracto
+las listas sí cuenta), sobre el mismo extracto y con la misma lectura. Los catálogos y la historia de
+los DBG son parte del pedido: si cambia cualquiera, es otro pedido. Si la lectura del extracto
 cambia, el pedido da otra conciliación. Si dos pedidos iguales llegan a la vez, los dos reciben la
 misma. Un extracto de otra empresa responde 404, igual que uno que no existe.</p>
+
+<p>Las decisiones de la empresa para ese banco (sección 14) también cuentan, aunque no viajan en el
+pedido. Después de informar una decisión nueva, o de cambiar una, el mismo pedido da otra
+conciliación, con otros <code>idConciliacion</code> e <code>idPropuesta</code>. Mientras la empresa tenga
+decisiones para ese banco, la conciliación guardada vale hasta el día siguiente: las decisiones pesan
+según su edad, y al cambiar el día el mismo pedido se concilia de nuevo. Las conciliaciones
+anteriores siguen consultables.</p>
 
 <h4>Los controles del pedido</h4>
 
@@ -883,8 +951,9 @@ cuerpo demasiado grande y cuerpo mal formado.</p>
 <code>idValor</code> (repetido, o que no es un texto ni un entero), <code>importe</code>,
 <code>fechaComprobante</code>, <code>fechaValor</code>, <code>fechaDeposito</code>,
 <code>idDepositoBancario</code>, <code>loteEnvioBanco</code>, <code>idProveedor</code>,
-<code>idCliente</code>, <code>contrapartes</code>, <code>cuentasPropias</code>, <code>lotes</code> o
-<code>ventanaDias</code>. AgilBank no concilia a
+<code>idCliente</code>, <code>contrapartes</code>, <code>cuentasPropias</code>, <code>lotes</code>,
+<code>ventanaDias</code>, <code>tiposGastoBancario</code>, <code>cuentasImputables</code>,
+<code>cuentasIvaYPercepciones</code> o <code>historiaDbg</code>. AgilBank no concilia a
 medias: un solo dato inválido corta todo el pedido.</p>
 
 <div class="desborde"><pre><code>{
@@ -901,35 +970,56 @@ medias: un solo dato inválido corta todo el pedido.</p>
 <div class="desborde"><table>
 <thead><tr><th>Clave</th><th>Qué es</th></tr></thead>
 <tbody>
-<tr><td><code>idPropuesta</code></td><td>Identificador de la propuesta. Es estable: la misma conciliación lo repite cada vez que se pide. Lo usarán las decisiones de la etapa siguiente</td></tr>
+<tr><td><code>idPropuesta</code></td><td>Identificador de la propuesta. Es estable: la misma conciliación lo repite cada vez que se pide. Es el que se informa en las decisiones (sección 14)</td></tr>
 <tr><td><code>idRenglon</code></td><td>El <code>id</code> del renglón de la lectura</td></tr>
-<tr><td><code>tipo</code></td><td><code>apareo</code>, <code>a-revisar</code> o <code>pendiente</code> (abajo)</td></tr>
+<tr><td><code>tipo</code></td><td><code>apareo</code>, <code>a-revisar</code>, <code>pendiente</code> o <code>dbg</code> (abajo)</td></tr>
 <tr><td><code>valores</code></td><td>Los <code>idValor</code> propuestos, como se enviaron. Solo en <code>apareo</code>; en los demás tipos, <code>null</code>. Puede traer más de uno: un depósito contra varios cheques, o un pago masivo contra varias transferencias</td></tr>
-<tr><td><code>renglones</code></td><td>Solo en <code>apareo</code>. Los renglones que se proponen contra esos valores, en el orden del extracto. Trae siempre al menos el propio renglón. Si un valor se reparte entre varios renglones, como el rescate de un fondo que el banco acredita en dos movimientos, todos traen la misma lista y los mismos <code>valores</code></td></tr>
-<tr><td><code>confianza</code></td><td><code>verified</code>, <code>grounded</code> o <code>weak</code> (abajo). Solo en <code>apareo</code>; en los demás tipos, <code>null</code></td></tr>
+<tr><td><code>renglones</code></td><td>Solo en <code>apareo</code> y en <code>dbg</code>. En un <code>apareo</code>, los renglones que se proponen contra esos valores, en el orden del extracto. Trae siempre al menos el propio renglón. En un <code>dbg</code>, los renglones del grupo, con el cargo primero (abajo). Si un valor se reparte entre varios renglones, como el rescate de un fondo que el banco acredita en dos movimientos, todos traen la misma lista y los mismos <code>valores</code></td></tr>
+<tr><td><code>confianza</code></td><td><code>verified</code>, <code>grounded</code> o <code>weak</code> (abajo). Solo en <code>apareo</code> y en <code>dbg</code> (el <code>dbg</code> nunca es <code>verified</code>); en los demás tipos, <code>null</code></td></tr>
 <tr><td><code>coincidencias</code></td><td>Lo que coincidió (abajo). Solo en <code>apareo</code>; en los demás tipos, <code>null</code></td></tr>
 <tr><td><code>marcas</code></td><td>Lista de avisos sobre cómo se llegó a la propuesta (abajo). Puede venir vacía. Un <code>a-revisar</code> nunca trae marcas</td></tr>
-<tr><td><code>motivo</code></td><td>En <code>a-revisar</code> y <code>pendiente</code>, el motivo en castellano, para mostrar. En <code>apareo</code>, <code>null</code></td></tr>
+<tr><td><code>motivo</code></td><td>En <code>a-revisar</code> y <code>pendiente</code>, el motivo en castellano, para mostrar. En <code>apareo</code> y <code>dbg</code>, <code>null</code></td></tr>
 <tr><td><code>candidatos</code></td><td>Solo en <code>a-revisar</code>: las combinaciones que encontró, cada una como <code>{ "valores": [...] }</code>. Puede venir vacía, si no se pudo buscar entero. En los demás tipos, <code>null</code></td></tr>
 </tbody>
 </table></div>
 
-<h3>Los tres tipos</h3>
+<p>Los campos de un <code>dbg</code> son estos. En los otros tres tipos, todos vienen en <code>null</code>.</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Clave</th><th>Qué es</th></tr></thead>
+<tbody>
+<tr><td><code>tipoMovimiento</code></td><td>El tipo de gasto bancario propuesto, <code>{ "id": "7" }</code>, con el <code>id</code> de <code>tiposGastoBancario</code>. <code>null</code> si no se pudo proponer uno</td></tr>
+<tr><td><code>cuenta</code></td><td>La cuenta donde imputar el cargo, <code>{ "id": "310", "codigo": "5.1.01" }</code>, con el <code>id</code> y el <code>codigo</code> de <code>cuentasImputables</code>. <code>null</code> si no se pudo proponer una</td></tr>
+<tr><td><code>cuentaIva</code>, <code>cuentaPercepcion</code></td><td>La cuenta del IVA y la de la percepción de IVA, con la misma forma que <code>cuenta</code>, de <code>cuentasIvaYPercepciones</code>. Pueden venir en <code>null</code>. Que vengan no quiere decir que el grupo tenga IVA o percepción: eso lo dicen <code>iva</code> y <code>percepcion</code></td></tr>
+<tr><td><code>importe</code></td><td>El total del grupo: el cargo, el IVA y la percepción juntos. En pesos, con signo desde el banco: negativo es dinero que sale</td></tr>
+<tr><td><code>iva</code>, <code>percepcion</code></td><td>La parte del <code>importe</code> que es IVA y la que es percepción de IVA, en pesos y con el mismo signo. Cero si el grupo no los tiene. Son parte del <code>importe</code>, no se suman aparte</td></tr>
+<tr><td><code>claveAgrupacion</code></td><td>Un texto que identifica «el mismo tipo de gasto, en la misma cuenta, en el mismo mes». Sirve para juntar grupos (abajo). Se compara entero: no lo desarmen</td></tr>
+<tr><td><code>origen</code></td><td>De dónde salió la cuenta: <code>decision</code>, <code>historia</code>, <code>catalogo</code> o <code>ninguno</code> (abajo)</td></tr>
+</tbody>
+</table></div>
+
+<p>Los <code>id</code> de <code>tipoMovimiento</code> y de las cuentas vuelven siempre como texto, aunque en el
+pedido hayan sido enteros: <code>310</code> vuelve <code>"310"</code>. El <code>codigo</code> es el del
+catálogo del pedido. Un id que el pedido repite con dos códigos distintos, o que ya no está en el
+catálogo, sale con <code>codigo</code> en <code>null</code>.</p>
+
+<h3>Los cuatro tipos</h3>
 
 <div class="desborde"><table>
 <thead><tr><th>Tipo</th><th>Qué quiere decir</th></tr></thead>
 <tbody>
 <tr><td><code>apareo</code></td><td>AgilBank encontró el valor, o los valores, que le corresponden al renglón</td></tr>
 <tr><td><code>a-revisar</code></td><td>Hay más de una respuesta posible, o no se pudo buscar entero. No propone ningún valor: las posibilidades que encontró, si encontró alguna, están en <code>candidatos</code>, para que las vea una persona</td></tr>
-<tr><td><code>pendiente</code></td><td>Se buscó, y no hay en el pedido un valor que le corresponda. Un renglón que no se pudo buscar entero vuelve <code>a-revisar</code>, nunca <code>pendiente</code>. Todo renglón vuelve con una propuesta o con «a revisar»</td></tr>
+<tr><td><code>pendiente</code></td><td>Se buscó, y no hay en el pedido un valor que le corresponda, y tampoco hay nada para crear con él: es un movimiento con un tercero, o se trata de un leasing, un préstamo o un fondo, o no se pudo clasificar, o la empresa lo registra como pendiente. Un renglón que no se pudo buscar entero vuelve <code>a-revisar</code>, nunca <code>pendiente</code>. Todo renglón vuelve con una propuesta o con «a revisar»</td></tr>
+<tr><td><code>dbg</code></td><td>Se buscó, no hay un valor que le corresponda, y es un gasto o un impuesto del banco: AgilBank propone crear un DBG, con su tipo de gasto y su cuenta. Un DBG agrupa el cargo con su IVA y su percepción (sección 13)</td></tr>
 </tbody>
 </table></div>
 
 <div class="nota">
-<p><b>Lo que viene.</b> En la etapa siguiente, un renglón <code>pendiente</code> se va a poder abrir en
-una propuesta de crear algo: <code>dbg</code>, <code>op</code> o <code>inversion</code>. La forma de la
-propuesta no cambia: sigue siendo el mismo objeto, con el <code>tipo</code> nuevo. Un <code>tipo</code>
-que no conozcan, trátenlo como <code>pendiente</code>.</p>
+<p><b>Lo que viene.</b> Las propuestas de crear una orden de pago (<code>op</code>) o una inversión
+(<code>inversion</code>) llegan en la etapa siguiente. La forma de la propuesta no cambia: sigue siendo
+el mismo objeto, con el <code>tipo</code> nuevo. Un <code>tipo</code> que no conozcan, trátenlo como
+<code>pendiente</code>.</p>
 </div>
 
 <h4>Un depósito contra varios cheques</h4>
@@ -965,6 +1055,34 @@ que no conozcan, trátenlo como <code>pendiente</code>.</p>
   ]
 }</code></pre></div>
 
+<h4>Un DBG</h4>
+
+<p>Una comisión, su IVA y su percepción de IVA, que ProntoNet registra como un solo DBG. Cada uno de
+los tres renglones lleva esta misma propuesta, con su <code>idPropuesta</code> y su
+<code>idRenglon</code> (el primero de <code>renglones</code> es el cargo):</p>
+
+<div class="desborde"><pre><code>{
+  "idPropuesta": "c4a7e2f1-3b08-4d95-a6e1-90f2d58b7c34",
+  "idRenglon": "r-52b0e9a41c7d836f0a25",
+  "tipo": "dbg",
+  "valores": null,
+  "renglones": ["r-52b0e9a41c7d836f0a25", "r-0e6f3d81b9a27c54e103", "r-a91c40d7e5f2b368071d"],
+  "confianza": "grounded",
+  "coincidencias": null,
+  "marcas": [],
+  "motivo": null,
+  "candidatos": null,
+  "tipoMovimiento": { "id": "7" },
+  "cuenta": { "id": "310", "codigo": "5.1.01" },
+  "cuentaIva": { "id": "520", "codigo": "1.3.02" },
+  "cuentaPercepcion": { "id": "521", "codigo": "1.3.03" },
+  "importe": -1240.00,
+  "iva": -210.00,
+  "percepcion": -30.00,
+  "claveAgrupacion": "7|310|2026-07",
+  "origen": "decision"
+}</code></pre></div>
+
 <h4>Un renglón pendiente</h4>
 
 <div class="desborde"><pre><code>{
@@ -982,15 +1100,19 @@ que no conozcan, trátenlo como <code>pendiente</code>.</p>
 
 <h3>Los motivos</h3>
 
-<p>El <code>motivo</code> viene en castellano para mostrarlo. Estos son los doce. Los cinco últimos dicen
-que no se pudo buscar y por qué: el renglón vuelve <code>a-revisar</code> sin candidatos, porque no
-se sabe si el valor falta.</p>
+<p>El <code>motivo</code> viene en castellano para mostrarlo. Estos son los dieciséis. Los cinco últimos
+dicen que no se pudo buscar y por qué: el renglón vuelve <code>a-revisar</code> sin candidatos, porque
+no se sabe si el valor falta. Un <code>dbg</code> no trae motivo.</p>
 
 <div class="desborde"><table>
 <thead><tr><th>Tipo</th><th>Motivo</th><th>Cuándo</th></tr></thead>
 <tbody>
-<tr><td><code>pendiente</code></td><td>«No hay un valor pendiente que coincida.»</td><td>Se buscó, y ningún valor del pedido le corresponde al renglón</td></tr>
+<tr><td><code>pendiente</code></td><td>«No hay un valor pendiente que coincida.»</td><td>Se buscó, y ningún valor del pedido le corresponde al renglón, y la lectura trae el aviso <code>no-cierra</code> o <code>lectura-parcial</code>: con un aviso, los pendientes no se abren (sección 10). Sin aviso, un renglón así sale con uno de los cuatro motivos de abajo, o como <code>dbg</code>. Trae la marca <code>lectura-con-aviso</code></td></tr>
 <tr><td><code>pendiente</code></td><td>«Transferencia entre cuentas propias sin valor cargado.»</td><td>El renglón es una transferencia entre cuentas propias y no aparece el valor. Trae la marca <code>cuentas-propias</code></td></tr>
+<tr><td><code>pendiente</code></td><td>«Movimiento con un tercero sin valor en ProntoNet.»</td><td>Se buscó, no hay valor, y el renglón es un movimiento con un tercero (una transferencia, un cheque, un pago de servicio, una orden judicial...) y no un gasto del banco</td></tr>
+<tr><td><code>pendiente</code></td><td>«Leasing, préstamo o fondo común: la propuesta para crearlo llega en la próxima etapa.»</td><td>El renglón es de un leasing, un préstamo o un fondo común de inversión. Todavía no se propone crearlo</td></tr>
+<tr><td><code>pendiente</code></td><td>«No se pudo clasificar el concepto.»</td><td>El renglón es <code>sin-clasificar</code> (sección 17)</td></tr>
+<tr><td><code>pendiente</code></td><td>«La empresa lo registra como pendiente de contabilidad.»</td><td>La empresa decidió, tres veces o más y casi siempre, que este concepto queda pendiente: AgilBank lo aprendió (sección 14). Vale también para el IVA y la percepción del cargo</td></tr>
 <tr><td><code>a-revisar</code></td><td>«Más de un renglón coincide con el mismo valor.»</td><td>Dos renglones reclaman el mismo valor y no son intercambiables</td></tr>
 <tr><td><code>a-revisar</code></td><td>«Hay más de un valor que coincide con el renglón.»</td><td>En la ventana del renglón hay de 2 a 50 valores del mismo importe y ningún paso los pudo separar: ni el número, ni la contraparte, ni los intercambiables. Trae como candidatos los que siguen libres, cada uno por separado</td></tr>
 <tr><td><code>a-revisar</code></td><td>«Hay más de una combinación de valores que suma el importe.»</td><td>Un renglón se puede explicar con valores distintos que suman lo mismo</td></tr>
@@ -1030,6 +1152,17 @@ más débil del que depende: una propuesta nunca es más firme que el renglón e
 coincidan con un renglón que cierra con su saldo. Si un grupo de renglones se propone contra un valor,
 manda el más débil del grupo.</p>
 
+<p>Un <code>dbg</code> es <code>grounded</code> o <code>weak</code>, nunca <code>verified</code>: nadie
+de afuera lo confirma. Es <code>grounded</code> solo si la cuenta salió de lo que la empresa decidió, con
+decisiones suficientes (sección 14), y ninguna de estas cosas lo baja:</p>
+
+<ul>
+<li>Un renglón del grupo no encadena con su saldo (<code>encadena</code> en <code>false</code>): <code>weak</code>, con la marca <code>renglon-sin-control</code>.</li>
+<li>No hay cuenta (<code>cuenta</code> en <code>null</code>), o la cuenta salió de la historia o del catálogo (<code>origen</code> distinto de <code>decision</code>): <code>weak</code>.</li>
+<li>La cuenta sale de las decisiones, pero el grupo tiene IVA o percepción y la cuenta de IVA o la de percepción que necesita no vino de esas decisiones, sino del catálogo por nombre: <code>weak</code>.</li>
+<li>En un grupo que junta varios cargos del día (sección 13), otro de esos cargos aprendió otra cuenta o otro tipo de gasto: <code>weak</code>.</li>
+</ul>
+
 <h3>Las coincidencias</h3>
 
 <p>Son las pruebas de por qué se propuso el apareo. Solo vienen las que se dieron.</p>
@@ -1061,7 +1194,8 @@ manda el más débil del grupo.</p>
 </table></div>
 
 <p>Un renglón <code>pendiente</code> puede traer <code>cuentas-propias</code> y
-<code>lectura-con-aviso</code>. Las otras marcas solo vienen en un <code>apareo</code>.</p>
+<code>lectura-con-aviso</code>. Un <code>dbg</code> solo puede traer <code>renglon-sin-control</code>. Las otras marcas solo vienen
+en un <code>apareo</code>.</p>
 
 <h2><span class="nro">10</span> Cómo se aparea</h2>
 
@@ -1193,7 +1327,7 @@ propia solo por el CBU: un CUIT no alcanza.</p>
 <div class="desborde"><table>
 <thead><tr><th>Aviso</th><th>Qué pasa al conciliar</th></tr></thead>
 <tbody>
-<tr><td><code>no-cierra</code>, <code>lectura-parcial</code></td><td>Se concilia igual. Un importe exacto contra un valor de ProntoNet es evidencia propia, que no depende de que el extracto cierre. Todos los apareos salen <code>weak</code>, con la marca <code>lectura-con-aviso</code>. En la etapa siguiente, un <code>pendiente</code> de esta conciliación no se abrirá en propuestas de crear</td></tr>
+<tr><td><code>no-cierra</code>, <code>lectura-parcial</code></td><td>Se concilia igual. Un importe exacto contra un valor de ProntoNet es evidencia propia, que no depende de que el extracto cierre. Todos los apareos salen <code>weak</code>, con la marca <code>lectura-con-aviso</code>. Los <code>pendiente</code> no se abren en <code>dbg</code>: quedan <code>pendiente</code>, con la marca y el motivo «No hay un valor pendiente que coincida.»</td></tr>
 <tr><td><code>varias-cuentas</code>, <code>cuenta-distinta</code></td><td>No se concilia: 409 <code>OTRA_CUENTA</code>. Los valores son de otra cuenta</td></tr>
 </tbody>
 </table></div>
@@ -1263,7 +1397,282 @@ las que tienen error.</p>
 <p>Antes de eso, los controles de credencial son los de siempre: 401 <code>NO_AUTORIZADO</code> y
 403 <code>AMBITO_INSUFICIENTE</code>, <code>SIN_EMPRESA</code> o <code>SIN_USUARIO_DE_SERVICIO</code>.</p>
 
-<h2><span class="nro">13</span> Errores</h2>
+<h2><span class="nro">13</span> Cómo se arma un DBG</h2>
+
+<p>Un DBG es un gasto o un impuesto del banco que ProntoNet registra con su tipo de gasto y su cuenta.
+AgilBank propone uno por cada renglón que el apareo dejó sin valor y es de la familia «Gastos e
+impuestos del banco» (anexo, sección 17). Esta sección explica cómo arma el grupo, de dónde saca la
+cuenta y cómo conviene usar la propuesta.</p>
+
+<p>Qué renglones se abren:</p>
+
+<ul>
+<li>Solo los que el apareo dejó <code>pendiente</code>. Un renglón con <code>apareo</code> o <code>a-revisar</code> sigue como estaba.</li>
+<li>Una transferencia entre cuentas propias sigue <code>pendiente</code>.</li>
+<li>Con una lectura con aviso (<code>no-cierra</code> o <code>lectura-parcial</code>) no se abre ninguno.</li>
+<li>Los renglones de la familia «Movimientos con terceros» y los <code>sin-clasificar</code> siguen <code>pendiente</code>, con su motivo (sección 09). La empresa puede enseñarle a AgilBank lo contrario: que un concepto de terceros es un DBG, o que un gasto del banco queda pendiente (sección 14).</li>
+</ul>
+
+<h3>El cargo, el IVA y la percepción</h3>
+
+<p>Un <b>cargo</b> es un renglón de gastos del banco que no es un IVA, una percepción de IVA ni uno de los
+que van siempre solos (abajo): una comisión, intereses, el impuesto de sellos. ProntoNet registra el
+cargo, su IVA y su percepción de IVA en un solo DBG, y AgilBank los agrupa. Un IVA o una percepción de
+IVA se pega a un cargo del mismo signo cuando:</p>
+
+<ol>
+<li><b>Comparten el número</b> (<code>referencia</code>). Si hay cargos con su mismo número, manda el número y no se mira nada más.</li>
+<li><b>O, si ninguno comparte el número, están cerca y cierran con la alícuota.</b> Son del mismo día, están a 3 renglones o menos (por <code>orden</code>) y el importe del IVA es la alícuota sobre el cargo, con una tolerancia de un centavo. Las alícuotas del IVA son 21 %, 10,5 % y 27 %. Las de la percepción de IVA, 3 % y 1,5 %.</li>
+</ol>
+
+<p>Se pega solo si hay <b>un único</b> cargo que podría ser el suyo. Si pueden ser dos o más, el IVA queda
+solo: AgilBank no elige. Un cargo lleva a lo sumo un IVA y una percepción. Si el lugar ya está tomado,
+el segundo queda solo.</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Renglones del extracto</th><th>Grupos</th></tr></thead>
+<tbody>
+<tr><td>Comisión −1.000,00 · IVA −210,00 · percepción de IVA −30,00, del mismo día y seguidos</td><td>Uno: el cargo, el IVA y la percepción. <code>importe</code> −1.240,00, <code>iva</code> −210,00, <code>percepcion</code> −30,00</td></tr>
+<tr><td>Dos comisiones de −1.000,00 el mismo día, y un IVA de −210,00</td><td>Dos grupos de un cargo, y el IVA solo: podría ser de cualquiera de las dos</td></tr>
+</tbody>
+</table></div>
+
+<h4>El IVA del día</h4>
+
+<p>Un IVA que no cierra con ningún cargo por separado puede ser el de varias comisiones del mismo día.
+AgilBank lo agrupa con ellas si se cumple todo esto:</p>
+
+<ul>
+<li>Son dos o más cargos del <b>mismo día, del mismo signo y del mismo tipo</b>, y están todos los de ese tipo ese día.</li>
+<li>Ninguno tiene ya un IVA o una percepción propios.</li>
+<li>La <b>suma</b> de sus importes cierra con la alícuota del IVA, con la tolerancia de un centavo.</li>
+<li>Hay una sola forma de agrupar: el IVA no cierra con las sumas de dos tipos distintos (cuenta también un tipo de un solo cargo), y ningún otro IVA del día cierra con la misma suma.</li>
+</ul>
+
+<p>Si hay más de una forma de agrupar, no se elige ninguna y el IVA queda solo. La percepción de IVA no
+se suma de esta manera: suele ser sobre una parte de los cargos. Un grupo así lleva el cargo primero en
+<code>renglones</code>, después los otros cargos, y al final el IVA. El grupo se deshace, y el IVA queda
+solo, si lo que la empresa decidió manda a uno de sus cargos a otro lado: uno a <code>dbg</code> y otro a
+<code>pendiente</code>.</p>
+
+<h4>Lo que va siempre solo</h4>
+
+<p>Estos tipos nunca se agrupan: cada renglón es un DBG propio. <code>percepcion-iibb</code>,
+<code>sircreb</code>, <code>recaudacion-iibb</code>, <code>impuesto-debitos</code>,
+<code>impuesto-creditos</code>, <code>impuesto-25413</code>, <code>devolucion-impuesto</code> y
+<code>anulacion-debito</code>.</p>
+
+<p>Un IVA o una percepción de IVA que quedó solo también es un DBG propio. Lleva la cuenta y el tipo de
+gasto donde la empresa registra el IVA: los del DBG de la historia que trae IVA, y no los de una
+comisión sin IVA. Todo su <code>importe</code> es <code>iva</code> (o <code>percepcion</code>). Sin historia, sale sin
+cuenta.</p>
+
+<h3>Cómo usar un grupo</h3>
+
+<p><b>Cada renglón del grupo lleva la misma propuesta.</b> Los tres renglones del ejemplo de la sección 09
+traen el mismo <code>tipoMovimiento</code>, las mismas cuentas, el mismo <code>importe</code> y la misma
+lista <code>renglones</code>. Cada uno trae su <code>idPropuesta</code> y su <code>idRenglon</code>. Un DBG por
+grupo distinto, no uno por propuesta: dos propuestas con la misma lista <code>renglones</code> son el
+mismo DBG, y sumarlas contaría el grupo dos veces. Si piden solo algunos renglones, el grupo se arma igual
+con todos los del extracto, y <code>renglones</code> los trae completos.</p>
+
+<p><b>Para consolidar</b>, junten los grupos que tengan la misma <code>claveAgrupacion</code>: el mismo tipo
+de gasto, en la misma cuenta, en el mismo mes del cargo. Suma el <code>importe</code>, el <code>iva</code> y la
+<code>percepcion</code> de cada grupo, una vez por grupo. Un grupo sin cuenta (<code>cuenta</code> en
+<code>null</code>) no se junta con otros: el usuario elige la cuenta primero.</p>
+
+<h3>De dónde sale la cuenta</h3>
+
+<p>AgilBank busca el tipo de gasto y la cuenta en cuatro lugares, de lo más firme a lo más débil, y se
+queda con el primero que sirve. El <code>origen</code> dice cuál fue.</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Origen</th><th>De dónde sale</th><th>Confianza</th></tr></thead>
+<tbody>
+<tr><td><code>decision</code></td><td><b>Lo que la empresa decidió.</b> El tipo de gasto y las cuentas que el usuario eligió para este concepto en decisiones anteriores (sección 14). Gana aunque haya pocas decisiones. Se usa si el tipo de gasto, con el coeficiente del renglón, y la cuenta siguen en los catálogos del pedido; si no, se pasa a lo que sigue. Si la decisión no trae la cuenta de IVA o la de percepción, se toma la del catálogo por nombre</td><td><code>grounded</code> con decisiones suficientes, si no <code>weak</code></td></tr>
+<tr><td><code>historia</code></td><td><b>Su historia.</b> De <code>historiaDbg</code>, el par (tipo de gasto, cuenta) con más importe acumulado para ese tipo de cargo y ese coeficiente. Lo reciente pesa más: cada DBG vale su importe por <code>0,5</code> elevado a los días que pasaron sobre 180, contados hasta el día de la conciliación. Si la empresa cambió de cuenta, gana la nueva</td><td><code>weak</code></td></tr>
+<tr><td><code>catalogo</code></td><td><b>El catálogo, por nombre.</b> La única cuenta de <code>cuentasImputables</code> cuyo nombre trae las palabras del tipo de cargo (comisión, intereses, sellos, impuesto con débito o crédito, SIRCREB, IIBB), y el único tipo de gasto con ese coeficiente. Si hay más de una o ninguna, no elige</td><td><code>weak</code></td></tr>
+<tr><td><code>ninguno</code></td><td><b>Sin cuenta.</b> <code>cuenta</code> en <code>null</code>. El <code>tipoMovimiento</code> puede venir igual, si el catálogo tiene uno solo con ese coeficiente</td><td><code>weak</code></td></tr>
+</tbody>
+</table></div>
+
+<p>De la historia y del catálogo salen también la cuenta de IVA y la de percepción: la única cuenta de
+<code>cuentasIvaYPercepciones</code> que dice «IVA» y no «percep», y la única que dice las dos cosas. Si hay más de
+una, queda en <code>null</code>.</p>
+
+<p>AgilBank reconoce de qué tipo de cargo es cada DBG de la historia por el nombre de su cuenta y de su
+tipo de gasto. No distingue los impuestos sobre débitos de los impuestos sobre créditos, ni SIRCREB de las
+recaudaciones de IIBB: para cada una de esas dos familias usa el mismo par, y separa los débitos de los
+créditos por el <code>coeficiente</code>.</p>
+
+<h2><span class="nro">14</span> Informar las decisiones</h2>
+
+<h3><span class="verbo">POST</span> <code>/api/v1/decisiones</code></h3>
+
+<p>ProntoNet informa lo que el usuario hizo con las propuestas: las aceptó, las corrigió o las rechazó.
+AgilBank registra cada decisión y aprende de las que sirven, para proponer mejor la próxima vez. El
+ámbito es <code>ab:decidir</code>. El cuerpo es JSON en UTF-8, con
+<code>Content-Type: application/json</code>, hasta 16 MB. La empresa sale de la credencial.</p>
+
+<div class="desborde"><pre><code>{
+  "decisiones": [
+    {
+      "idConciliacion": "3f6c2a9e-5b1d-4c7a-9e02-6d1b8f4a7c35",
+      "idPropuesta": "c4a7e2f1-3b08-4d95-a6e1-90f2d58b7c34",
+      "resultado": "corregida",
+      "elegido": {
+        "tipo": "dbg",
+        "tipoMovimiento": 7,
+        "cuenta": 312,
+        "cuentaIva": 520,
+        "cuentaPercepcion": null
+      }
+    },
+    {
+      "idConciliacion": "3f6c2a9e-5b1d-4c7a-9e02-6d1b8f4a7c35",
+      "idPropuesta": "8a41d0c2-6e37-4f5b-b1a9-02c5e7d93f18",
+      "resultado": "aceptada",
+      "elegido": { "tipo": "apareo", "valores": [90210] }
+    }
+  ]
+}</code></pre></div>
+
+<p>Hasta 1.500 decisiones por pedido, de hasta 50 conciliaciones distintas. Cada decisión lleva:</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Clave</th><th>Obligatoria</th><th>Qué es</th></tr></thead>
+<tbody>
+<tr><td><code>idConciliacion</code></td><td><span class="oblig">Sí</span></td><td>El <code>idConciliacion</code> de la respuesta de la conciliación. Texto de hasta 100 caracteres, o un entero</td></tr>
+<tr><td><code>idPropuesta</code></td><td><span class="oblig">Sí</span></td><td>El <code>idPropuesta</code> de la propuesta decidida. Tiene que ser de esa conciliación</td></tr>
+<tr><td><code>resultado</code></td><td><span class="oblig">Sí</span></td><td><code>aceptada</code> (el usuario dejó lo propuesto), <code>corregida</code> (eligió otra cosa) o <code>rechazada</code> (no era eso)</td></tr>
+<tr><td><code>elegido</code></td><td><span class="oblig">Sí</span></td><td>Lo que quedó, con el <code>tipo</code> y los campos de abajo. Se informa también en una <code>aceptada</code>: AgilBank aprende de lo elegido, no de lo propuesto</td></tr>
+</tbody>
+</table></div>
+
+<p>Dentro de <code>elegido</code>, el <code>tipo</code> es <code>apareo</code>, <code>dbg</code> o <code>pendiente</code>.
+(<code>a-revisar</code> no se elige: es una propuesta, no un resultado.)</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Tipo</th><th>Campos</th></tr></thead>
+<tbody>
+<tr><td><code>apareo</code></td><td><code>valores</code>: los <code>idValor</code> elegidos, o <code>null</code> si faltan. Cada uno, texto de hasta 100 caracteres o un entero. Hasta 20.000</td></tr>
+<tr><td><code>dbg</code></td><td><code>tipoMovimiento</code> y <code>cuenta</code>, <span class="oblig">obligatorios</span>: el <code>id</code> del tipo de gasto y el <code>id</code> de la cuenta, tal como están en los catálogos de la conciliación. Van como un texto o un entero, no como el objeto <code>{ "id": … }</code> de la propuesta. <code>cuentaIva</code> y <code>cuentaPercepcion</code> pueden faltar o ir en <code>null</code>. Un DBG sin cuenta no enseña nada, por eso se exigen</td></tr>
+<tr><td><code>pendiente</code></td><td>Ningún campo más</td></tr>
+</tbody>
+</table></div>
+
+<p>De <code>elegido</code> se guardan solo los campos de esta tabla. Cualquier otra clave se ignora, también en
+el resto del cuerpo.</p>
+
+<h4>La respuesta</h4>
+
+<p><b>200</b>, aunque alguna decisión se rechace. Cada decisión se registra por separado: las rechazadas
+no frenan a las demás.</p>
+
+<div class="desborde"><pre><code>{
+  "registradas": ["c4a7e2f1-3b08-4d95-a6e1-90f2d58b7c34"],
+  "rechazadas": [
+    {
+      "idPropuesta": "8a41d0c2-6e37-4f5b-b1a9-02c5e7d93f18",
+      "motivo": "La propuesta no está en esa conciliación."
+    }
+  ]
+}</code></pre></div>
+
+<p><code>registradas</code> y <code>rechazadas</code> traen el <code>idPropuesta</code> de cada decisión, en el orden del
+pedido. Estos son los motivos de rechazo. Son de una decisión, no del pedido:</p>
+
+<div class="desborde"><table>
+<thead><tr><th>Motivo</th><th>Cuándo</th></tr></thead>
+<tbody>
+<tr><td>«No hay una conciliación con ese identificador en esta empresa.»</td><td>No existe, o es de otra empresa. Las dos cosas responden igual</td></tr>
+<tr><td>«La propuesta no está en esa conciliación.»</td><td>El <code>idPropuesta</code> no es de esa conciliación</td></tr>
+<tr><td>«La conciliación es anterior a las decisiones: hay que volver a conciliar.»</td><td>La conciliación se hizo antes de que existieran las decisiones y no guardó los datos del renglón. Se vuelve a conciliar y se decide sobre la nueva</td></tr>
+<tr><td>«Lo elegido lleva más de 20.000 valores.»</td><td>Un <code>apareo</code> con más de 20.000 <code>valores</code></td></tr>
+</tbody>
+</table></div>
+
+<h4>Los errores del pedido</h4>
+
+<p>Un error del pedido corta todo: no se registra ninguna decisión. Los controles van en este orden y se
+responde con el primero que falla. Los de las credenciales y del cuerpo son los de la conciliación (sección 08).</p>
+
+<div class="desborde"><table>
+<thead><tr><th class="num">#</th><th>Control</th><th>HTTP</th><th>Código</th></tr></thead>
+<tbody>
+<tr><td class="num">1</td><td>El pedido no trae credencial. Se responde antes de leer el cuerpo</td><td>401</td><td><code>NO_AUTORIZADO</code></td></tr>
+<tr><td class="num">2</td><td>El pedido no trae <code>Content-Type: application/json</code>, o el cuerpo usa una codificación o un juego de caracteres que no se acepta</td><td>415</td><td><code>CUERPO_NO_SOPORTADO</code></td></tr>
+<tr><td class="num">3</td><td>El cuerpo pesa más de 16 MB</td><td>413</td><td><code>CUERPO_DEMASIADO_GRANDE</code></td></tr>
+<tr><td class="num">4</td><td>El cuerpo no es un JSON válido, o llegó incompleto</td><td>400</td><td><code>DECISION_INVALIDA</code>, con <code>"campo": null</code></td></tr>
+<tr><td class="num">5</td><td>La credencial es inválida, venció o fue revocada, o se dio de baja su usuario de servicio</td><td>401</td><td><code>NO_AUTORIZADO</code></td></tr>
+<tr><td class="num">6</td><td>La credencial no tiene el ámbito <code>ab:decidir</code></td><td>403</td><td><code>AMBITO_INSUFICIENTE</code></td></tr>
+<tr><td class="num">7</td><td>La credencial no está asociada a una empresa, o no tiene usuario de servicio. No ocurre con credenciales emitidas por nosotros</td><td>403</td><td><code>SIN_EMPRESA</code>, <code>SIN_USUARIO_DE_SERVICIO</code></td></tr>
+<tr><td class="num">8</td><td>El pedido o una decisión no tiene la forma indicada, o pasa un tope</td><td>400</td><td><code>DECISION_INVALIDA</code>, con <code>campo</code></td></tr>
+</tbody>
+</table></div>
+
+<p>El <code>campo</code> de un <code>DECISION_INVALIDA</code> es uno de estos: <code>decisiones</code> (el cuerpo no
+es un objeto, no trae la lista, trae más de 1.500, o un elemento no es un objeto), <code>resultado</code>,
+<code>elegido</code>, <code>elegido.tipo</code>, <code>elegido.cuenta</code>, <code>elegido.tipoMovimiento</code>,
+<code>elegido.cuentaIva</code>, <code>elegido.cuentaPercepcion</code>, <code>elegido.valores</code>,
+<code>idConciliacion</code> (también cuando el pedido trae decisiones de más de 50 conciliaciones) o
+<code>idPropuesta</code>. En una decisión se controla en ese orden. Si en un <code>dbg</code> faltan o están mal las dos,
+la cuenta y el tipo de gasto, el campo que se informa es <code>elegido.cuenta</code>.</p>
+
+<div class="desborde"><pre><code>{
+  "codigo": "DECISION_INVALIDA",
+  "error": "Una decisión no tiene la forma del contrato.",
+  "campo": "elegido.cuenta"
+}</code></pre></div>
+
+<h3>Qué reemplaza lo que se repite</h3>
+
+<p>AgilBank guarda <b>una decisión por renglón de cada conciliación</b>. Informar otra decisión sobre el
+mismo renglón de la misma conciliación reemplaza la anterior: la última manda.</p>
+
+<p>En un grupo de DBG, <b>decidir sobre cualquier renglón del grupo es decidir el grupo</b>. La decisión
+se guarda con el renglón del cargo, que va primero en <code>renglones</code>, sea cual sea la propuesta
+sobre la que se informó. Los tres renglones del ejemplo de la sección 09 son una sola decisión, y si se
+informan las tres, la última reemplaza a las anteriores. Para el aprendizaje también cuentan una vez.</p>
+
+<h3>Cómo aprende AgilBank</h3>
+
+<p>Una decisión enseña si es sobre una propuesta <code>dbg</code> o <code>pendiente</code> y lo que se eligió es
+<code>dbg</code> o <code>pendiente</code>. <b>Una decisión sobre un <code>apareo</code> o un <code>a-revisar</code> se
+registra, pero no enseña</b>, y tampoco una decisión que termina en un <code>apareo</code>. Lo aprendido
+es de <b>esa empresa y de ese banco</b>: nada cruza de una empresa a otra, ni de un banco a otro. Se leen las
+5.000 decisiones más recientes de la empresa en ese banco.</p>
+
+<p>El aprendizaje es por <b>concepto</b>: el banco, el código de operación y el texto del concepto sin sus
+números. Todos los renglones con el mismo concepto cuentan juntos. Un renglón cuenta una sola vez, con su
+decisión más reciente, aunque lo hayan decidido en varias conciliaciones.</p>
+
+<p>Cada decisión tiene un <b>peso</b> que cae a la mitad cada 180 días: vale 1 el día que se informa, 0,5 a los 180 días y 0,25
+a los 360. Se cuenta desde el día en que se informó hasta el día de la conciliación. Lo reciente pesa más
+que lo viejo, y si la empresa cambia de criterio, el criterio nuevo termina ganando.</p>
+
+<p>AgilBank toma una cuenta como <code>grounded</code> cuando se cumplen las tres cosas:</p>
+
+<ul>
+<li>Hay <b>3 decisiones</b> o más sobre el concepto.</li>
+<li>El <b>80 %</b> o más del peso está en el mismo par: el mismo tipo de gasto y las mismas cuentas de cargo, de IVA y de percepción.</li>
+<li>La última decisión, sin contar las rechazadas, es de <b>menos de un año</b>.</li>
+</ul>
+
+<p>Si no se cumplen, se usa igual el par de más peso, pero la propuesta sale <code>weak</code>. La misma
+regla de 3 decisiones y 80 % decide si el concepto sale <code>dbg</code> o <code>pendiente</code>: con eso,
+un concepto de terceros que la empresa siempre crea como DBG pasa a proponerse como <code>dbg</code>, y un gasto del
+banco que siempre deja pendiente pasa a <code>pendiente</code> con el motivo «La empresa lo registra como pendiente
+de contabilidad.». La decisión sobre un cargo vale para todo su grupo: el IVA y la percepción lo siguen.</p>
+
+<p><b>Una decisión rechazada no enseña.</b> Cuenta en el total de las decisiones, pero no suma a ningún
+par, y le resta su peso al par que se había propuesto.</p>
+
+<p>La decisión de la empresa pasa por encima de la historia y del catálogo (sección 13). Un DBG que sale
+de las decisiones baja a <code>weak</code> si la cuenta de IVA o de percepción que necesita no vino de esas
+decisiones. Si una cuenta aprendida ya no está en el catálogo del pedido, se ignora y se sigue con la historia.</p>
+
+<h2><span class="nro">15</span> Errores</h2>
 
 <p>Los errores de las rutas de esta referencia traen el código HTTP y un cuerpo JSON:</p>
 
@@ -1275,7 +1684,7 @@ las que tienen error.</p>
 
 <p><code>codigo</code> es estable: programen contra él. <code>error</code> es un mensaje en castellano,
 para mostrar o registrar, y puede cambiar. <code>campo</code> viene solo en <code>CUENTA_INVALIDA</code>,
-<code>CORRECCION_INVALIDA</code> y <code>PEDIDO_INVALIDO</code>: nombra la clave con el problema, o es <code>null</code> si el
+<code>CORRECCION_INVALIDA</code>, <code>PEDIDO_INVALIDO</code> y <code>DECISION_INVALIDA</code>: nombra la clave con el problema, o es <code>null</code> si el
 problema es del cuerpo entero. En <code>PEDIDO_INVALIDO</code> trae además <code>idValor</code>
 cuando el problema está en un valor.</p>
 
@@ -1285,7 +1694,7 @@ cuando el problema está en un valor.</p>
 <tr><td><code>NO_AUTORIZADO</code></td><td class="num">401</td><td>La credencial falta, es inválida, venció o fue revocada, o se dio de baja su usuario de servicio</td></tr>
 <tr><td><code>AMBITO_INSUFICIENTE</code></td><td class="num">403</td><td>La credencial no tiene el ámbito que pide la ruta</td></tr>
 <tr><td><code>SIN_EMPRESA</code></td><td class="num">403</td><td>La credencial no está asociada a una empresa. No ocurre con credenciales emitidas por nosotros</td></tr>
-<tr><td><code>SIN_USUARIO_DE_SERVICIO</code></td><td class="num">403</td><td>Enviar, corregir, conciliar o subir un lote con una credencial sin usuario de servicio. Las consultas no lo piden. No ocurre con credenciales emitidas por nosotros</td></tr>
+<tr><td><code>SIN_USUARIO_DE_SERVICIO</code></td><td class="num">403</td><td>Enviar, corregir, conciliar, subir un lote o informar decisiones con una credencial sin usuario de servicio. Las consultas no lo piden. No ocurre con credenciales emitidas por nosotros</td></tr>
 <tr><td><code>ENVIO_NO_MULTIPART</code></td><td class="num">415</td><td>El envío del extracto no es <code>multipart/form-data</code></td></tr>
 <tr><td><code>ENVIO_INVALIDO</code></td><td class="num">400</td><td>El cuerpo del envío está mal formado o cortado, trae más de una parte de archivo, sea cual sea su nombre, o la parte <code>archivo</code> no trae <code>filename</code>. En <code>POST /api/v1/lotes</code>, también cuando el pedido no es <code>multipart/form-data</code>, y falta o llegó vacía la parte <code>archivo</code></td></tr>
 <tr><td><code>FALTA_ARCHIVO</code></td><td class="num">400</td><td>Falta la parte <code>archivo</code>, o llegó vacía</td></tr>
@@ -1294,9 +1703,10 @@ cuando el problema está en un valor.</p>
 <tr><td><code>HUELLA_INVALIDA</code></td><td class="num">400</td><td>La huella de la ruta no son 64 caracteres hexadecimales</td></tr>
 <tr><td><code>NO_ENCONTRADO</code></td><td class="num">404</td><td>No hay un extracto con ese identificador o esa huella, ni una conciliación con ese identificador, en la empresa de la credencial</td></tr>
 <tr><td><code>CORRECCION_INVALIDA</code></td><td class="num">400</td><td>La corrección no tiene la forma indicada, el cuerpo no es un JSON válido o llegó incompleto. Trae <code>campo</code></td></tr>
-<tr><td><code>CUERPO_DEMASIADO_GRANDE</code></td><td class="num">413</td><td>El cuerpo de una corrección pesa más de 64 KB, o el de un pedido de conciliación, más de 16 MB</td></tr>
-<tr><td><code>CUERPO_NO_SOPORTADO</code></td><td class="num">415</td><td>El cuerpo de una corrección o de un pedido de conciliación usa una codificación de contenido o un juego de caracteres que no se acepta, o un pedido de conciliación no trae <code>Content-Type: application/json</code>. Se acepta JSON en UTF-8</td></tr>
+<tr><td><code>CUERPO_DEMASIADO_GRANDE</code></td><td class="num">413</td><td>El cuerpo de una corrección pesa más de 64 KB, o el de un pedido de conciliación o de decisiones, más de 16 MB</td></tr>
+<tr><td><code>CUERPO_NO_SOPORTADO</code></td><td class="num">415</td><td>El cuerpo de una corrección, de un pedido de conciliación o de decisiones usa una codificación de contenido o un juego de caracteres que no se acepta, o un pedido de conciliación o de decisiones no trae <code>Content-Type: application/json</code>. Se acepta JSON en UTF-8</td></tr>
 <tr><td><code>PEDIDO_INVALIDO</code></td><td class="num">400</td><td>El pedido de conciliación no tiene la forma indicada, un renglón o un lote pedido no existe, o el cuerpo no es un JSON válido o llegó incompleto. Trae <code>campo</code> y, si el problema está en un valor, <code>idValor</code> (sección 08)</td></tr>
+<tr><td><code>DECISION_INVALIDA</code></td><td class="num">400</td><td>El pedido de decisiones o una decisión no tiene la forma indicada, pasa un tope, o el cuerpo no es un JSON válido o llegó incompleto. Trae <code>campo</code> (sección 14). Una decisión que no se puede registrar por otro motivo no es un error: vuelve en <code>rechazadas</code> con su motivo</td></tr>
 <tr><td><code>EXTRACTO_SIN_LEER</code></td><td class="num">409</td><td>Se pidió conciliar un extracto que todavía no está leído: está <code>en-proceso</code> o <code>fallido</code></td></tr>
 <tr><td><code>SIN_LECTURA</code></td><td class="num">409</td><td>Se pidió conciliar un extracto cuya lectura tiene el veredicto <code>sin-lectura</code> o <code>no-disponible</code></td></tr>
 <tr><td><code>OTRA_CUENTA</code></td><td class="num">409</td><td>Se pidió conciliar un extracto cuya lectura trae el aviso <code>varias-cuentas</code> o <code>cuenta-distinta</code></td></tr>
@@ -1309,11 +1719,11 @@ cuando el problema está en un valor.</p>
 <p>Dos respuestas llegan sin <code>codigo</code>:</p>
 
 <ul>
-<li><b>429</b>, cuando se pasa el cupo de pedidos (sección 14). Trae el encabezado <code>Retry-After</code>, con los segundos que faltan para que se reinicie la ventana, y el cuerpo <code>{ "error": "Too many requests, please try again later." }</code>, en inglés.</li>
+<li><b>429</b>, cuando se pasa el cupo de pedidos (sección 16). Trae el encabezado <code>Retry-After</code>, con los segundos que faltan para que se reinicie la ventana, y el cuerpo <code>{ "error": "Too many requests, please try again later." }</code>, en inglés.</li>
 <li><b>404</b> de una ruta que no existe. En un <code>GET</code> el cuerpo es <code>{ "error": "Not found", "message": … }</code>. Con otros verbos, la respuesta es la página de error del servidor web, no JSON.</li>
 </ul>
 
-<h2><span class="nro">14</span> Límites</h2>
+<h2><span class="nro">16</span> Límites</h2>
 
 <div class="desborde"><table>
 <thead><tr><th>Qué</th><th>Límite</th></tr></thead>
@@ -1335,7 +1745,13 @@ cuando el problema está en un valor.</p>
 <tr><td>Valores de una conciliación</td><td>20.000</td></tr>
 <tr><td>Lotes de una conciliación</td><td>50</td></tr>
 <tr><td><code>ventanaDias</code></td><td>Un entero de 0 a 31. Si falta, 5</td></tr>
-<tr><td>El cuerpo de un pedido de conciliación</td><td>16 MB</td></tr>
+<tr><td>El cuerpo de un pedido de conciliación o de decisiones</td><td>16 MB</td></tr>
+<tr><td><code>tiposGastoBancario</code></td><td>100 tipos</td></tr>
+<tr><td><code>cuentasImputables</code> y <code>cuentasIvaYPercepciones</code></td><td>10.000 cuentas entre las dos listas</td></tr>
+<tr><td><code>historiaDbg</code></td><td>5.000 DBG</td></tr>
+<tr><td>Decisiones de un pedido</td><td>1.500, de hasta 50 conciliaciones distintas</td></tr>
+<tr><td><code>valores</code> de lo elegido en una decisión</td><td>20.000. Con más, la decisión se rechaza con su motivo</td></tr>
+<tr><td>Decisiones que se leen para aprender</td><td>Las 5.000 más recientes de la empresa en el banco del extracto</td></tr>
 <tr><td>Transferencias de un lote</td><td>5.000</td></tr>
 <tr><td>El archivo de un lote</td><td>10 MB</td></tr>
 <tr><td>El tiempo de una conciliación</td><td>6 segundos por pedido, y 2 segundos por cada búsqueda de una suma. Pasado el tiempo, lo que no se terminó de buscar vuelve <code>a-revisar</code> (sección 10)</td></tr>
@@ -1354,7 +1770,7 @@ cuando el problema está en un valor.</p>
 
 <p>Un extracto diario en planilla o texto suele leerse en menos de un minuto. Un resumen mensual escaneado de unas 40 páginas puede tardar varios minutos. No es un plazo: consulten hasta que el estado deje de ser <code>en-proceso</code>. Si sigue <code>en-proceso</code> más de 30 minutos, envíenlo de nuevo; si la respuesta es 200 con <code>en-proceso</code>, sigan consultando y vuelvan a enviarlo más tarde.</p>
 
-<h2><span class="nro">15</span> Anexo: los tipos canónicos</h2>
+<h2><span class="nro">17</span> Anexo: los tipos canónicos</h2>
 
 <p>Hay 30 tipos, en tres familias: «Movimientos con terceros», «Gastos e impuestos del banco» y
 «Sin tipo». Estos son los valores de <code>tipo.codigo</code> en la lectura y de <code>tipo</code> en las
@@ -1396,6 +1812,6 @@ correcciones.</p>
 </tbody>
 </table></div>
 
-<p class="pie">API de AgilBank · 15-10-2026</p>
+<p class="pie">API de AgilBank · 16-10-2026</p>
 
 </div>
