@@ -303,7 +303,7 @@ envían, más se controla. Las claves que no figuran en la tabla se ignoran.</p>
 <div class="desborde"><pre><code>{
   "banco": "BANCO CREDICOOP CENTRAL",
   "numero": "CTA CTE. PESOS $ 191-001-055555/5",
-  "cbu": "1910001800005555555555",
+  "cbu": "1910001800005555555556",
   "moneda": "Pesos",
   "periodoDesde": "2026-07-01",
   "periodoHasta": "2026-07-31",
@@ -417,9 +417,9 @@ autenticación va antes de leer el cuerpo.</p>
 <thead><tr><th class="num">#</th><th>Control</th><th>HTTP</th><th>Código</th></tr></thead>
 <tbody>
 <tr><td class="num">1</td><td>La credencial falta, es inválida, venció o fue revocada, o se dio de baja su usuario de servicio</td><td>401</td><td><code>NO_AUTORIZADO</code></td></tr>
-<tr><td class="num">2</td><td>La credencial no tiene el ámbito <code>ab:leer</code></td><td>403</td><td><code>AMBITO_INSUFICIENTE</code></td></tr>
-<tr><td class="num">3</td><td>La credencial no está asociada a una empresa. No ocurre con credenciales emitidas por nosotros</td><td>403</td><td><code>SIN_EMPRESA</code></td></tr>
-<tr><td class="num">4</td><td>La credencial no tiene usuario de servicio. No ocurre con credenciales emitidas por nosotros</td><td>403</td><td><code>SIN_USUARIO_DE_SERVICIO</code></td></tr>
+<tr><td class="num">2</td><td>El cuerpo usa una codificación de contenido o un juego de caracteres que no se acepta</td><td>415</td><td><code>CUERPO_NO_SOPORTADO</code></td></tr>
+<tr><td class="num">3</td><td>El cuerpo pesa más de 16 MB</td><td>413</td><td><code>CUERPO_DEMASIADO_GRANDE</code></td></tr>
+<tr><td class="num">4</td><td>El cuerpo no es un JSON válido, o llegó incompleto</td><td>400</td><td><code>PEDIDO_INVALIDO</code>, con <code>"campo": null</code></td></tr>
 <tr><td class="num">5</td><td>El pedido no es <code>multipart/form-data</code></td><td>415</td><td><code>ENVIO_NO_MULTIPART</code></td></tr>
 <tr><td class="num">6</td><td>El cuerpo está mal formado o cortado, o trae más de una parte de archivo, sea cual sea su nombre (por ejemplo, la <code>cuenta</code> enviada como archivo), o la parte <code>archivo</code> no trae <code>filename</code></td><td>400</td><td><code>ENVIO_INVALIDO</code></td></tr>
 <tr><td class="num">7</td><td>Falta la parte <code>archivo</code>, o llegó vacía</td><td>400</td><td><code>FALTA_ARCHIVO</code></td></tr>
@@ -481,7 +481,7 @@ pedidos (sección 14): respeten el encabezado <code>Retry-After</code> de un 429
   "encabezado": {
     "banco": { "codigo": "191", "nombre": "Banco Credicoop Cooperativo Limitado" },
     "cuenta": "CTA CTE. PESOS $ 191-001-055555/5",
-    "cbu": "1910001800005555555555",
+    "cbu": "1910001800005555555556",
     "moneda": "Pesos",
     "periodoDesde": "2026-07-01",
     "periodoHasta": "2026-07-31",
@@ -499,11 +499,11 @@ pedidos (sección 14): respeten el encabezado <code>Retry-After</code> de un 429
       "saldo": 1265432.65,
       "referencia": "100123",
       "contraparte": {
-        "cuit": "30234567892", "nombre": "ACME", "cbu": null
+        "cuit": "30234567893", "nombre": "ACME", "cbu": null
       },
       "delBanco": {
         "codigo": "974",
-        "texto": "Transf. Interbanking - Distinto Titular Ord.:30234567892-ACME",
+        "texto": "Transf. Interbanking - Distinto Titular Ord.:30234567893-ACME",
         "complementos": []
       },
       "encadena": null,
@@ -644,7 +644,7 @@ Si trae datos, vienen en <code>datos</code>.</p>
 
 <p>Para la conciliación, «frena las propuestas» no quiere decir lo mismo en todos los avisos. La
 sección 10 dice qué pasa con cada uno al conciliar: con <code>no-cierra</code> y
-<code>lectura-parcial</code> se concilia igual, con todo en <code>weak</code>.</p>
+<code>lectura-parcial</code> se concilia igual, con todos los apareos en <code>weak</code>.</p>
 
 <h2><span class="nro">07</span> Las correcciones</h2>
 
@@ -715,17 +715,21 @@ con qué valor se corresponde cada renglón. La respuesta es inmediata: tarda se
 de la lectura. El ámbito es <code>ab:conciliar</code>.</p>
 
 <p>El cuerpo es JSON en UTF-8, con <code>Content-Type: application/json</code>. Todas las claves son
-opcionales, pero sin <code>valores</code> no hay nada con qué aparear.</p>
+opcionales, pero sin <code>valores</code> no hay nada con qué aparear. Una clave que no se quiere
+enviar se omite: <code>null</code> no vale en <code>renglones</code>, <code>valores</code>,
+<code>contrapartes</code>, <code>cuentasPropias</code>, <code>lotes</code> ni <code>ventanaDias</code>, y
+responde 400. Dentro de cada valor, en cambio, los datos opcionales sí pueden ir en <code>null</code>.</p>
 
 <div class="nota">
-<p><b>Un cuidado.</b> Sin el encabezado <code>Content-Type: application/json</code> el cuerpo se
-ignora, y AgilBank concilia un pedido sin valores: todos los renglones vuelven <code>pendiente</code>.</p>
+<p><b>Un cuidado.</b> Hoy, sin el encabezado <code>Content-Type: application/json</code> el cuerpo se
+ignora, y el pedido se trata como vacío: AgilBank concilia sin valores y todos los renglones vuelven
+<code>pendiente</code>. Lo mismo pasa si el pedido va sin cuerpo.</p>
 </div>
 
 <div class="desborde"><table>
 <thead><tr><th>Clave</th><th>Qué es</th></tr></thead>
 <tbody>
-<tr><td><code>renglones</code></td><td>Los <code>id</code> de los renglones que se piden, tal como vienen en la lectura. Hasta 1.500. Si falta, se piden todos los del extracto. Un id que no está en la lectura responde 400</td></tr>
+<tr><td><code>renglones</code></td><td>Los <code>id</code> de los renglones que se piden, tal como vienen en la lectura. Hasta 1.500, cada uno un texto no vacío. Si falta, se piden todos los del extracto. Un id que no está en la lectura responde 400</td></tr>
 <tr><td><code>valores</code></td><td>Los valores pendientes de la cuenta. Hasta 20.000. Se describen abajo</td></tr>
 <tr><td><code>contrapartes</code></td><td>Un objeto con <code>proveedores</code> y <code>clientes</code>, cada uno una lista. Se describe abajo</td></tr>
 <tr><td><code>cuentasPropias</code></td><td>Las otras cuentas de la empresa. Se describe abajo</td></tr>
@@ -742,14 +746,14 @@ pedir un renglón solo no esconde que otro renglón del extracto reclama el mism
 <div class="desborde"><table>
 <thead><tr><th>Clave</th><th>Obligatoria</th><th>Qué es</th></tr></thead>
 <tbody>
-<tr><td><code>idValor</code></td><td><span class="oblig">Sí</span></td><td>El identificador del valor en ProntoNet: texto o número, hasta 100 caracteres. No puede repetirse en el pedido. La respuesta lo devuelve tal como se envió</td></tr>
-<tr><td><code>importe</code></td><td><span class="oblig">Sí</span></td><td>Número con signo y hasta dos decimales: positivo es dinero que entra, negativo es dinero que sale, como en el extracto. Un importe con más de dos decimales se rechaza, no se redondea. Tiene que ser un número JSON, no un texto</td></tr>
+<tr><td><code>idValor</code></td><td><span class="oblig">Sí</span></td><td>El identificador del valor en ProntoNet: texto de hasta 100 caracteres, o un número entero. No puede repetirse en el pedido. La respuesta lo devuelve tal como se envió</td></tr>
+<tr><td><code>importe</code></td><td><span class="oblig">Sí</span></td><td>Número con signo y hasta dos decimales: positivo es dinero que entra, negativo es dinero que sale, como en el extracto. Un importe con más de dos decimales se rechaza, no se redondea. Tiene que ser un número JSON, no un texto, y su valor absoluto tiene que ser menor que 10.000.000.000.000</td></tr>
 <tr><td><code>tipo</code></td><td>No</td><td>El tipo del valor, como lo llama ProntoNet. Solo importa si contiene la palabra «transferencia» (sin distinguir mayúsculas ni tildes): ese valor es una transferencia, y su CUIT puede no coincidir (sección 10)</td></tr>
 <tr><td><code>numero</code></td><td>No</td><td>El número del cheque, de la transferencia o de la operación. Se compara sin ceros a la izquierda</td></tr>
 <tr><td><code>fechaComprobante</code>, <code>fechaValor</code>, <code>fechaDeposito</code></td><td>No</td><td>Fecha real <code>AAAA-MM-DD</code>, o <code>null</code>. Cualquiera puede faltar</td></tr>
-<tr><td><code>idDepositoBancario</code></td><td>No</td><td>La boleta de depósito a la que pertenece el valor. Los valores de una misma boleta se proponen juntos contra un solo renglón de depósito</td></tr>
-<tr><td><code>loteEnvioBanco</code></td><td>No</td><td>El lote de envío al banco al que pertenece el valor. Los valores de un mismo lote se proponen juntos contra un solo renglón de pago masivo</td></tr>
-<tr><td><code>cuitLibrador</code></td><td>No</td><td>El CUIT del librador. Se usa como CUIT del valor cuando no tiene proveedor ni cliente</td></tr>
+<tr><td><code>idDepositoBancario</code></td><td>No</td><td>La boleta de depósito a la que pertenece el valor. Los valores de una misma boleta y del mismo signo se proponen juntos contra un solo renglón. Una boleta con un solo valor no cuenta</td></tr>
+<tr><td><code>loteEnvioBanco</code></td><td>No</td><td>El lote de envío al banco al que pertenece el valor. Los valores de un mismo lote y del mismo signo se proponen juntos contra un solo renglón. Un lote con un solo valor no cuenta</td></tr>
+<tr><td><code>cuitLibrador</code></td><td>No</td><td>El CUIT del librador. Se usa como CUIT del valor cuando el proveedor o el cliente del valor no está en <code>contrapartes</code>, o está sin CUIT. Si el valor trae proveedor y cliente, se mira primero el proveedor</td></tr>
 <tr><td><code>idProveedor</code>, <code>idCliente</code></td><td>No</td><td>La contraparte del valor, que se busca en <code>contrapartes</code></td></tr>
 </tbody>
 </table></div>
@@ -795,11 +799,11 @@ Cualquier otra clave se ignora.</p>
       { "id": 12, "razonSocial": "Proveedora Ejemplo SA", "cuit": "30-71234567-8", "cbu": null }
     ],
     "clientes": [
-      { "id": 41, "razonSocial": "ACME", "cuit": "30-23456789-2", "cbu": null }
+      { "id": 41, "razonSocial": "ACME", "cuit": "30-23456789-3", "cbu": null }
     ]
   },
   "cuentasPropias": [
-    { "id": 3, "banco": "Banco Ejemplo", "numero": "CC 123/4", "cbu": "0170099220000012345678", "moneda": "Pesos" }
+    { "id": 3, "banco": "Banco Ejemplo", "numero": "CC 123/4", "cbu": "0170099220000012345679", "moneda": "Pesos" }
   ],
   "lotes": [],
   "ventanaDias": 5
@@ -820,7 +824,7 @@ describe en la sección 09.</p>
       "valores": [90210],
       "renglones": ["r-818c556e8def0a8f574d"],
       "confianza": "grounded",
-      "coincidencias": { "importe": true, "fecha": { "dias": 0 }, "cuit": "30234567892" },
+      "coincidencias": { "importe": true, "fecha": { "dias": 0 }, "cuit": "30234567893" },
       "marcas": [],
       "motivo": null,
       "candidatos": null
@@ -853,8 +857,8 @@ misma. Un extracto de otra empresa responde 404, igual que uno que no existe.</p
 
 <p>AgilBank controla el pedido en este orden y responde con el primer error que encuentra. Si el
 pedido no trae credencial, responde 401 antes de leer el cuerpo. Con una credencial que no vale, el
-cuerpo se lee primero: un cuerpo demasiado grande, mal formado o con una codificación no aceptada
-responde ese error.</p>
+cuerpo se lee primero, y las filas 2 a 4 se aplican en este orden: codificación no aceptada,
+cuerpo demasiado grande y cuerpo mal formado.</p>
 
 <div class="desborde"><table>
 <thead><tr><th class="num">#</th><th>Control</th><th>HTTP</th><th>Código</th></tr></thead>
@@ -879,10 +883,11 @@ responde ese error.</p>
 
 <p>El <code>campo</code> de un <code>PEDIDO_INVALIDO</code> es una de estas claves:
 <code>cuerpo</code> (el cuerpo no es un objeto), <code>renglones</code>, <code>valores</code>,
-<code>idValor</code> (repetido o con un tipo que no sirve), <code>importe</code>,
+<code>idValor</code> (repetido, o que no es un texto ni un entero), <code>importe</code>,
 <code>fechaComprobante</code>, <code>fechaValor</code>, <code>fechaDeposito</code>,
-<code>idDepositoBancario</code>, <code>loteEnvioBanco</code>, <code>contrapartes</code>,
-<code>cuentasPropias</code>, <code>lotes</code> o <code>ventanaDias</code>. AgilBank no concilia a
+<code>idDepositoBancario</code>, <code>loteEnvioBanco</code>, <code>idProveedor</code>,
+<code>idCliente</code>, <code>contrapartes</code>, <code>cuentasPropias</code>, <code>lotes</code> o
+<code>ventanaDias</code>. AgilBank no concilia a
 medias: un solo dato inválido corta todo el pedido.</p>
 
 <div class="desborde"><pre><code>{
@@ -1013,7 +1018,7 @@ más débil del que depende: una propuesta nunca es más firme que el renglón e
 <ul>
 <li>El renglón no encadena con su saldo (<code>encadena</code> en <code>false</code>): <code>weak</code>, con la marca <code>renglon-sin-control</code>.</li>
 <li>El renglón no se puede controlar (<code>encadena</code> en <code>null</code>): como mucho <code>grounded</code>.</li>
-<li>La lectura trae el aviso <code>no-cierra</code> o <code>lectura-parcial</code>: todo <code>weak</code>, con la marca <code>lectura-con-aviso</code> (sección 10).</li>
+<li>La lectura trae el aviso <code>no-cierra</code> o <code>lectura-parcial</code>: todos los apareos salen <code>weak</code>, con la marca <code>lectura-con-aviso</code> (sección 10).</li>
 </ul>
 
 <p>Una lectura nunca llega a <code>verified</code> por sí sola: eso lo da que el número y el importe
@@ -1076,9 +1081,15 @@ dejaron libres los anteriores, y un valor se usa una sola vez.</p>
 <li><b>Número e importe.</b> El número coincide y el importe es el mismo. No mira la fecha: un cheque que se acredita 20 días después aparea igual. Si el número coincide, un CUIT distinto no impide el apareo ni lo debilita.</li>
 <li><b>Importe único en la ventana.</b> Un solo valor con ese importe cae en la ventana del renglón.</li>
 <li><b>Importe y contraparte.</b> Hay varios valores del mismo importe en la ventana, pero uno solo coincide en el CUIT o en el CBU.</li>
-<li><b>Intercambiables.</b> Hay tantos renglones como valores del mismo importe en la ventana, dos o más, y nada los distingue. Se emparejan por la fecha más cercana y, a igual fecha, por el orden. Salen <code>weak</code>, con la marca <code>intercambiable</code>.</li>
-<li><b>Un renglón, varios valores.</b> Un depósito contra varios cheques, o un pago masivo contra varias transferencias. Primero, los valores de una misma boleta (<code>idDepositoBancario</code>) o de un mismo lote (<code>loteEnvioBanco</code>, o un detalle subido) cuya suma da exacto el renglón, siempre que al menos uno caiga en la ventana. Después, solo para un renglón de depósito de cheques o de pago masivo, una suma exacta de valores que caen en la ventana. Si hay más de una combinación, el renglón va a <code>a-revisar</code>.</li>
-<li><b>Varios renglones, un valor.</b> Hasta 6 renglones del mismo día y del mismo signo, cuya suma da exacto un valor, con una sola combinación posible. Solo para los renglones del mismo tipo de fondo común de inversión (el rescate de un fondo acreditado en dos movimientos), o para una cuota de leasing o de préstamo con sus intereses, IVA, percepción de IVA, débito automático, comisión y sellos. Las transferencias no se agrupan así: con cientos por mes, la casualidad abunda.</li>
+<li><b>Intercambiables.</b> En el extracto hay tantos renglones libres de ese importe como valores libres, dos o más. AgilBank los empareja por la fecha más cercana y, a igual fecha, por el orden. Si cada pareja cae en la ventana y ninguna queda afuera por un CUIT que no coincide, se aceptan. Si una sola no cabe, no se acepta ninguna. Salen <code>weak</code>, con la marca <code>intercambiable</code>.</li>
+<li><b>Un renglón, varios valores.</b> Un depósito contra varios cheques, o un pago masivo contra varias transferencias. Hay tres formas, y se las busca en este orden:
+<ul>
+<li>Los valores de una misma boleta (<code>idDepositoBancario</code>) o de un mismo lote (<code>loteEnvioBanco</code>) suman exacto el renglón. Basta que uno de ellos caiga en la ventana.</li>
+<li>Un detalle subido (sección 12) suma exacto un renglón que sale dinero. Este caso no mira la fecha.</li>
+<li>Para un renglón de depósito de cheques o de pago masivo, una suma exacta de valores que caen en la ventana.</li>
+</ul>
+Si hay más de una combinación, el renglón va a <code>a-revisar</code>.</li>
+<li><b>Varios renglones, un valor.</b> Hasta 6 renglones del mismo día y del mismo signo suman exacto un valor, y no hay otra combinación posible. Sirve para el rescate o la suscripción de un fondo común de inversión que el banco acredita en dos movimientos, y para una cuota de leasing o de préstamo que el banco divide en la cuota, los intereses, el IVA, la percepción de IVA, el débito automático, la comisión y los sellos. Las transferencias no se agrupan así: con cientos por mes, la casualidad abunda.</li>
 <li><b>Importe único en el período.</b> Al final, un renglón y un valor libres que son los únicos con ese importe y ese signo en todo el extracto y en todo el pedido aparean sin ventana. Salen <code>weak</code>, con la marca <code>importe-unico</code>. Cuentan también un renglón del mismo importe que ya apareó y un valor que ya se usó: con ellos no hay único.</li>
 </ol>
 
@@ -1091,10 +1102,11 @@ mientras resuelvan algo, porque lo resuelto puede dejar a otro renglón con un s
 <h3>La ventana de días</h3>
 
 <p><code>ventanaDias</code> es cuántos días de diferencia se aceptan entre la fecha del valor en
-ProntoNet y la del movimiento en el banco cuando el número no coincide. Es un entero de 0 a 31, y se
-cuenta hacia los dos lados. Si no viene, son 5. Con 0, solo vale el mismo día. La ventana también
-rige para las sumas de los pasos 5 y 6. No afecta al paso 1, que no mira la fecha, ni al paso 7, que
-aparea sin ventana.</p>
+ProntoNet y la del movimiento en el banco cuando el número no coincide. Es un entero de 0 a 31. Se
+cuenta hacia los dos lados. Si no viene, son 5. Con 0, solo vale el mismo día.</p>
+
+<p>La ventana rige en los pasos 2 a 4 y en las sumas de los pasos 5 y 6, salvo en el detalle subido.
+No rige en el paso 1, que no mira la fecha, ni en el paso 7, que aparea sin ventana.</p>
 
 <p>La ventana se mide primero contra la fecha principal del valor, y después contra cualquiera de sus
 fechas:</p>
@@ -1106,7 +1118,7 @@ fechas:</p>
 </ul>
 
 <p>El orden importa. Si los renglones miraran desde el principio todas las fechas, uno que ve el valor
-solo por una fecha secundaria le disputaría el valor al renglón que lo ve por la fecha con que lo ve
+solo por una fecha secundaria le quitaría el valor al renglón que lo ve por la fecha con que lo ve
 el banco.</p>
 
 <div class="nota">
@@ -1119,9 +1131,11 @@ más valores del mismo importe para el mismo renglón. Si con el cambio sube la 
 <h3>Las sumas y el techo de tiempo</h3>
 
 <p>Buscar una suma exacta de valores o de renglones puede llevar mucho tiempo. AgilBank le pone un
-techo: hoy, 2 segundos por renglón y 6 segundos por pedido. Pasado el techo en la suma de valores,
-el renglón vuelve <code>a-revisar</code> con el motivo, y la respuesta nunca queda colgada. Una
-búsqueda que no terminó nunca produce un apareo.</p>
+techo: hoy, 2 segundos por renglón y 6 segundos por pedido. Pasado el techo en la suma de valores
+(paso 5), el renglón vuelve <code>a-revisar</code> con el motivo. Pasado el techo en la suma de
+renglones (paso 6), los renglones vuelven <code>pendiente</code> y el valor queda reclamado por más de
+un renglón. La respuesta nunca queda colgada, y una búsqueda que no terminó nunca produce un
+apareo.</p>
 
 <p>La suma de valores de la ventana se busca solo para los renglones de depósito de cheques y de pago
 masivo, y solo si en la ventana hay hasta 200 valores del mismo signo. Con más, no se busca. Buscar
@@ -1148,8 +1162,9 @@ dan los mismos valores, es una sola combinación.</p>
 
 <p>Si en un mismo paso dos renglones reclaman el mismo valor y no son intercambiables, los dos
 vuelven <code>a-revisar</code>, con ese valor entre los candidatos. Lo mismo le pasa a un renglón
-que ve un valor en disputa entre sus candidatos: ese valor puede ser el suyo, así que su otro
-candidato no es único. Ningún paso posterior propone como apareo un valor en disputa.</p>
+que tiene entre sus candidatos un valor reclamado por más de un renglón: ese valor puede ser el suyo,
+así que su otro candidato no es único. Ningún paso posterior propone como apareo un valor reclamado
+por más de un renglón.</p>
 
 <h3>Las cuentas propias</h3>
 
@@ -1166,7 +1181,7 @@ propia solo por el CBU: un CUIT no alcanza.</p>
 <div class="desborde"><table>
 <thead><tr><th>Aviso</th><th>Qué pasa al conciliar</th></tr></thead>
 <tbody>
-<tr><td><code>no-cierra</code>, <code>lectura-parcial</code></td><td>Se concilia igual. Un importe exacto contra un valor de ProntoNet es evidencia propia, que no depende de que el extracto cierre. Todas las propuestas salen <code>weak</code>, con la marca <code>lectura-con-aviso</code>. En la etapa siguiente, un <code>pendiente</code> de esta conciliación no se abrirá en propuestas de crear</td></tr>
+<tr><td><code>no-cierra</code>, <code>lectura-parcial</code></td><td>Se concilia igual. Un importe exacto contra un valor de ProntoNet es evidencia propia, que no depende de que el extracto cierre. Todos los apareos salen <code>weak</code>, con la marca <code>lectura-con-aviso</code>. En la etapa siguiente, un <code>pendiente</code> de esta conciliación no se abrirá en propuestas de crear</td></tr>
 <tr><td><code>varias-cuentas</code>, <code>cuenta-distinta</code></td><td>No se concilia: 409 <code>OTRA_CUENTA</code>. Los valores son de otra cuenta</td></tr>
 </tbody>
 </table></div>
@@ -1205,7 +1220,7 @@ rótulos no tiene que ser la primera: se toma la primera que tenga el monto y el
 <tbody>
 <tr><td>Monto</td><td><code>Monto</code> o <code>Importe</code></td><td><span class="oblig">Sí</span></td></tr>
 <tr><td>Estado</td><td><code>Estado</code></td><td><span class="oblig">Sí</span></td></tr>
-<tr><td>CUIT del beneficiario</td><td><code>CUIT</code> o <code>CUIT beneficiario</code></td><td>No. Con CUIT, el apareo es más firme</td></tr>
+<tr><td>CUIT del beneficiario</td><td><code>CUIT</code> o <code>CUIT beneficiario</code></td><td>No. Sirve para saber qué valor corresponde a cada transferencia cuando hay varios del mismo importe</td></tr>
 <tr><td>Número de pago</td><td><code>Número de pago</code> o <code>Nro de pago</code></td><td>No. Se lee y se guarda; hoy no se usa para aparear</td></tr>
 <tr><td>Fecha de pago</td><td><code>Fecha de pago</code></td><td>No. Se lee y se guarda; hoy no se usa para aparear</td></tr>
 </tbody>
@@ -1311,7 +1326,7 @@ cuando el problema está en un valor.</p>
 <tr><td>El cuerpo de un pedido de conciliación</td><td>16 MB</td></tr>
 <tr><td>Transferencias de un lote</td><td>5.000</td></tr>
 <tr><td>El archivo de un lote</td><td>10 MB</td></tr>
-<tr><td>La búsqueda de sumas de una conciliación</td><td>2 segundos por renglón y 6 segundos por pedido. Pasado el tiempo, el renglón vuelve <code>a-revisar</code> (sección 10)</td></tr>
+<tr><td>La búsqueda de sumas de una conciliación</td><td>2 segundos por renglón y 6 segundos por pedido. Pasado el tiempo, la suma de valores vuelve <code>a-revisar</code> y la de renglones, <code>pendiente</code> (sección 10)</td></tr>
 </tbody>
 </table></div>
 
