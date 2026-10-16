@@ -9,3 +9,10 @@ export type {
 export type { Verdict } from "./verdict";
 export { agilbankRoutes, type ProductPieces, type Transport } from "./api/routes";
 export { configureBackgroundReading, markStatementFailed, readStatementStage, type BackgroundStorage } from "./backgroundReading";
+export { reconcile, type ReconcileInput } from "./reconcile/reconcile";
+export { readBatch, type BatchReading } from "./reconcile/batch";
+export { toPublicReconciliation, type ConciliacionPublica, type PropuestaPublica, type StoredProposal } from "./reconcile/publicReconciliation";
+export type {
+  Batch, BatchTransfer, Coincidence, Confidence, Mark, OwnAccount, Party, PendingValue, Proposal, ReconcileContext,
+  ReconcileOptions, Reconciliation,
+} from "./reconcile/types";

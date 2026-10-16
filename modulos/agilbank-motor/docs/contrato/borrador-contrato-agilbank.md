@@ -1,9 +1,9 @@
 # AgilBank: borrador del contrato
 
-> **Reemplazado** para la lectura (§1 a §6, §8 y el anexo) por la referencia de la API, `agilbank-server/docs/api-agilbank.html`.
-> El §7 (conciliación y decisiones) sigue siendo un boceto hasta los sub-proyectos 2 y 3.
+> **Reemplazado** para la lectura (§1 a §6, §8 y el anexo) y para la conciliación (§7) por la referencia de la API, `agilbank-server/docs/api-agilbank.html`.
+> Del §7 solo siguen como boceto las decisiones, hasta el sub-proyecto 3.
 
-*Para BDL · borrador del 10-10-2026 · lo firme es la lectura; la conciliación es un boceto*
+*Para BDL · borrador del 10-10-2026 · lo firme es la lectura y la conciliación; las decisiones son un boceto*
 
 Este borrador es para que puedan desarrollar en paralelo la carga del extracto en el Resumen de
 Conciliación, la pantalla de propuestas y el aviso de las decisiones. Sigue la misma lógica que
@@ -13,7 +13,8 @@ Pronto IAC: envío del documento, consulta del estado, pedido con contexto y avi
 |---|---|
 | Enviar un extracto, consultarlo y el objeto de la lectura (§1 a §5) | Firme para la etapa de lectura. Puede sumar campos, no cambiar los que hay |
 | Las correcciones de las tablas (§6) | Firme en la forma |
-| Pedir la conciliación e informar las decisiones (§7) | Boceto: se define en los próximos sub-proyectos |
+| Pedir la conciliación (§7) | Firme: está en la referencia de la API |
+| Informar las decisiones (§7) | Boceto: se define en el sub-proyecto 3 |
 
 ## 1. El circuito
 
@@ -209,18 +210,17 @@ corrección y la usa la etapa de débitos y créditos.
 La corrección vale desde la lectura siguiente **solo para la empresa** que la mandó. Nosotros la
 revisamos: lo confirmado pasa a la tabla común y les llega a todos.
 
-## 7. Boceto: la conciliación y las decisiones
+## 7. La conciliación y las decisiones
 
-Se define en los próximos sub-proyectos. Lo dejamos escrito para que puedan pensar la pantalla.
+La conciliación de un extracto con los valores de ProntoNet está definida en la referencia de la API,
+`agilbank-server/docs/api-agilbank.html` (secciones 08 a 12): conciliar un extracto
+(`POST /api/v1/extractos/{idExtracto}/conciliacion`), consultar una conciliación
+(`GET /api/v1/conciliaciones/{idConciliacion}`) y subir el detalle de un pago masivo
+(`POST /api/v1/lotes`). Lo firme es lo que dice la referencia; este párrafo no la repite.
 
-`POST /api/v1/extractos/{idExtracto}/conciliacion`: los `id` de los renglones nuevos, los valores
-pendientes de la cuenta, los tipos de movimiento, las cuentas contables, las contrapartes y las
-cuentas propias, con los campos de `diccionario_datos.md`. Devuelve una propuesta por renglón:
-`apareo` (con los ids de los valores), `dbg` (tipo de movimiento, cuenta, importe, IVA y percepción,
-y los renglones que agrupa) o `pendiente`, siempre con su confianza y los datos que coincidieron.
-
-`POST /api/v1/decisiones`: por propuesta, `aceptada`, `corregida` o `rechazada`, con lo propuesto y
-lo elegido.
+Siguen para el sub-proyecto 3: qué proponer crear para un renglón sin apareo (`dbg`, `op`,
+`inversion`: hoy esos renglones vuelven `pendiente`, y la forma de la propuesta no cambia), y
+`POST /api/v1/decisiones`, con el aviso de lo que aceptó, corrigió o rechazó el tesorero.
 
 ## 8. Límites
 
