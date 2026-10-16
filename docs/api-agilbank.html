@@ -982,7 +982,7 @@ que no conozcan, trátenlo como <code>pendiente</code>.</p>
 
 <h3>Los motivos</h3>
 
-<p>El <code>motivo</code> viene en castellano para mostrarlo. Estos son los once. Los cinco últimos dicen
+<p>El <code>motivo</code> viene en castellano para mostrarlo. Estos son los doce. Los cinco últimos dicen
 que no se pudo buscar y por qué: el renglón vuelve <code>a-revisar</code> sin candidatos, porque no
 se sabe si el valor falta.</p>
 
@@ -992,6 +992,7 @@ se sabe si el valor falta.</p>
 <tr><td><code>pendiente</code></td><td>«No hay un valor pendiente que coincida.»</td><td>Se buscó, y ningún valor del pedido le corresponde al renglón</td></tr>
 <tr><td><code>pendiente</code></td><td>«Transferencia entre cuentas propias sin valor cargado.»</td><td>El renglón es una transferencia entre cuentas propias y no aparece el valor. Trae la marca <code>cuentas-propias</code></td></tr>
 <tr><td><code>a-revisar</code></td><td>«Más de un renglón coincide con el mismo valor.»</td><td>Dos renglones reclaman el mismo valor y no son intercambiables</td></tr>
+<tr><td><code>a-revisar</code></td><td>«Hay más de un valor que coincide con el renglón.»</td><td>En la ventana del renglón hay de 2 a 50 valores del mismo importe y ningún paso los pudo separar: ni el número, ni la contraparte, ni los intercambiables. Trae como candidatos los que siguen libres, cada uno por separado</td></tr>
 <tr><td><code>a-revisar</code></td><td>«Hay más de una combinación de valores que suma el importe.»</td><td>Un renglón se puede explicar con valores distintos que suman lo mismo</td></tr>
 <tr><td><code>a-revisar</code></td><td>«Hay más de una combinación de renglones que suma un valor.»</td><td>Un valor se puede explicar con renglones distintos que suman lo mismo</td></tr>
 <tr><td><code>a-revisar</code></td><td>«La búsqueda de una suma de valores pasó el tiempo disponible: hay que revisarlo a mano.»</td><td>La búsqueda de una suma de valores del renglón (paso 5) se cortó por el techo de tiempo. Trae como candidatos las combinaciones que alcanzó a ver (sección 10)</td></tr>
@@ -1101,8 +1102,10 @@ Si hay más de una combinación, el renglón va a <code>a-revisar</code>.</li>
 cualquiera de sus fechas (la ventana, abajo). Dentro de cada vuelta, los pasos 1 a 3 se repiten
 mientras resuelvan algo, porque lo resuelto puede dejar a otro renglón con un solo candidato.</p>
 
-<p>Un renglón que no apareó en ningún paso vuelve <code>pendiente</code>. Uno que no se pudo buscar
-entero, por el tiempo o por un tope, vuelve <code>a-revisar</code> con el motivo que dice por qué.</p>
+<p>Un renglón que no apareó en ningún paso vuelve <code>pendiente</code> si no tiene ningún valor
+candidato, y <code>a-revisar</code> con sus candidatos si en su ventana quedan valores del mismo importe
+que ningún paso pudo separar. Uno que no se pudo buscar entero, por el tiempo o por un tope, vuelve
+<code>a-revisar</code> con el motivo que dice por qué.</p>
 
 <h3>La ventana de días</h3>
 
@@ -1179,7 +1182,7 @@ por más de un renglón.</p>
 
 <p>Un renglón cuya contraparte trae un CBU de <code>cuentasPropias</code> es una transferencia entre
 cuentas de la empresa. Busca su valor por importe y fecha, en los mismos pasos, y si lo encuentra, el
-apareo trae la marca <code>cuentas-propias</code>. Si no, vuelve <code>pendiente</code>, con la marca
+apareo trae la marca <code>cuentas-propias</code>. Si no hay ninguno, vuelve <code>pendiente</code>, con la marca
 y el motivo «Transferencia entre cuentas propias sin valor cargado.». Un renglón se toma por cuenta
 propia solo por el CBU: un CUIT no alcanza.</p>
 
