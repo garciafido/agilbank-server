@@ -790,7 +790,7 @@ como vacía. Las cuatro entran en la huella del pedido (abajo).</p>
 <div class="desborde"><table>
 <thead><tr><th>Lista</th><th>Claves</th></tr></thead>
 <tbody>
-<tr><td><code>tiposGastoBancario</code></td><td><code>id</code> (obligatoria), <code>descripcion</code> y <code>coeficiente</code> (obligatorio): <code>1</code> si el tipo es de un débito, el dinero que sale, y <code>-1</code> si es de un crédito. AgilBank busca estos tipos por el nombre de la descripción</td></tr>
+<tr><td><code>tiposGastoBancario</code></td><td><code>id</code> (obligatoria), <code>descripcion</code> y <code>coeficiente</code> (obligatorio): <code>1</code> si el tipo es de un débito, el dinero que sale, y <code>-1</code> si es de un crédito. En la historia, AgilBank busca el tipo por el nombre de la descripción y por el coeficiente. En el catálogo, toma el único tipo con el coeficiente del renglón</td></tr>
 <tr><td><code>cuentasImputables</code>, <code>cuentasIvaYPercepciones</code></td><td><code>id</code> (obligatoria), <code>codigo</code> (obligatoria: texto o entero) y <code>descripcion</code>. AgilBank busca las cuentas por el nombre de la descripción y por el código</td></tr>
 <tr><td><code>historiaDbg</code></td><td><code>idValor</code> (obligatoria), <code>fecha</code> (obligatoria, <code>AAAA-MM-DD</code>), <code>tipoGasto</code> (el nombre de un tipo de <code>tiposGastoBancario</code>), <code>coeficiente</code> (obligatoria, <code>1</code> o <code>-1</code>), <code>importe</code>, <code>iva</code> y <code>percepcionIva</code> (pesos <b>sin signo</b>, de cero en adelante, con hasta dos decimales; si faltan, cero), <code>cuentaContableCodigo</code> (el <code>codigo</code> de una cuenta de <code>cuentasImputables</code>), <code>cuentaContable</code> (el nombre de la cuenta) y <code>detalle</code></td></tr>
 </tbody>
@@ -800,8 +800,9 @@ como vacía. Las cuatro entran en la huella del pedido (abajo).</p>
 importe negativo en el extracto. Un DBG de la historia cuyo <code>tipoGasto</code>, con ese
 <code>coeficiente</code>, o cuya <code>cuentaContableCodigo</code> no estén en los catálogos del mismo
 pedido no cuenta. Un dato que no tiene la forma indicada corta el pedido con 400
-<code>PEDIDO_INVALIDO</code>, con el <code>campo</code> de la lista y, en la historia, el
-<code>idValor</code>.</p>
+<code>PEDIDO_INVALIDO</code>, con el <code>campo</code> de la lista. En la historia trae además el
+<code>idValor</code> del DBG con el problema, salvo cuando el problema es el <code>coeficiente</code> o
+cuando el elemento no es un objeto.</p>
 
 <h4>Un pedido de ejemplo</h4>
 
@@ -913,7 +914,7 @@ misma. Un extracto de otra empresa responde 404, igual que uno que no existe.</p
 pedido. Después de informar una decisión nueva, o de cambiar una, el mismo pedido da otra
 conciliación, con otros <code>idConciliacion</code> e <code>idPropuesta</code>. Mientras la empresa tenga
 decisiones para ese banco, la conciliación guardada vale hasta el día siguiente: las decisiones pesan
-según su edad, y al cambiar el día el mismo pedido se concilia de nuevo. Las conciliaciones
+según su edad, y al cambiar el día UTC (a las 21:00 en la Argentina) el mismo pedido se concilia de nuevo. Las conciliaciones
 anteriores siguen consultables.</p>
 
 <h4>Los controles del pedido</h4>
@@ -1160,7 +1161,7 @@ decisiones suficientes (sección 14), y ninguna de estas cosas lo baja:</p>
 <li>Un renglón del grupo no encadena con su saldo (<code>encadena</code> en <code>false</code>): <code>weak</code>, con la marca <code>renglon-sin-control</code>.</li>
 <li>No hay cuenta (<code>cuenta</code> en <code>null</code>), o la cuenta salió de la historia o del catálogo (<code>origen</code> distinto de <code>decision</code>): <code>weak</code>.</li>
 <li>La cuenta sale de las decisiones, pero el grupo tiene IVA o percepción y la cuenta de IVA o la de percepción que necesita no vino de esas decisiones, sino del catálogo por nombre: <code>weak</code>.</li>
-<li>En un grupo que junta varios cargos del día (sección 13), otro de esos cargos aprendió otra cuenta o otro tipo de gasto: <code>weak</code>.</li>
+<li>En un grupo que junta varios cargos del día (sección 13), otro de esos cargos aprendió otro tipo de gasto, otra cuenta, otra cuenta de IVA u otra de percepción: <code>weak</code>.</li>
 </ul>
 
 <h3>Las coincidencias</h3>
@@ -1236,8 +1237,8 @@ Si hay más de una combinación, el renglón va a <code>a-revisar</code>.</li>
 cualquiera de sus fechas (la ventana, abajo). Dentro de cada vuelta, los pasos 1 a 3 se repiten
 mientras resuelvan algo, porque lo resuelto puede dejar a otro renglón con un solo candidato.</p>
 
-<p>Un renglón que no apareó en ningún paso vuelve <code>pendiente</code> si no tiene ningún valor
-candidato, y <code>a-revisar</code> con sus candidatos si en su ventana quedan valores del mismo importe
+<p>Un renglón que no apareó en ningún paso y no tiene ningún valor candidato vuelve <code>pendiente</code>
+o, si es un gasto o un impuesto del banco, <code>dbg</code> (secciones 09 y 13). Vuelve <code>a-revisar</code> con sus candidatos si en su ventana quedan valores del mismo importe
 que ningún paso pudo separar. Uno que no se pudo buscar entero, por el tiempo o por un tope, vuelve
 <code>a-revisar</code> con el motivo que dice por qué.</p>
 
@@ -1478,8 +1479,9 @@ con todos los del extracto, y <code>renglones</code> los trae completos.</p>
 
 <p><b>Para consolidar</b>, junten los grupos que tengan la misma <code>claveAgrupacion</code>: el mismo tipo
 de gasto, en la misma cuenta, en el mismo mes del cargo. Suma el <code>importe</code>, el <code>iva</code> y la
-<code>percepcion</code> de cada grupo, una vez por grupo. Un grupo sin cuenta (<code>cuenta</code> en
-<code>null</code>) no se junta con otros: el usuario elige la cuenta primero.</p>
+<code>percepcion</code> de cada grupo, una vez por grupo. No junten los grupos con
+<code>cuenta</code> en <code>null</code>, aunque la <code>claveAgrupacion</code> coincida: dos grupos sin cuenta
+tienen la misma clave sin ser lo mismo. El usuario elige la cuenta primero.</p>
 
 <h3>De dónde sale la cuenta</h3>
 
@@ -1490,7 +1492,7 @@ queda con el primero que sirve. El <code>origen</code> dice cuál fue.</p>
 <thead><tr><th>Origen</th><th>De dónde sale</th><th>Confianza</th></tr></thead>
 <tbody>
 <tr><td><code>decision</code></td><td><b>Lo que la empresa decidió.</b> El tipo de gasto y las cuentas que el usuario eligió para este concepto en decisiones anteriores (sección 14). Gana aunque haya pocas decisiones. Se usa si el tipo de gasto, con el coeficiente del renglón, y la cuenta siguen en los catálogos del pedido; si no, se pasa a lo que sigue. Si la decisión no trae la cuenta de IVA o la de percepción, se toma la del catálogo por nombre</td><td><code>grounded</code> con decisiones suficientes, si no <code>weak</code></td></tr>
-<tr><td><code>historia</code></td><td><b>Su historia.</b> De <code>historiaDbg</code>, el par (tipo de gasto, cuenta) con más importe acumulado para ese tipo de cargo y ese coeficiente. Lo reciente pesa más: cada DBG vale su importe por <code>0,5</code> elevado a los días que pasaron sobre 180, contados hasta el día de la conciliación. Si la empresa cambió de cuenta, gana la nueva</td><td><code>weak</code></td></tr>
+<tr><td><code>historia</code></td><td><b>Su historia.</b> De <code>historiaDbg</code>, el par (tipo de gasto, cuenta) con más importe acumulado para ese tipo de cargo y ese coeficiente. Lo reciente pesa más: cada DBG vale su importe por <code>0,5</code> elevado a los días que pasaron sobre 180, contados hasta el día de la conciliación (día UTC). Si la empresa cambió de cuenta, gana la nueva</td><td><code>weak</code></td></tr>
 <tr><td><code>catalogo</code></td><td><b>El catálogo, por nombre.</b> La única cuenta de <code>cuentasImputables</code> cuyo nombre trae las palabras del tipo de cargo (comisión, intereses, sellos, impuesto con débito o crédito, SIRCREB, IIBB), y el único tipo de gasto con ese coeficiente. Si hay más de una o ninguna, no elige</td><td><code>weak</code></td></tr>
 <tr><td><code>ninguno</code></td><td><b>Sin cuenta.</b> <code>cuenta</code> en <code>null</code>. El <code>tipoMovimiento</code> puede venir igual, si el catálogo tiene uno solo con ese coeficiente</td><td><code>weak</code></td></tr>
 </tbody>
@@ -1530,7 +1532,7 @@ AgilBank registra cada decisión y aprende de las que sirven, para proponer mejo
     },
     {
       "idConciliacion": "3f6c2a9e-5b1d-4c7a-9e02-6d1b8f4a7c35",
-      "idPropuesta": "8a41d0c2-6e37-4f5b-b1a9-02c5e7d93f18",
+      "idPropuesta": "e5b2a8d6-7c41-4a09-9f3e-1d60b4c8a275",
       "resultado": "aceptada",
       "elegido": { "tipo": "apareo", "valores": [90210] }
     }
@@ -1545,7 +1547,7 @@ AgilBank registra cada decisión y aprende de las que sirven, para proponer mejo
 <tr><td><code>idConciliacion</code></td><td><span class="oblig">Sí</span></td><td>El <code>idConciliacion</code> de la respuesta de la conciliación. Texto de hasta 100 caracteres, o un entero</td></tr>
 <tr><td><code>idPropuesta</code></td><td><span class="oblig">Sí</span></td><td>El <code>idPropuesta</code> de la propuesta decidida. Tiene que ser de esa conciliación</td></tr>
 <tr><td><code>resultado</code></td><td><span class="oblig">Sí</span></td><td><code>aceptada</code> (el usuario dejó lo propuesto), <code>corregida</code> (eligió otra cosa) o <code>rechazada</code> (no era eso)</td></tr>
-<tr><td><code>elegido</code></td><td><span class="oblig">Sí</span></td><td>Lo que quedó, con el <code>tipo</code> y los campos de abajo. Se informa también en una <code>aceptada</code>: AgilBank aprende de lo elegido, no de lo propuesto</td></tr>
+<tr><td><code>elegido</code></td><td><span class="oblig">Sí</span></td><td>Lo que quedó, con el <code>tipo</code> y los campos de abajo. Se informa también en una <code>aceptada</code>: AgilBank aprende de lo elegido, no de lo propuesto. En una <code>rechazada</code> también es obligatorio: lleva lo que quedó en su lugar, por ejemplo <code>{ "tipo": "pendiente" }</code></td></tr>
 </tbody>
 </table></div>
 
@@ -1573,7 +1575,7 @@ no frenan a las demás.</p>
   "registradas": ["c4a7e2f1-3b08-4d95-a6e1-90f2d58b7c34"],
   "rechazadas": [
     {
-      "idPropuesta": "8a41d0c2-6e37-4f5b-b1a9-02c5e7d93f18",
+      "idPropuesta": "e5b2a8d6-7c41-4a09-9f3e-1d60b4c8a275",
       "motivo": "La propuesta no está en esa conciliación."
     }
   ]
@@ -1648,7 +1650,7 @@ números. Todos los renglones con el mismo concepto cuentan juntos. Un renglón 
 decisión más reciente, aunque lo hayan decidido en varias conciliaciones.</p>
 
 <p>Cada decisión tiene un <b>peso</b> que cae a la mitad cada 180 días: vale 1 el día que se informa, 0,5 a los 180 días y 0,25
-a los 360. Se cuenta desde el día en que se informó hasta el día de la conciliación. Lo reciente pesa más
+a los 360. Se cuenta desde el día en que se informó hasta el día de la conciliación. Los días son días UTC: en la Argentina el día cambia a las 21:00. Lo reciente pesa más
 que lo viejo, y si la empresa cambia de criterio, el criterio nuevo termina ganando.</p>
 
 <p>AgilBank toma una cuenta como <code>grounded</code> cuando se cumplen las tres cosas:</p>
@@ -1659,11 +1661,14 @@ que lo viejo, y si la empresa cambia de criterio, el criterio nuevo termina gana
 <li>La última decisión, sin contar las rechazadas, es de <b>menos de un año</b>.</li>
 </ul>
 
-<p>Si no se cumplen, se usa igual el par de más peso, pero la propuesta sale <code>weak</code>. La misma
-regla de 3 decisiones y 80 % decide si el concepto sale <code>dbg</code> o <code>pendiente</code>: con eso,
-un concepto de terceros que la empresa siempre crea como DBG pasa a proponerse como <code>dbg</code>, y un gasto del
-banco que siempre deja pendiente pasa a <code>pendiente</code> con el motivo «La empresa lo registra como pendiente
-de contabilidad.». La decisión sobre un cargo vale para todo su grupo: el IVA y la percepción lo siguen.</p>
+<p>Si no se cumplen, se usa igual el par de más peso, pero la propuesta sale <code>weak</code>.</p>
+
+<p>La misma regla de 3 decisiones y 80 % decide si un concepto sale <code>dbg</code> o <code>pendiente</code>.
+Un concepto de terceros que la empresa siempre crea como DBG pasa a proponerse como <code>dbg</code>. Un gasto
+del banco que siempre deja pendiente pasa a <code>pendiente</code>, con el motivo «La empresa lo registra como
+pendiente de contabilidad.».</p>
+
+<p>La decisión sobre un cargo vale para todo su grupo: el IVA y la percepción lo siguen.</p>
 
 <p><b>Una decisión rechazada no enseña.</b> Cuenta en el total de las decisiones, pero no suma a ningún
 par, y le resta su peso al par que se había propuesto.</p>
