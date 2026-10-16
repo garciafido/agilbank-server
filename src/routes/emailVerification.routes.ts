@@ -9,12 +9,15 @@ import { redis } from '../services/redis/redisClient';
 import { container, DependencyContainer } from 'tsyringe';
 import { SchemaMetadataStore } from '../common/services/schemaMetadata';
 import { SecurePrismaOps } from '../common/services/securePrismaOps';
+import { NotFoundError } from '../common/errors/NotFoundError';
 import {
   generateVerificationSignature,
   verifySignature,
   buildVerificationUrl,
   maskEmail,
   normalizeEmail,
+  verificationScopeOf,
+  EmailVerificationScopeValue,
 } from '../common/utils/emailVerification';
 import { enqueueVerificationEmail } from '../workers/queues/emailQueue';
 import { senderDisplayName } from '../common/emailVerification/senderDisplayName';
@@ -92,6 +95,42 @@ const publicUrlOf = (tenant: object | null | undefined): string | null | undefin
   (tenant as { publicUrl?: string | null } | null | undefined)?.publicUrl;
 
 /**
+ * Si el proyecto declara el campo scope de EmailVerification: lo que pide el
+ * enlace vigente, verificar solo el email ('email') o además validar los datos
+ * del registro al que apunta ('data'). Sin el campo, el alcance se deduce de
+ * sourceEntity y sourceRecordId (verificationScopeOf), como antes de existir.
+ * Se mira en cada pedido (es una lectura barata), no al cargar el módulo.
+ */
+const hasScopeColumn = (): boolean => 'scope' in Prisma.EmailVerificationScalarFieldEnum;
+
+/** El scope guardado, en un proyecto que puede no declararlo. */
+const storedScopeOf = (record: object): string | null =>
+  (record as { scope?: string | null }).scope ?? null;
+
+/**
+ * La escritura condicionada del envío no encontró la verificación como se leyó
+ * (SecurePrismaOps no la encuentra, o Prisma no actualiza nada: P2025) o el alta
+ * chocó con la de otro envío al mismo email (P2002): otro envío ganó.
+ */
+const otherSendWon = (error: unknown): boolean => {
+  if (error instanceof NotFoundError) return true;
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  return code === 'P2025' || code === 'P2002';
+};
+
+/**
+ * Los datos de este registro ya están validados en esta verificación: apunta a
+ * él y el contacto envió el formulario de datos (validationSubmittedAt). Un
+ * email verificado por otro origen (otro registro, o solo el email) no cuenta.
+ */
+const dataValidatedFor = (
+  record: { sourceEntity: string | null; sourceRecordId: string | null; validationSubmittedAt: Date | null },
+  sourceEntity: string,
+  sourceRecordId: unknown
+): boolean =>
+  record.sourceEntity === sourceEntity && record.sourceRecordId === sourceRecordId && record.validationSubmittedAt != null;
+
+/**
  * Lo que las páginas públicas muestran de la empresa (encabezado y título).
  *
  * afterCommit: para la respuesta de una confirmación o una verificación que ya
@@ -102,6 +141,7 @@ const publicUrlOf = (tenant: object | null | undefined): string | null | undefin
  */
 async function tenantInfoOf(
   record: {
+    scope?: string | null;
     sourceEntity: string | null;
     sourceRecordId: string | null;
     tenant_: { id: string; name: string | null; logo_data: any } | null;
@@ -110,7 +150,10 @@ async function tenantInfoOf(
 ) {
   let tenantName: string;
   try {
-    tenantName = await shownTenantName(record.tenant_, !!(record.sourceEntity && record.sourceRecordId));
+    // El nombre de la validación de datos solo si el enlace vigente la pide: un
+    // envío de solo email sobre una verificación que antes fue de datos se
+    // presenta con el de la empresa, como el mail que lo pidió.
+    tenantName = await shownTenantName(record.tenant_, verificationScopeOf(record) === 'data');
   } catch (err) {
     if (!options.afterCommit) throw err;
     logger.error(
@@ -167,6 +210,18 @@ async function contactNameOf(
 class VerificationNotPending extends Error {
   constructor(readonly status: string | null) {
     super('Email verification is no longer pending');
+  }
+}
+
+/**
+ * El enlace dejó de pedir la validación de datos de este registro entre que se
+ * cargó la verificación y la transacción de la confirmación (un envío de solo
+ * email, o uno de datos para otro registro, con el mismo enlace): no se aplica
+ * nada.
+ */
+class VerificationScopeChanged extends Error {
+  constructor() {
+    super('Email verification no longer asks for this data validation');
   }
 }
 
@@ -327,7 +382,22 @@ async function validatePublicRequest(vid: string, sig: string) {
 /**
  * POST /api/email-verification/send
  * Authenticated — operator requests verification for a contact email.
- * Body: { email: string, sourceEntity: string, sourceRecordId?: string }
+ * Body: { email: string, sourceEntity: string, sourceRecordId?: string, resend?: boolean, scope?: 'email' | 'data' }
+ *
+ * scope dice qué pide el enlace: 'email', verificar solo la dirección; 'data'
+ * (por defecto), además validar los datos del registro, si la entidad tiene
+ * validación de datos y hay sourceRecordId (si no, es 'email'). Un pedido de
+ * solo email nunca toca lo de la validación de datos (sourceEntity,
+ * sourceRecordId, validationSubmittedAt, validationChanges): no marca datos ni
+ * pisa una validación anterior.
+ *
+ * Respuestas: { success, status: 'sent' | 'already_verified' | 'already_validated', scope }.
+ * Errores propios: 400 invalid_scope; 409 data_validation_pending (solo email
+ * con una validación de datos pendiente, que ya verifica el email al enviarse);
+ * 409 scope_not_supported (solo email sobre una verificación de datos, en un
+ * proyecto sin el campo scope: el enlace abriría el formulario de datos); 409
+ * concurrent_send (otro envío al mismo email cambió o creó la verificación entre
+ * la lectura y la escritura: no se escribe ni se manda nada).
  */
 router.post('/email-verification/send', async (req, res) => {
   let context: ServiceContext;
@@ -345,12 +415,15 @@ router.post('/email-verification/send', async (req, res) => {
   }
 
   try {
-    const { email, sourceEntity, sourceRecordId, resend } = req.body;
+    const { email, sourceEntity, sourceRecordId, resend, scope: requestedScope } = req.body;
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       return res.status(400).json({ success: false, error: 'invalid_email' });
     }
     if (!sourceEntity || typeof sourceEntity !== 'string') {
       return res.status(400).json({ success: false, error: 'invalid_source_entity' });
+    }
+    if (requestedScope != null && requestedScope !== 'email' && requestedScope !== 'data') {
+      return res.status(400).json({ success: false, error: 'invalid_scope' });
     }
 
     // Permission check: user must have _update on the source entity
@@ -366,39 +439,65 @@ router.post('/email-verification/send', async (req, res) => {
     const tenantId = context.currentUser.tenant_id_;
     const userId = context.currentUser.id;
 
-    // Determine if this entity has external validation
-    const hasDataValidation = !!(sourceRecordId && externalValidationRegistry[sourceEntity]);
+    // El alcance del pedido: 'data' si no pide solo el email, apunta a un
+    // registro y la entidad tiene validación de datos; si no, 'email'. Sin scope
+    // en el cuerpo, como antes de existir el campo.
+    const scope: EmailVerificationScopeValue =
+      requestedScope !== 'email' && sourceRecordId && externalValidationRegistry[sourceEntity] ? 'data' : 'email';
+    const hasDataValidation = scope === 'data';
+    const withScope = hasScopeColumn();
 
     // Look up existing verification for (email, tenant) — tenant filter applied by SecurePrismaOps
     let record = await db.findFirst({
       where: { email: normalized },
     });
+    // Lo que pide el enlace vigente de la verificación guardada.
+    const recordScope = record ? verificationScopeOf(record) : null;
+    const now = new Date();
 
-    // Already verified — return status unless resend requested
+    // Sin el campo scope, el alcance se deduce de sourceEntity y sourceRecordId,
+    // que un pedido de solo email no borra: el enlace abriría el formulario de datos.
+    if (!withScope && scope === 'email' && recordScope === 'data') {
+      return res.status(409).json({ success: false, error: 'scope_not_supported' });
+    }
+
+    // Ya hecho (sin resend): el email ya verificado, o los datos de este registro
+    // ya validados con el email verificado. Un email verificado por otro origen
+    // no frena la validación de datos.
     if (record && record.status === 'verified' && !resend) {
-      return res.json({
-        success: true,
-        status: 'already_verified',
-        verifiedAt: record.verifiedAt,
-      });
+      if (scope === 'email') {
+        return res.json({
+          success: true,
+          status: 'already_verified',
+          verifiedAt: record.verifiedAt,
+          scope,
+        });
+      }
+      if (dataValidatedFor(record, sourceEntity, sourceRecordId)) {
+        return res.json({
+          success: true,
+          status: 'already_validated',
+          verifiedAt: record.verifiedAt,
+          validationSubmittedAt: record.validationSubmittedAt,
+          scope,
+        });
+      }
     }
 
-    // Resend: reset status so email can be re-sent
-    if (record && resend) {
-      await db.update({
-        where: { id: record.id },
-        data: {
-          status: 'pending',
-          verifiedAt: null,
-          validationChanges: null,
-          validationSubmittedAt: null,
-        },
-      });
-      record = { ...record, status: 'pending', lastSentAt: null };
+    // Una validación de datos pendiente (sin vencer) ya verifica el email al
+    // enviarse: un pedido de solo email la reemplazaría (el enlace es el mismo).
+    if (
+      scope === 'email' &&
+      record &&
+      record.status === 'pending' &&
+      recordScope === 'data' &&
+      !(record.expiresAt && record.expiresAt < now)
+    ) {
+      return res.status(409).json({ success: false, error: 'data_validation_pending' });
     }
 
-    // Cooldown: minimum 5 minutes between sends
-    if (record && record.lastSentAt) {
+    // Cooldown: minimum 5 minutes between sends (un reenvío pedido no lo espera).
+    if (record && !resend && record.lastSentAt) {
       const elapsed = Date.now() - record.lastSentAt.getTime();
       if (elapsed < MIN_RESEND_INTERVAL_MS) {
         const retryAfter = new Date(record.lastSentAt.getTime() + MIN_RESEND_INTERVAL_MS);
@@ -410,44 +509,78 @@ router.post('/email-verification/send', async (req, res) => {
       }
     }
 
-    const now = new Date();
     const expiresAt = new Date(now.getTime() + EXPIRATION_HOURS * 60 * 60 * 1000);
 
-    // Build data with optional sourceEntity/sourceRecordId
+    // Lo que pide el enlace, si el proyecto declara el campo.
+    const scopeFields: Record<string, any> = withScope ? { scope } : {};
+    // Con 'data', el registro al que apunta. La validación hecha (fecha y cambios)
+    // queda mientras siga apuntando al mismo registro; si pasa a otro, se borra:
+    // era de aquel. Con 'email' no se toca nada de esto.
     const sourceFields: Record<string, any> = {};
-    if (hasDataValidation && sourceRecordId) {
+    if (hasDataValidation) {
       sourceFields.sourceEntity = sourceEntity;
       sourceFields.sourceRecordId = sourceRecordId;
+      if (record && (record.sourceEntity !== sourceEntity || record.sourceRecordId !== sourceRecordId)) {
+        sourceFields.validationChanges = Prisma.DbNull;
+        sourceFields.validationSubmittedAt = null;
+      }
     }
 
-    if (!record) {
-      // Create new PENDING record — tenant + audit fields injected by SecurePrismaOps
-      record = await db.create({
-        data: {
-          email: normalized,
-          status: 'pending',
-          expiresAt,
-          sentAt: now,
-          sentCount: 1,
-          lastSentAt: now,
-          requestedBy: { connect: { id: userId } },
-          ...sourceFields,
-        },
-      });
-    } else {
-      // Update existing: new expiration, increment sentCount (audit fields auto-injected)
-      record = await db.update({
-        where: { id: record.id },
-        data: {
-          status: 'pending',
-          expiresAt,
-          sentAt: now,
-          sentCount: { increment: 1 },
-          lastSentAt: now,
-          requestedBy: { connect: { id: userId } },
-          ...sourceFields,
-        },
-      });
+    // Que dos envíos simultáneos no se pisen: la escritura vale solo si la
+    // verificación sigue como se leyó (el mismo estado, el mismo último envío y lo
+    // mismo pedido), como la marca de verify-email. Si en el medio otro envío (o
+    // la verificación, o el vencimiento) la cambió, o la creó, no se escribe ni se
+    // manda nada: 409 concurrent_send. Sin esto, un pedido de solo email podía
+    // dejar scope: email justo después de un pedido de datos ya enviado por mail.
+    try {
+      if (!record) {
+        // Create new PENDING record — tenant + audit fields injected by SecurePrismaOps.
+        // Si otro envío la creó en el medio, choca con (empresa, email): P2002.
+        record = await db.create({
+          data: {
+            email: normalized,
+            status: 'pending',
+            expiresAt,
+            sentAt: now,
+            sentCount: 1,
+            lastSentAt: now,
+            requestedBy: { connect: { id: userId } },
+            ...scopeFields,
+            ...sourceFields,
+          },
+        });
+      } else {
+        // Update existing: un enlace nuevo, pendiente (el email deja de estar
+        // verificado hasta que se use), new expiration, increment sentCount (audit
+        // fields auto-injected). Si la verificación ya no está como se leyó,
+        // SecurePrismaOps no la encuentra (NotFoundError) o Prisma no actualiza
+        // nada (P2025).
+        record = await db.update({
+          where: {
+            id: record.id,
+            status: record.status,
+            lastSentAt: record.lastSentAt,
+            sourceEntity: record.sourceEntity,
+            sourceRecordId: record.sourceRecordId,
+            ...((withScope ? { scope: storedScopeOf(record) } : {}) as {}),
+          },
+          data: {
+            status: 'pending',
+            verifiedAt: null,
+            expiresAt,
+            sentAt: now,
+            sentCount: { increment: 1 },
+            lastSentAt: now,
+            requestedBy: { connect: { id: userId } },
+            ...scopeFields,
+            ...sourceFields,
+          },
+        });
+      }
+    } catch (error) {
+      if (!otherSendWon(error)) throw error;
+      logger.info({ tenantId, verificationId: record?.id }, 'Email verification send: changed by a concurrent send; nothing written');
+      return res.status(409).json({ success: false, error: 'concurrent_send' });
     }
 
     // El nombre del contacto para el saludo, solo en la validación de datos. Sale
@@ -488,7 +621,7 @@ router.post('/email-verification/send', async (req, res) => {
     // su código (su mensaje puede traer el mail: Prisma copia la consulta con sus valores).
     logger.info({ tenantId, verificationId: record.id, hasDataValidation }, 'Email verification sent');
 
-    return res.json({ success: true, status: 'sent' });
+    return res.json({ success: true, status: 'sent', scope });
   } catch (error) {
     logger.error(errorKind(error), 'Error in email-verification/send');
     return res.status(500).json({ success: false, error: 'internal_error' });
@@ -525,8 +658,13 @@ router.get('/public/verify-email/info', async (req, res) => {
       });
     }
 
-    // Check if this has external validation data
-    const evConfig = record.sourceEntity ? externalValidationRegistry[record.sourceEntity] : null;
+    // Check if this has external validation data: solo si el enlace vigente pide
+    // los datos (un envío de solo email sobre una verificación que antes fue de
+    // datos abre la página del email).
+    const evConfig =
+      verificationScopeOf(record) === 'data' && record.sourceEntity
+        ? externalValidationRegistry[record.sourceEntity]
+        : null;
 
     if (evConfig && record.sourceRecordId) {
       // Data validation mode — fetch entity data
@@ -637,6 +775,14 @@ router.post('/public/external-validation/submit', async (req, res) => {
 
     const { record } = result;
 
+    // Must have source entity + record, y que el enlace vigente pida los datos: un
+    // envío de solo email (aunque la verificación apunte a un registro de antes)
+    // no acepta el formulario. Antes que "ya confirmada": un email verificado con
+    // un enlace de solo email no es una confirmación de datos.
+    if (verificationScopeOf(record) !== 'data' || !record.sourceEntity || !record.sourceRecordId) {
+      return res.status(400).json({ success: false, error: 'no_validation_context' });
+    }
+
     // Ya confirmada (este formulario se envió antes, o lo envió otra pestaña): no
     // se vuelve a aplicar. Es la respuesta de una confirmación ya guardada, como
     // la de más abajo: un asiento que tira no la vuelve un error.
@@ -646,11 +792,6 @@ router.post('/public/external-validation/submit', async (req, res) => {
         message: 'already_verified',
         tenantInfo: await tenantInfoOf(record, { afterCommit: true }),
       });
-    }
-
-    // Must have source entity + record
-    if (!record.sourceEntity || !record.sourceRecordId) {
-      return res.status(400).json({ success: false, error: 'no_validation_context' });
     }
 
     const evConfig = externalValidationRegistry[record.sourceEntity];
@@ -892,16 +1033,31 @@ router.post('/public/external-validation/submit', async (req, res) => {
     //
     // Solo confirma una verificación que, dentro de la transacción, sigue
     // pendiente: el estado de más arriba se leyó antes, y un doble envío del
-    // mismo formulario (doble clic, dos pestañas) llega hasta acá dos veces.
+    // mismo formulario (doble clic, dos pestañas) llega hasta acá dos veces. Y
+    // solo si el enlace sigue pidiendo los datos de este registro: entre la carga
+    // y acá pudo salir otro envío con el mismo enlace (de solo email, o de datos
+    // para otro registro).
     const confirmOnce = () =>
       runWithTransactionScope(() =>
         basePrisma.$transaction(
           async (tx): Promise<ExternalValidationSubmittedResult> => {
             const current = await tx.emailVerification.findUnique({
               where: { id: record.id },
-              select: { status: true },
+              select: {
+                status: true,
+                sourceEntity: true,
+                sourceRecordId: true,
+                ...((hasScopeColumn() ? { scope: true } : {}) as {}),
+              },
             });
             if (current?.status !== 'pending') throw new VerificationNotPending(current?.status ?? null);
+            if (
+              verificationScopeOf(current) !== 'data' ||
+              current.sourceEntity !== record.sourceEntity ||
+              current.sourceRecordId !== record.sourceRecordId
+            ) {
+              throw new VerificationScopeChanged();
+            }
 
             if (changes.length > 0 && baseContext) {
               // Args en shape de input GraphQL: refs → `${campo}Id`, escalares directos.
@@ -960,7 +1116,9 @@ router.post('/public/external-validation/submit', async (req, res) => {
               data: {
                 status: 'verified',
                 verifiedAt: now,
-                validationChanges: changes.length > 0 ? changes.map(auditChange) : undefined,
+                // Sin cambios, vacío: no queda el diff de una validación anterior
+                // junto a la fecha de esta.
+                validationChanges: changes.length > 0 ? changes.map(auditChange) : Prisma.DbNull,
                 validationSubmittedAt: now,
                 version_: randomUUID(),
                 lastUpdatedAt_: now,
@@ -996,6 +1154,9 @@ router.post('/public/external-validation/submit', async (req, res) => {
         submitted = await confirmOnce();
       }
     } catch (err: any) {
+      if (err instanceof VerificationScopeChanged) {
+        return res.status(409).json({ success: false, error: 'scope_changed' });
+      }
       if (err instanceof VerificationNotPending) {
         // Otro envío la confirmó (o la revocaron, o venció) mientras tanto: la
         // misma respuesta que si ya lo estaba al llegar.
@@ -1122,6 +1283,10 @@ router.post('/public/external-validation/submit', async (req, res) => {
 /**
  * POST /api/public/verify-email
  * Public — contact clicks button on landing page (email-only verification).
+ *
+ * Solo con un enlace de solo email: uno que pide los datos se confirma con el
+ * formulario (external-validation/submit), nunca acá (409
+ * data_validation_required). Nunca toca lo de la validación de datos.
  */
 router.post('/public/verify-email', async (req, res) => {
   try {
@@ -1148,10 +1313,21 @@ router.post('/public/verify-email', async (req, res) => {
       });
     }
 
-    // Mark as VERIFIED
+    if (verificationScopeOf(record) === 'data') {
+      return res.status(409).json({ success: false, error: 'data_validation_required' });
+    }
+
+    // Mark as VERIFIED, solo si nada cambió desde que se leyó: sigue pendiente y
+    // con el mismo alcance (otro envío con el mismo enlace pudo pedir los datos).
     const now = new Date();
-    await basePrisma.emailVerification.update({
-      where: { id: record.id },
+    const marked = await basePrisma.emailVerification.updateMany({
+      where: {
+        id: record.id,
+        status: 'pending',
+        sourceEntity: record.sourceEntity,
+        sourceRecordId: record.sourceRecordId,
+        ...((hasScopeColumn() ? { scope: storedScopeOf(record) } : {}) as {}),
+      },
       data: {
         status: 'verified',
         verifiedAt: now,
@@ -1159,6 +1335,24 @@ router.post('/public/verify-email', async (req, res) => {
         lastUpdatedAt_: now,
       },
     });
+    if (marked.count !== 1) {
+      const after = await basePrisma.emailVerification.findUnique({
+        where: { id: record.id },
+        select: { status: true },
+      });
+      if (after?.status === 'verified') {
+        return res.json({
+          success: true,
+          message: 'already_verified',
+          ...(await tenantInfoOf(record, { afterCommit: true })),
+        });
+      }
+      if (!after) return res.status(404).json({ success: false, error: 'not_found' });
+      if (after.status === 'revoked' || after.status === 'expired') {
+        return res.status(410).json({ success: false, error: after.status });
+      }
+      return res.status(409).json({ success: false, error: 'scope_changed' });
+    }
 
     // Publish SSE event, con plazo (publishLiveEvents): la verificación ya quedó guardada.
     await publishLiveEvents('email verification', record.id, () =>

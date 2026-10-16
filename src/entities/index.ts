@@ -20,6 +20,8 @@ import { alertsTypeDefs, alertsResolvers } from "../alerts/graphql";
 // Entities Type Defs
 import { abStatementTypeDefs } from "./abStatement/schemas";
 import { abConceptCorrectionTypeDefs } from "./abConceptCorrection/schemas";
+import { abReconciliationTypeDefs } from "./abReconciliation/schemas";
+import { abPaymentBatchTypeDefs } from "./abPaymentBatch/schemas";
 import { userTypeDefs } from "./user/schemas";
 import { roleTypeDefs } from "./role/schemas";
 import { permissionTypeDefs } from "./permission/schemas";
@@ -33,6 +35,8 @@ import { emailVerificationTypeDefs } from "./emailVerification/schemas";
 // Entities Resolvers
 import { abStatementResolvers } from "./abStatement/resolvers/abStatementResolvers";
 import { abConceptCorrectionResolvers } from "./abConceptCorrection/resolvers/abConceptCorrectionResolvers";
+import { abReconciliationResolvers } from "./abReconciliation/resolvers/abReconciliationResolvers";
+import { abPaymentBatchResolvers } from "./abPaymentBatch/resolvers/abPaymentBatchResolvers";
 import { userResolvers } from "./user/resolvers/userResolvers";
 import { roleResolvers } from "./role/resolvers/roleResolvers";
 import { permissionResolvers } from "./permission/resolvers/permissionResolvers";
@@ -58,6 +62,8 @@ import { abStatementReadResolver } from "../pipelines";
 // DisplayIds
 export * from "./abStatement/resolvers/displayId";
 export * from "./abConceptCorrection/resolvers/displayId";
+export * from "./abReconciliation/resolvers/displayId";
+export * from "./abPaymentBatch/resolvers/displayId";
 export * from "./user/resolvers/displayId";
 export * from "./role/resolvers/displayId";
 export * from "./permission/resolvers/displayId";
@@ -82,6 +88,8 @@ const resolvers = merge(
   alertsResolvers,
   abStatementResolvers,
   abConceptCorrectionResolvers,
+  abReconciliationResolvers,
+  abPaymentBatchResolvers,
   userResolvers,
   roleResolvers,
   permissionResolvers,
@@ -106,6 +114,8 @@ export const schema: GraphQLSchema = makeExecutableSchema({
     alertsTypeDefs,
     abStatementTypeDefs,
     abConceptCorrectionTypeDefs,
+    abReconciliationTypeDefs,
+    abPaymentBatchTypeDefs,
     userTypeDefs,
     roleTypeDefs,
     permissionTypeDefs,

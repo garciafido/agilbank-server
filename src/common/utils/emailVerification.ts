@@ -64,6 +64,30 @@ export function maskEmail(email: string): string {
 }
 
 /**
+ * Lo que pide el enlace vigente de una verificación: 'email' (verificar solo la
+ * dirección) o 'data' (además, validar los datos del registro al que apunta).
+ */
+export type EmailVerificationScopeValue = "email" | "data";
+
+/**
+ * El alcance efectivo de una verificación: el campo scope, si el proyecto lo
+ * declara y el registro lo tiene. Un registro sin scope (de antes del campo, o
+ * de un proyecto que no lo declara) se deduce como antes: 'data' si apunta a un
+ * registro (sourceEntity y sourceRecordId), 'email' si no. Lo usan la ruta de la
+ * verificación y las rutas propias del proyecto que dependen del enlace (una
+ * subida de documentos, por ejemplo): un enlace de solo email no habilita nada
+ * de la validación de datos.
+ */
+export function verificationScopeOf(record: {
+  scope?: string | null;
+  sourceEntity?: string | null;
+  sourceRecordId?: string | null;
+}): EmailVerificationScopeValue {
+  if (record.scope === "email" || record.scope === "data") return record.scope;
+  return record.sourceEntity && record.sourceRecordId ? "data" : "email";
+}
+
+/**
  * Normalize email for consistent lookups: lowercase + trim + strip diacritics.
  */
 export function normalizeEmail(email: string): string {

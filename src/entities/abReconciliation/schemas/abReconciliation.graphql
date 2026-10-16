@@ -1,0 +1,70 @@
+type AbReconciliation {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  requestKey: String!
+  statementId: String!
+  request: Json!
+  result: Json!
+  proposalCount: Int!
+}
+
+extend type Mutation {
+  abReconciliationDelete(id: String!): AbReconciliation!
+}
+
+extend type Query {
+  abReconciliationOne(id: String!): AbReconciliation!
+  abReconciliationListWithOffset(
+    where: AbReconciliation_Filter
+    orderBy: [AbReconciliation_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [AbReconciliation]!
+  abReconciliationListWithCursor(
+    where: AbReconciliation_Filter
+    orderBy: AbReconciliation_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [AbReconciliation]!
+}
+
+input AbReconciliation_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  requestKey: FilterString
+  statementId: FilterString
+  request: FilterJson
+  result: FilterJson
+  proposalCount: FilterInt
+  AND: [AbReconciliation_Filter!]
+  OR: [AbReconciliation_Filter!]
+  NOT: [AbReconciliation_Filter!]
+}
+
+input AbReconciliation_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  requestKey: SortOrder
+  statementId: SortOrder
+  request: SortOrder
+  result: SortOrder
+  proposalCount: SortOrder
+}
+
+input AbReconciliation_OrderByCursor {
+  id: SortOrder
+}

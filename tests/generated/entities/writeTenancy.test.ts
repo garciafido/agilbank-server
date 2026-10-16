@@ -120,6 +120,12 @@ const ENTITIES = [
     basePermission: "abConceptCorrection",
     shared: false,
   },
+  {
+    entity: "AbReconciliation",
+    basePermission: "abReconciliation",
+    shared: false,
+  },
+  { entity: "AbPaymentBatch", basePermission: "abPaymentBatch", shared: false },
   { entity: "User", basePermission: "user", shared: false },
   { entity: "Role", basePermission: "role", shared: false },
   { entity: "Permission", basePermission: "permission", shared: true },

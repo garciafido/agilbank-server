@@ -32,6 +32,17 @@
  *
  * 5. La verificación con el link espera el evento en vivo con plazo: con un
  *    Redis que no contesta, responde igual.
+ * 6. El alcance del enlace (scope): un pedido de solo email no marca los datos
+ *    como validados ni pisa una validación anterior (sourceEntity,
+ *    sourceRecordId, validationSubmittedAt y validationChanges quedan como
+ *    estaban); con una validación de datos pendiente se rechaza; la página y la
+ *    verificación con el link siguen lo que pide el enlace vigente. Un email
+ *    verificado por otro origen no frena la validación de datos. Un proyecto
+ *    sin el campo scope (simulado) sigue como antes, salvo que un pedido de solo
+ *    email sobre una verificación de datos se rechaza.
+ * 7. Dos envíos simultáneos no se pisan: la escritura vale solo si la
+ *    verificación sigue como se leyó; si otro envío la cambió o la creó en el
+ *    medio, 409 concurrent_send, sin mandar el mail.
  *
  * No usa base: la base, la cola de mails, el envío del mail, Redis, la sesión y
  * el asiento van simulados.
@@ -40,6 +51,7 @@
 import { container } from "tsyringe";
 import { getEmailVerificationTemplate } from "../../src/common/emailTemplates/emailVerificationEmail";
 import { generateVerificationSignature } from "../../src/common/utils/emailVerification";
+import { Prisma } from "../../src/prisma/generated-client/client";
 import { processEmailNotification } from "../../src/workers/processors/emailProcessor";
 import { logger } from "../../src/utils/logger";
 import { withDeadline } from "../../src/utils/withDeadline";
@@ -55,6 +67,16 @@ const mockCopy = jest.fn();
 const mockSaved = jest.fn();
 const mockSendEmail = jest.fn();
 const mockPublish = jest.fn();
+// La verificación guardada para el email (SecurePrismaOps.findFirst; por defecto
+// ninguna), lo que se crea y lo que se actualiza.
+const mockExisting = jest.fn();
+const mockCreate = jest.fn();
+const mockUpdate = jest.fn();
+// La verificación con el link: la marca (updateMany) y lo que lee si no marcó.
+const mockMark = jest.fn();
+// Si el proyecto declara EmailVerification.scope: undefined, como el proyecto; true o
+// false lo simulan.
+let mockScopeColumn: boolean | undefined;
 const TENANT = { id: "t1", name: "EMPRESA", logo_data: null, publicUrl: null };
 
 jest.mock("../../src/common/emailVerification/senderDisplayName", () => ({
@@ -77,6 +99,25 @@ jest.mock("../../src/common/utils/email", () => ({
   ...jest.requireActual("../../src/common/utils/email"),
   sendEmail: (...args: unknown[]) => mockSendEmail(...args),
 }));
+jest.mock("../../src/prisma/generated-client/client", () => {
+  const actual = jest.requireActual("../../src/prisma/generated-client/client");
+  const fields = actual.Prisma.EmailVerificationScalarFieldEnum;
+  const Prisma = new Proxy(actual.Prisma, {
+    get(target, key, receiver) {
+      if (
+        key === "EmailVerificationScalarFieldEnum" &&
+        mockScopeColumn !== undefined
+      ) {
+        const rest = Object.fromEntries(
+          Object.entries({ ...fields }).filter(([name]) => name !== "scope")
+        );
+        return mockScopeColumn ? { ...rest, scope: "scope" } : rest;
+      }
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  return { ...actual, Prisma };
+});
 jest.mock("../../src/prisma/client", () => ({
   basePrisma: {
     tenant: {
@@ -90,6 +131,7 @@ jest.mock("../../src/prisma/client", () => ({
     emailVerification: {
       findUnique: (...args: unknown[]) => mockVerificationFindUnique(...args),
       update: async () => ({}),
+      updateMany: (...args: unknown[]) => mockMark(...args),
     },
     contact: {
       findFirst: (...args: unknown[]) => mockContactFindFirst(...args),
@@ -115,13 +157,27 @@ jest.mock("../../src/service-context", () => ({
 jest.mock("../../src/common/services/securePrismaOps", () => ({
   SecurePrismaOps: class {
     async findFirst() {
-      return null;
+      return mockExisting() ?? null;
     }
     async create({ data }: { data: Record<string, unknown> }) {
+      mockCreate(data);
       return { id: "v1", ...data, ...(mockSaved() ?? {}) };
     }
-    async update({ data }: { data: Record<string, unknown> }) {
-      return { id: "v1", ...data, ...(mockSaved() ?? {}) };
+    async update({
+      where,
+      data,
+    }: {
+      where: Record<string, unknown>;
+      data: Record<string, unknown>;
+    }) {
+      // Con lo pedido y con la condición: un test lo hace tirar como la base.
+      mockUpdate(data, where);
+      return {
+        id: "v1",
+        ...(mockExisting() ?? {}),
+        ...data,
+        ...(mockSaved() ?? {}),
+      };
     }
   },
 }));
@@ -376,7 +432,17 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
     mockSaved.mockReset();
     mockPublish.mockReset();
     mockPublish.mockResolvedValue(1);
+    mockExisting.mockReset();
+    mockCreate.mockReset();
+    mockUpdate.mockReset();
+    mockMark.mockReset();
+    mockMark.mockResolvedValue({ count: 1 });
+    mockScopeColumn = undefined;
+    lastStatus = 200;
   });
+
+  // El código de la última respuesta (200 si la ruta no puso otro).
+  let lastStatus = 200;
 
   const call = async (
     method: "get" | "post",
@@ -393,7 +459,8 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
     }
     let body: any;
     const res = {
-      status() {
+      status(code: number) {
+        lastStatus = code;
         return res;
       },
       json(value: unknown) {
@@ -418,8 +485,15 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
       },
     });
 
-  /** Un registro de verificación firmado, de validación de datos (o simple). */
-  const signed = (dataValidation: boolean, status = "verified") => {
+  /**
+   * Un registro de verificación firmado, de validación de datos (o simple). Con
+   * scope, el que quedó guardado; sin él, un registro de antes del campo.
+   */
+  const signed = (
+    dataValidation: boolean,
+    status = "verified",
+    scope?: "email" | "data"
+  ) => {
     const record = {
       id: "v1",
       email: "contacto@example.com",
@@ -429,6 +503,7 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
       expiresAt: new Date(Date.now() + 3600_000),
       sourceEntity: dataValidation ? "Contact" : null,
       sourceRecordId: dataValidation ? "c1" : null,
+      ...(scope ? { scope } : {}),
     };
     mockVerificationFindUnique.mockResolvedValue(record);
     return {
@@ -441,6 +516,7 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
     expect(await sendDataValidation()).toEqual({
       success: true,
       status: "sent",
+      scope: "data",
     });
     expect(mockEnqueue.mock.calls[0][0]).toMatchObject({
       tenantName: "EDITORIAL DEL PROYECTO",
@@ -459,6 +535,7 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
       expect(await sendDataValidation()).toEqual({
         success: true,
         status: "sent",
+        scope: "data",
       });
       expect(mockEnqueue.mock.calls[0][0]).toMatchObject({
         tenantName: "EMPRESA",
@@ -477,7 +554,7 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
       await call("post", "/email-verification/send", {
         body: { email: "contacto@example.com", sourceEntity: "Contact" },
       })
-    ).toEqual({ success: true, status: "sent" });
+    ).toEqual({ success: true, status: "sent", scope: "email" });
     expect(mockEnqueue.mock.calls[0][0]).toMatchObject({
       tenantName: "EMPRESA",
       hasDataValidation: false,
@@ -497,6 +574,7 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
     expect(await sendDataValidation()).toEqual({
       success: true,
       status: "sent",
+      scope: "data",
     });
     expect(mockEnqueue.mock.calls[0][0].recipientName).toBe("Ana");
     expect(mockContactFindFirst).toHaveBeenCalledWith({
@@ -557,7 +635,7 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
           tenant_id_: "t2",
         },
       })
-    ).toEqual({ success: true, status: "sent" });
+    ).toEqual({ success: true, status: "sent", scope: "data" });
     expect(mockContactFindFirst).toHaveBeenCalledWith({
       where: { id: "c1", tenant_id_: "t1" },
       select: { firstName: true },
@@ -574,7 +652,7 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
           sourceRecordId: "s1",
         },
       })
-    ).toEqual({ success: true, status: "sent" });
+    ).toEqual({ success: true, status: "sent", scope: "data" });
     expect(mockSupplierFindFirst).not.toHaveBeenCalled();
     expect(mockEnqueue.mock.calls[0][0]).toMatchObject({
       hasDataValidation: true,
@@ -593,6 +671,7 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
       expect(await sendDataValidation()).toEqual({
         success: true,
         status: "sent",
+        scope: "data",
       });
       expect(mockEnqueue).toHaveBeenCalledTimes(1);
       expect(mockEnqueue.mock.calls[0][0]).not.toHaveProperty("recipientName");
@@ -641,16 +720,7 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
       mockSender.mockRejectedValue(
         new Error("no se pudo leer el seudónimo para contacto@example.com")
       );
-      // Recién verificada (después del update) y ya verificada de antes.
-      expect(
-        await call("post", "/public/verify-email", {
-          body: signed(true, "pending"),
-        })
-      ).toMatchObject({
-        success: true,
-        message: "verified",
-        tenantName: "EMPRESA",
-      });
+      // Ya verificada de antes, con un enlace de datos (el nombre del asiento).
       expect(
         await call("post", "/public/verify-email", {
           body: signed(true, "verified"),
@@ -723,6 +793,7 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
       expect(await sendDataValidation()).toEqual({
         success: true,
         status: "sent",
+        scope: "data",
       });
       await call("post", "/email-verification/send", {
         body: { email: "contacto@example.com", sourceEntity: "Contact" },
@@ -772,6 +843,398 @@ describe("las rutas: el nombre del asiento en la validación de datos, con respa
     } finally {
       for (const spy of [info, warn, error]) spy.mockRestore();
     }
+  });
+
+  describe("el alcance del enlace: verificar solo el email, o el email y los datos", () => {
+    const send = (body: Record<string, unknown>) =>
+      call("post", "/email-verification/send", {
+        body: {
+          email: "contacto@example.com",
+          sourceEntity: "Contact",
+          ...body,
+        },
+      });
+    /** La verificación guardada para el email. */
+    const existing = (extra: Record<string, unknown>) =>
+      mockExisting.mockReturnValue({
+        id: "v1",
+        email: "contacto@example.com",
+        status: "verified",
+        verifiedAt: new Date("2026-10-01T12:00:00Z"),
+        expiresAt: new Date(Date.now() + 3600_000),
+        lastSentAt: new Date(Date.now() - 86_400_000),
+        sourceEntity: null,
+        sourceRecordId: null,
+        validationSubmittedAt: null,
+        validationChanges: null,
+        ...extra,
+      });
+    /** Los datos de c1 validados (con el email verificado). */
+    const VALIDATED = {
+      scope: "data",
+      sourceEntity: "Contact",
+      sourceRecordId: "c1",
+      validationSubmittedAt: new Date("2026-10-01T12:00:00Z"),
+      validationChanges: [
+        { field: "firstName", oldValue: "A", newValue: "Ana" },
+      ],
+    };
+    /** Lo de la validación de datos, que un pedido de solo email no toca. */
+    const DATA_FIELDS = [
+      "sourceEntity",
+      "sourceRecordId",
+      "validationSubmittedAt",
+      "validationChanges",
+    ];
+    const sentEmail = { success: true, status: "sent", scope: "email" };
+    const sentData = { success: true, status: "sent", scope: "data" };
+
+    beforeEach(() => {
+      mockScopeColumn = true;
+    });
+
+    it("solo el email, sin verificación guardada: la crea de solo email, sin el registro, y el mail es el simple", async () => {
+      expect(await send({ sourceRecordId: "c1", scope: "email" })).toEqual(
+        sentEmail
+      );
+      expect(mockCreate.mock.calls[0][0]).toMatchObject({
+        status: "pending",
+        scope: "email",
+      });
+      for (const field of DATA_FIELDS)
+        expect(mockCreate.mock.calls[0][0]).not.toHaveProperty(field);
+      expect(mockEnqueue.mock.calls[0][0]).toMatchObject({
+        hasDataValidation: false,
+        tenantName: "EMPRESA",
+      });
+      expect(mockSender).not.toHaveBeenCalled();
+    });
+
+    it("solo el email con los datos validados: sin resend, already_verified sin escribir ni mandar; con resend, pendiente de solo email y lo de los datos intacto", async () => {
+      existing(VALIDATED);
+      expect(
+        await send({ sourceRecordId: "c1", scope: "email" })
+      ).toMatchObject({
+        success: true,
+        status: "already_verified",
+        scope: "email",
+      });
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockEnqueue).not.toHaveBeenCalled();
+
+      expect(
+        await send({ sourceRecordId: "c1", scope: "email", resend: true })
+      ).toEqual(sentEmail);
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockUpdate.mock.calls[0][0]).toMatchObject({
+        status: "pending",
+        scope: "email",
+        verifiedAt: null,
+      });
+      for (const field of DATA_FIELDS)
+        expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty(field);
+      expect(mockEnqueue.mock.calls[0][0]).toMatchObject({
+        hasDataValidation: false,
+        tenantName: "EMPRESA",
+      });
+    });
+
+    it.each([
+      [
+        "con scope",
+        {
+          ...VALIDATED,
+          status: "pending",
+          validationSubmittedAt: null,
+          validationChanges: null,
+        },
+      ],
+      [
+        "de antes del campo (sin scope, apunta a un registro)",
+        {
+          scope: undefined,
+          status: "pending",
+          sourceEntity: "Contact",
+          sourceRecordId: "c1",
+        },
+      ],
+    ])(
+      "solo el email con una validación de datos pendiente (%s): 409 data_validation_pending, sin escribir ni mandar",
+      async (_name, saved) => {
+        existing(saved);
+        for (const resend of [false, true]) {
+          expect(
+            await send({ sourceRecordId: "c1", scope: "email", resend })
+          ).toEqual({
+            success: false,
+            error: "data_validation_pending",
+          });
+          expect(lastStatus).toBe(409);
+        }
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(mockCreate).not.toHaveBeenCalled();
+        expect(mockEnqueue).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ["vencida", { status: "expired" }],
+      [
+        "pendiente con el plazo cumplido",
+        { status: "pending", expiresAt: new Date(Date.now() - 1000) },
+      ],
+    ])(
+      "solo el email con una validación de datos %s: se manda, y lo validado antes queda",
+      async (_name, state) => {
+        existing({ ...VALIDATED, ...state });
+        expect(await send({ sourceRecordId: "c1", scope: "email" })).toEqual(
+          sentEmail
+        );
+        expect(mockUpdate.mock.calls[0][0]).toMatchObject({
+          status: "pending",
+          scope: "email",
+        });
+        for (const field of DATA_FIELDS)
+          expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty(field);
+      }
+    );
+
+    it("validar los datos con el email verificado por otro origen: se manda sin resend, y apunta a este registro", async () => {
+      existing({ scope: "email" });
+      expect(await send({ sourceRecordId: "c1", scope: "data" })).toEqual(
+        sentData
+      );
+      expect(mockUpdate.mock.calls[0][0]).toMatchObject({
+        status: "pending",
+        verifiedAt: null,
+        scope: "data",
+        sourceEntity: "Contact",
+        sourceRecordId: "c1",
+      });
+      expect(mockEnqueue.mock.calls[0][0]).toMatchObject({
+        hasDataValidation: true,
+        tenantName: "EDITORIAL DEL PROYECTO",
+      });
+    });
+
+    it("validar los datos de otro registro: la validación hecha era del anterior y se borra", async () => {
+      existing(VALIDATED);
+      expect(
+        await send({ sourceRecordId: "c2", scope: "data", resend: true })
+      ).toEqual(sentData);
+      const data = mockUpdate.mock.calls[0][0];
+      expect(data).toMatchObject({
+        scope: "data",
+        sourceEntity: "Contact",
+        sourceRecordId: "c2",
+        validationSubmittedAt: null,
+      });
+      expect(data.validationChanges).toBe(Prisma.DbNull);
+    });
+
+    it("validar otra vez los datos del mismo registro: sin resend, already_validated; con resend, lo validado queda hasta la nueva confirmación", async () => {
+      existing(VALIDATED);
+      expect(await send({ sourceRecordId: "c1", scope: "data" })).toMatchObject(
+        {
+          success: true,
+          status: "already_validated",
+          scope: "data",
+        }
+      );
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockEnqueue).not.toHaveBeenCalled();
+
+      expect(
+        await send({ sourceRecordId: "c1", scope: "data", resend: true })
+      ).toEqual(sentData);
+      const data = mockUpdate.mock.calls[0][0];
+      expect(data).toMatchObject({
+        status: "pending",
+        scope: "data",
+        sourceRecordId: "c1",
+      });
+      expect(data).not.toHaveProperty("validationSubmittedAt");
+      expect(data).not.toHaveProperty("validationChanges");
+    });
+
+    it("sin scope en el pedido, como antes: con registro, el email y los datos; sin registro, solo el email. Un scope que no es ninguno de los dos: 400", async () => {
+      expect(await send({ sourceRecordId: "c1" })).toEqual(sentData);
+      expect(await send({})).toEqual(sentEmail);
+      expect(mockCreate.mock.calls.map((c: any[]) => c[0].scope)).toEqual([
+        "data",
+        "email",
+      ]);
+      expect(await send({ sourceRecordId: "c1", scope: "todo" })).toEqual({
+        success: false,
+        error: "invalid_scope",
+      });
+      expect(lastStatus).toBe(400);
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+    });
+
+    it("la página de un enlace de solo email sobre una verificación que fue de datos: la del email, con el nombre de la empresa", async () => {
+      const info = await call("get", "/public/verify-email/info", {
+        query: signed(true, "pending", "email"),
+      });
+      expect(info).toMatchObject({ success: true, mode: "emailOnly" });
+      expect(info.tenantInfo.tenantName).toBe("EMPRESA");
+      expect(mockSender).not.toHaveBeenCalled();
+      expect(mockContactFindFirst).not.toHaveBeenCalled();
+    });
+
+    it("la verificación con el link: un enlace de datos no se verifica sin el formulario (409); uno de solo email se marca sin tocar lo de los datos", async () => {
+      expect(
+        await call("post", "/public/verify-email", {
+          body: signed(true, "pending"),
+        })
+      ).toEqual({
+        success: false,
+        error: "data_validation_required",
+      });
+      expect(lastStatus).toBe(409);
+      expect(mockMark).not.toHaveBeenCalled();
+
+      expect(
+        (
+          await call("post", "/public/verify-email", {
+            body: signed(true, "pending", "email"),
+          })
+        ).message
+      ).toBe("verified");
+      expect(mockMark.mock.calls[0][0].where).toEqual({
+        id: "v1",
+        status: "pending",
+        sourceEntity: "Contact",
+        sourceRecordId: "c1",
+        scope: "email",
+      });
+      expect(Object.keys(mockMark.mock.calls[0][0].data).sort()).toEqual([
+        "lastUpdatedAt_",
+        "status",
+        "verifiedAt",
+        "version_",
+      ]);
+    });
+
+    it("la verificación con el link: si el enlace cambió entre la lectura y la marca, 409 scope_changed; si otro lo verificó, already_verified", async () => {
+      mockMark.mockResolvedValue({ count: 0 });
+      // La relectura encuentra el mismo registro, todavía pendiente: cambió el alcance.
+      expect(
+        await call("post", "/public/verify-email", {
+          body: signed(false, "pending", "email"),
+        })
+      ).toEqual({
+        success: false,
+        error: "scope_changed",
+      });
+      expect(lastStatus).toBe(409);
+
+      const credentials = signed(false, "pending", "email");
+      const saved = await mockVerificationFindUnique();
+      mockVerificationFindUnique
+        .mockResolvedValueOnce(saved)
+        .mockResolvedValueOnce({ status: "verified" });
+      expect(
+        await call("post", "/public/verify-email", { body: credentials })
+      ).toMatchObject({
+        success: true,
+        message: "already_verified",
+      });
+    });
+
+    it("dos envíos simultáneos no se pisan: la escritura exige la verificación como se leyó; si otro envío la cambió o la creó en el medio, 409 concurrent_send sin mandar el mail", async () => {
+      // Se leyó un pedido de datos vencido; el envío de solo email escribe solo si sigue así.
+      existing({ ...VALIDATED, status: "expired" });
+      expect(await send({ sourceRecordId: "c1", scope: "email" })).toEqual(
+        sentEmail
+      );
+      expect(mockUpdate.mock.calls[0][1]).toEqual({
+        id: "v1",
+        status: "expired",
+        lastSentAt: (await mockExisting()).lastSentAt,
+        sourceEntity: "Contact",
+        sourceRecordId: "c1",
+        scope: "data",
+      });
+
+      // Otro envío la cambió en el medio: SecurePrismaOps no la encuentra con la
+      // condición, o Prisma no actualiza nada.
+      const {
+        NotFoundError,
+      } = require("../../src/common/errors/NotFoundError");
+      for (const lost of [
+        new NotFoundError(
+          "EmailVerification matching {} not found or not accessible for update."
+        ),
+        Object.assign(new Error("No record was found for an update."), {
+          code: "P2025",
+        }),
+      ]) {
+        mockUpdate.mockReset();
+        mockEnqueue.mockReset();
+        mockUpdate.mockImplementationOnce(() => {
+          throw lost;
+        });
+        expect(await send({ sourceRecordId: "c1", scope: "email" })).toEqual({
+          success: false,
+          error: "concurrent_send",
+        });
+        expect(lastStatus).toBe(409);
+        expect(mockEnqueue).not.toHaveBeenCalled();
+      }
+
+      // Otro envío la creó en el medio: el alta choca con (empresa, email).
+      mockExisting.mockReset();
+      mockCreate.mockImplementationOnce(() => {
+        throw Object.assign(new Error("Unique constraint failed"), {
+          code: "P2002",
+        });
+      });
+      expect(await send({ sourceRecordId: "c1", scope: "data" })).toEqual({
+        success: false,
+        error: "concurrent_send",
+      });
+      expect(lastStatus).toBe(409);
+      expect(mockEnqueue).not.toHaveBeenCalled();
+
+      // Cualquier otro error sigue siendo un 500.
+      mockCreate.mockImplementationOnce(() => {
+        throw new Error("otra cosa");
+      });
+      expect(await send({ sourceRecordId: "c1", scope: "data" })).toEqual({
+        success: false,
+        error: "internal_error",
+      });
+      expect(lastStatus).toBe(500);
+    });
+
+    it("un proyecto sin el campo scope: solo el email sobre una verificación de datos se rechaza (409 scope_not_supported); lo demás como antes, sin escribir scope", async () => {
+      mockScopeColumn = false;
+      existing({ ...VALIDATED, scope: undefined });
+      expect(
+        await send({ sourceRecordId: "c1", scope: "email", resend: true })
+      ).toEqual({
+        success: false,
+        error: "scope_not_supported",
+      });
+      expect(lastStatus).toBe(409);
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockEnqueue).not.toHaveBeenCalled();
+
+      mockExisting.mockReset();
+      expect(await send({ sourceRecordId: "c1" })).toEqual(sentData);
+      expect(await send({ scope: "email" })).toEqual(sentEmail);
+      for (const [data] of mockCreate.mock.calls)
+        expect(data).not.toHaveProperty("scope");
+      expect(
+        (
+          await call("post", "/public/verify-email", {
+            body: signed(false, "pending"),
+          })
+        ).message
+      ).toBe("verified");
+      expect(mockMark.mock.calls[0][0].where).not.toHaveProperty("scope");
+    });
   });
 });
 

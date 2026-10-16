@@ -427,6 +427,246 @@
       ]
     },
     {
+      "name": "AbReconciliation",
+      "labels": {
+        "es": {
+          "s": "Conciliación",
+          "p": "Conciliaciones",
+          "d": "Lo que se pidió conciliar de un extracto y la propuesta del motor para cada renglón."
+        }
+      },
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "ID"
+            },
+            "en": {
+              "s": "ID"
+            },
+            "pt": {
+              "s": "ID"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "requestKey",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Clave del Pedido",
+              "p": "El extracto y el SHA-256 del pedido"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "statementId",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Extracto",
+              "p": "El id del extracto conciliado"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "request",
+          "type": "Json",
+          "labels": {
+            "es": {
+              "s": "Pedido",
+              "p": "Lo que mandó ProntoNet"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "result",
+          "type": "Json",
+          "labels": {
+            "es": {
+              "s": "Propuestas",
+              "p": "Una por renglón pedido"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "proposalCount",
+          "type": "Int",
+          "labels": {
+            "es": {
+              "s": "Propuestas",
+              "p": "Cantidad de propuestas"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "createdAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de creación"
+            },
+            "en": {
+              "s": "Created at"
+            },
+            "pt": {
+              "s": "Data de criação"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "updatedAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de actualización"
+            },
+            "en": {
+              "s": "Updated at"
+            },
+            "pt": {
+              "s": "Data de atualização"
+            }
+          },
+          "groupable": false
+        }
+      ],
+      "displayFields": [
+        "statementId",
+        "proposalCount",
+        "createdAt_"
+      ]
+    },
+    {
+      "name": "AbPaymentBatch",
+      "labels": {
+        "es": {
+          "s": "Lote de Pagos",
+          "p": "Lotes de Pagos",
+          "d": "El detalle de un pago masivo tal como lo da el banco: las transferencias del lote y su estado."
+        }
+      },
+      "fields": [
+        {
+          "name": "id",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "ID"
+            },
+            "en": {
+              "s": "ID"
+            },
+            "pt": {
+              "s": "ID"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "originalName",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Nombre",
+              "p": "Nombre original del archivo"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "contentHash",
+          "type": "String",
+          "labels": {
+            "es": {
+              "s": "Huella del Archivo",
+              "p": "SHA-256 del contenido"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "transfers",
+          "type": "Json",
+          "labels": {
+            "es": {
+              "s": "Transferencias",
+              "p": "Las transferencias del lote"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "transferCount",
+          "type": "Int",
+          "labels": {
+            "es": {
+              "s": "Transferencias",
+              "p": "Cantidad"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "failedCount",
+          "type": "Int",
+          "labels": {
+            "es": {
+              "s": "Con Error",
+              "p": "Transferencias en estado de error"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "createdAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de creación"
+            },
+            "en": {
+              "s": "Created at"
+            },
+            "pt": {
+              "s": "Data de criação"
+            }
+          },
+          "groupable": false
+        },
+        {
+          "name": "updatedAt_",
+          "type": "DateTime",
+          "labels": {
+            "es": {
+              "s": "Fecha de actualización"
+            },
+            "en": {
+              "s": "Updated at"
+            },
+            "pt": {
+              "s": "Data de atualização"
+            }
+          },
+          "groupable": false
+        }
+      ],
+      "displayFields": [
+        "originalName",
+        "transferCount",
+        "failedCount"
+      ]
+    },
+    {
       "name": "User",
       "labels": {
         "en": {

@@ -10,6 +10,10 @@ import { AbConceptCorrectionOneService } from "../../../src/entities/abConceptCo
 import { AbConceptCorrectionCreateService } from "../../../src/entities/abConceptCorrection/services/abConceptCorrectionCreateService";
 import { AbConceptCorrectionUpdateService } from "../../../src/entities/abConceptCorrection/services/abConceptCorrectionUpdateService";
 import { AbConceptCorrectionDeleteService } from "../../../src/entities/abConceptCorrection/services/abConceptCorrectionDeleteService";
+import { AbReconciliationOneService } from "../../../src/entities/abReconciliation/services/abReconciliationOneService";
+import { AbReconciliationDeleteService } from "../../../src/entities/abReconciliation/services/abReconciliationDeleteService";
+import { AbPaymentBatchOneService } from "../../../src/entities/abPaymentBatch/services/abPaymentBatchOneService";
+import { AbPaymentBatchDeleteService } from "../../../src/entities/abPaymentBatch/services/abPaymentBatchDeleteService";
 import { UserOneService } from "../../../src/entities/user/services/userOneService";
 import { UserCreateService } from "../../../src/entities/user/services/userCreateService";
 import { UserUpdateService } from "../../../src/entities/user/services/userUpdateService";
@@ -136,6 +140,46 @@ const ENTIDADES = [
     permiso: "abConceptCorrection_delete",
     ejecutar: (c: any, p: any, s: any) =>
       new AbConceptCorrectionDeleteService(c, p, s).deleteAbConceptCorrection(
+        { id: "x" } as any,
+        undefined
+      ),
+  },
+  {
+    entidad: "AbReconciliation",
+    accion: "retrieve",
+    permiso: "abReconciliation_retrieve",
+    ejecutar: (c: any, p: any, s: any) =>
+      new AbReconciliationOneService(c, p, s).getOne(
+        { id: "x" } as any,
+        undefined
+      ),
+  },
+  {
+    entidad: "AbReconciliation",
+    accion: "delete",
+    permiso: "abReconciliation_delete",
+    ejecutar: (c: any, p: any, s: any) =>
+      new AbReconciliationDeleteService(c, p, s).deleteAbReconciliation(
+        { id: "x" } as any,
+        undefined
+      ),
+  },
+  {
+    entidad: "AbPaymentBatch",
+    accion: "retrieve",
+    permiso: "abPaymentBatch_retrieve",
+    ejecutar: (c: any, p: any, s: any) =>
+      new AbPaymentBatchOneService(c, p, s).getOne(
+        { id: "x" } as any,
+        undefined
+      ),
+  },
+  {
+    entidad: "AbPaymentBatch",
+    accion: "delete",
+    permiso: "abPaymentBatch_delete",
+    ejecutar: (c: any, p: any, s: any) =>
+      new AbPaymentBatchDeleteService(c, p, s).deleteAbPaymentBatch(
         { id: "x" } as any,
         undefined
       ),

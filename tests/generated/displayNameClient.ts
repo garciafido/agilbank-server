@@ -92,6 +92,20 @@ export function abConceptCorrectionDisplayId(
   return String(source.bankText ?? _langStore.emptyStringSymbol);
 }
 
+export function abReconciliationDisplayId(
+  source: any,
+  _langStore: ClientLangStore
+): string {
+  return String(source.requestKey ?? _langStore.emptyStringSymbol);
+}
+
+export function abPaymentBatchDisplayId(
+  source: any,
+  _langStore: ClientLangStore
+): string {
+  return String(source.originalName ?? _langStore.emptyStringSymbol);
+}
+
 export function userDisplayId(
   source: any,
   _langStore: ClientLangStore

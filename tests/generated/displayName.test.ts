@@ -9,6 +9,8 @@ import { Decimal } from "@prisma/client/runtime/client";
 import * as displayNameClient from "./displayNameClient";
 import * as abStatementDisplayIdModule from "../../src/entities/abStatement/resolvers/displayId";
 import * as abConceptCorrectionDisplayIdModule from "../../src/entities/abConceptCorrection/resolvers/displayId";
+import * as abReconciliationDisplayIdModule from "../../src/entities/abReconciliation/resolvers/displayId";
+import * as abPaymentBatchDisplayIdModule from "../../src/entities/abPaymentBatch/resolvers/displayId";
 import * as userDisplayIdModule from "../../src/entities/user/resolvers/displayId";
 import * as roleDisplayIdModule from "../../src/entities/role/resolvers/displayId";
 import * as permissionDisplayIdModule from "../../src/entities/permission/resolvers/displayId";
@@ -69,6 +71,28 @@ const MODEL: Record<
       rate: { type: "Decimal", nullable: true },
       review: { type: "__Enum", nullable: false },
       reviewedAt: { type: "DateTime", nullable: true },
+    },
+    relations: {},
+  },
+  AbReconciliation: {
+    columns: {
+      id: { type: "Id", nullable: false },
+      requestKey: { type: "String", nullable: false },
+      statementId: { type: "String", nullable: false },
+      request: { type: "Json", nullable: false },
+      result: { type: "Json", nullable: false },
+      proposalCount: { type: "Int", nullable: false },
+    },
+    relations: {},
+  },
+  AbPaymentBatch: {
+    columns: {
+      id: { type: "Id", nullable: false },
+      originalName: { type: "String", nullable: false },
+      contentHash: { type: "String", nullable: false },
+      transfers: { type: "Json", nullable: false },
+      transferCount: { type: "Int", nullable: false },
+      failedCount: { type: "Int", nullable: false },
     },
     relations: {},
   },
@@ -254,6 +278,25 @@ const COMPARED: Compared[] = [
     byLanguage: false,
     hops: 0,
     client: displayNameClient.abConceptCorrectionDisplayId,
+  },
+  {
+    entity: "AbReconciliation",
+    fragments:
+      abReconciliationDisplayIdModule.abReconciliationDisplayIdFragments,
+    name: abReconciliationDisplayIdModule.abReconciliationDisplayName,
+    text: abReconciliationDisplayIdModule.abReconciliationDisplayId,
+    byLanguage: false,
+    hops: 0,
+    client: displayNameClient.abReconciliationDisplayId,
+  },
+  {
+    entity: "AbPaymentBatch",
+    fragments: abPaymentBatchDisplayIdModule.abPaymentBatchDisplayIdFragments,
+    name: abPaymentBatchDisplayIdModule.abPaymentBatchDisplayName,
+    text: abPaymentBatchDisplayIdModule.abPaymentBatchDisplayId,
+    byLanguage: false,
+    hops: 0,
+    client: displayNameClient.abPaymentBatchDisplayId,
   },
   {
     entity: "User",
@@ -573,6 +616,8 @@ describe("<entidad>DisplayId sigue siendo texto", () => {
   const UNCHANGED = [
     "AbStatement",
     "AbConceptCorrection",
+    "AbReconciliation",
+    "AbPaymentBatch",
     "User",
     "Role",
     "Permission",

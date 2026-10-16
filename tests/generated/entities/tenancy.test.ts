@@ -7,6 +7,10 @@ import { AbStatementOneService } from "../../../src/entities/abStatement/service
 import { AbStatementListWithOffsetService } from "../../../src/entities/abStatement/services/abStatementListWithOffsetService";
 import { AbConceptCorrectionOneService } from "../../../src/entities/abConceptCorrection/services/abConceptCorrectionOneService";
 import { AbConceptCorrectionListWithOffsetService } from "../../../src/entities/abConceptCorrection/services/abConceptCorrectionListWithOffsetService";
+import { AbReconciliationOneService } from "../../../src/entities/abReconciliation/services/abReconciliationOneService";
+import { AbReconciliationListWithOffsetService } from "../../../src/entities/abReconciliation/services/abReconciliationListWithOffsetService";
+import { AbPaymentBatchOneService } from "../../../src/entities/abPaymentBatch/services/abPaymentBatchOneService";
+import { AbPaymentBatchListWithOffsetService } from "../../../src/entities/abPaymentBatch/services/abPaymentBatchListWithOffsetService";
 import { UserOneService } from "../../../src/entities/user/services/userOneService";
 import { UserListWithOffsetService } from "../../../src/entities/user/services/userListWithOffsetService";
 import { RoleOneService } from "../../../src/entities/role/services/roleOneService";
@@ -102,6 +106,34 @@ const ENTIDADES = [
       ),
     listar: (c: any, p: any, s: any) =>
       new AbConceptCorrectionListWithOffsetService(c, p, s).listWithOffset(
+        {} as any
+      ),
+  },
+  {
+    entidad: "AbReconciliation",
+    permiso: "abReconciliation_retrieve",
+    compartida: false,
+    leerUno: (c: any, p: any, s: any) =>
+      new AbReconciliationOneService(c, p, s).getOne(
+        { id: "x" } as any,
+        undefined
+      ),
+    listar: (c: any, p: any, s: any) =>
+      new AbReconciliationListWithOffsetService(c, p, s).listWithOffset(
+        {} as any
+      ),
+  },
+  {
+    entidad: "AbPaymentBatch",
+    permiso: "abPaymentBatch_retrieve",
+    compartida: false,
+    leerUno: (c: any, p: any, s: any) =>
+      new AbPaymentBatchOneService(c, p, s).getOne(
+        { id: "x" } as any,
+        undefined
+      ),
+    listar: (c: any, p: any, s: any) =>
+      new AbPaymentBatchListWithOffsetService(c, p, s).listWithOffset(
         {} as any
       ),
   },

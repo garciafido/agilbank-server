@@ -40,12 +40,17 @@
  *    vacío o que no es un texto no va, ni ninguna otra columna de la fila.
  * 6. El log no lleva lo que mandó el contacto ni su nombre: de un error, solo
  *    el tipo y el código (su mensaje puede traer los dos).
+ * 7. Solo confirma un enlace que pide los datos de ese registro (scope): uno de
+ *    solo email se rechaza antes, y si el enlace cambió entre la carga y la
+ *    transacción (otro envío con el mismo enlace), no se aplica nada. Sin
+ *    cambios, el diff guardado queda vacío (no el de una validación anterior).
  *
  * No usa base: la base, Redis, la sesión, el asiento, el servicio de la entidad
  * y los avisos van simulados.
  */
 
 import { generateVerificationSignature } from "../../src/common/utils/emailVerification";
+import { Prisma } from "../../src/prisma/generated-client/client";
 import { NullValueError } from "../../src/common/errors/NullValueError";
 import { ValidationError } from "../../src/common/errors/ValidationError";
 import { PrismaError } from "../../src/common/errors/PrismaError";
@@ -415,6 +420,12 @@ const OLD = {
   born: new Date("1985-03-12T00:00:00.000Z"),
 };
 const SIG = generateVerificationSignature("v1", "ana@example.com", "t1");
+// La verificación dentro de la transacción: pendiente y pidiendo los datos de c1.
+const PENDING_TX = {
+  status: "pending",
+  sourceEntity: "Contact",
+  sourceRecordId: "c1",
+};
 let router: any;
 // El log, simulado: para ver qué lleva (y que no lleve lo que mandó el contacto).
 const logs: Record<"info" | "warn" | "error", jest.SpyInstance> = {} as any;
@@ -461,7 +472,7 @@ beforeEach(() => {
   mockOrder.length = 0;
   mockDeferred.mockClear();
   mockTxStatus.mockReset();
-  mockTxStatus.mockResolvedValue({ status: "pending" });
+  mockTxStatus.mockResolvedValue(PENDING_TX);
   mockTxMark.mockReset();
   mockTxMark.mockImplementation(async () => {
     mockEvents.push("verified");
@@ -615,6 +626,10 @@ describe("la confirmación: cambios, asiento y marca en una transacción", () =>
     expect(body).toMatchObject({ success: true, changes: 0, verified: true });
     expect(mockEvents).toEqual(["seat", "verified"]);
     expect(mockServiceUpdate).not.toHaveBeenCalled();
+    // Vacío, no el diff de una validación anterior junto a la fecha de esta.
+    expect(mockTxMark.mock.calls[0][0].data.validationChanges).toBe(
+      Prisma.DbNull
+    );
   });
 
   it("si el asiento tira, no se marca verificado, no sale el evento y no se avisa", async () => {
@@ -1028,6 +1043,82 @@ describe("un Enum sin opciones declaradas", () => {
   });
 });
 
+describe("el alcance del enlace: solo confirma uno que pide los datos de ese registro", () => {
+  const nothingApplied = () => {
+    expect(mockServiceUpdate).not.toHaveBeenCalled();
+    expect(mockOnSubmitted).not.toHaveBeenCalled();
+    expect(mockTxMark).not.toHaveBeenCalled();
+    expect(mockEvents).toEqual([]);
+    expect(mockNotify).not.toHaveBeenCalled();
+    expect(mockPublish).not.toHaveBeenCalled();
+  };
+
+  it.each([
+    ["pendiente", "pending"],
+    ["ya verificado", "verified"],
+  ])(
+    "un enlace de solo email (%s), aunque la verificación apunte al registro: 400 no_validation_context, sin nada",
+    async (_name, status) => {
+      mockVerificationFindUnique.mockResolvedValue({
+        id: "v1",
+        email: "ana@example.com",
+        tenant_id_: "t1",
+        tenant_: {
+          id: "t1",
+          name: "EMPRESA",
+          logo_data: null,
+          publicUrl: null,
+        },
+        status,
+        expiresAt: new Date(Date.now() + 3600000),
+        scope: "email",
+        sourceEntity: "Contact",
+        sourceRecordId: "c1",
+      });
+      const { status: code, body } = await submit({ firstName: "Ana María" });
+      expect([code, body]).toEqual([
+        400,
+        { success: false, error: "no_validation_context" },
+      ]);
+      expect(mockAttempts).toBe(0);
+      nothingApplied();
+    }
+  );
+
+  it.each([
+    ["pasó a pedir solo el email", { ...PENDING_TX, scope: "email" }],
+    [
+      "pasó a pedir los datos de otro registro",
+      { ...PENDING_TX, scope: "data", sourceRecordId: "c2" },
+    ],
+  ])(
+    "el enlace cambió entre la carga y la transacción (%s): 409 scope_changed, sin nada aplicado",
+    async (_name, current) => {
+      mockTxStatus.mockResolvedValue(current);
+      const { status, body } = await submit({ firstName: "Ana María" });
+      expect([status, body]).toEqual([
+        409,
+        { success: false, error: "scope_changed" },
+      ]);
+      expect(mockAttempts).toBe(1);
+      nothingApplied();
+    }
+  );
+
+  it("la transacción lee, con el estado, a qué registro apunta el enlace y su alcance (si el proyecto lo declara)", async () => {
+    await submit({ firstName: "Ana María" });
+    const select = mockTxStatus.mock.calls[0][0].select;
+    expect(select).toMatchObject({
+      status: true,
+      sourceEntity: true,
+      sourceRecordId: true,
+    });
+    expect("scope" in select).toBe(
+      "scope" in Prisma.EmailVerificationScalarFieldEnum
+    );
+  });
+});
+
 describe("un choque con otra transacción se reintenta una vez; un doble envío confirma una sola vez", () => {
   const submittedEvents = () =>
     published().filter((e: any) => e.type === "externalValidation.submitted");
@@ -1121,7 +1212,7 @@ describe("un choque con otra transacción se reintenta una vez; un doble envío 
   it("doble envío: el reintento encuentra la verificación confirmada por el otro envío: already_verified, sin cambios, sin asiento y sin aviso", async () => {
     mockCommitFailures.push(conflict());
     mockTxStatus
-      .mockResolvedValueOnce({ status: "pending" })
+      .mockResolvedValueOnce(PENDING_TX)
       .mockResolvedValueOnce({ status: "verified" });
     const { status, body } = await submit({ firstName: "Ana", taxId: "   " });
     expect(status).toBe(200);
@@ -1161,7 +1252,7 @@ describe("un choque con otra transacción se reintenta una vez; un doble envío 
   it("si la marca no encuentra la verificación pendiente, se revierte todo: already_verified, sin aviso", async () => {
     mockTxMark.mockResolvedValueOnce({ count: 0 });
     mockTxStatus
-      .mockResolvedValueOnce({ status: "pending" })
+      .mockResolvedValueOnce(PENDING_TX)
       .mockResolvedValueOnce({ status: "verified" });
     const { status, body } = await submit({ firstName: "Ana", taxId: "   " });
     expect([status, body.message]).toEqual([200, "already_verified"]);
@@ -1272,7 +1363,7 @@ describe("lo que el asiento deja para después del commit (afterCommit)", () => 
       () => {
         mockTxMark.mockResolvedValueOnce({ count: 0 });
         mockTxStatus
-          .mockResolvedValueOnce({ status: "pending" })
+          .mockResolvedValueOnce(PENDING_TX)
           .mockResolvedValueOnce({ status: "verified" });
       },
     ],
@@ -1612,7 +1703,7 @@ describe("lo que pasa después del commit no cambia la respuesta", () => {
     seatFails();
     mockCommitFailures.push(conflict());
     mockTxStatus
-      .mockResolvedValueOnce({ status: "pending" })
+      .mockResolvedValueOnce(PENDING_TX)
       .mockResolvedValueOnce({ status: "verified" });
     const { status, body } = await submit({ firstName: "Ana", taxId: "   " });
     expect([status, body.success]).toEqual([200, true]);
