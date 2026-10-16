@@ -714,17 +714,12 @@ en <code>null</code>.</p>
 con qué valor se corresponde cada renglón. La respuesta es inmediata: tarda segundos, no los minutos
 de la lectura. El ámbito es <code>ab:conciliar</code>.</p>
 
-<p>El cuerpo es JSON en UTF-8, con <code>Content-Type: application/json</code>. Todas las claves son
-opcionales, pero sin <code>valores</code> no hay nada con qué aparear. Una clave que no se quiere
+<p>El cuerpo es JSON en UTF-8, con <code>Content-Type: application/json</code> (con o sin
+<code>charset</code>). Sin ese encabezado, AgilBank responde 415 <code>CUERPO_NO_SOPORTADO</code> sin leer el
+cuerpo y sin conciliar. Todas las claves son opcionales, pero sin <code>valores</code> no hay nada con qué aparear. Una clave que no se quiere
 enviar se omite: <code>null</code> no vale en <code>renglones</code>, <code>valores</code>,
 <code>contrapartes</code>, <code>cuentasPropias</code>, <code>lotes</code> ni <code>ventanaDias</code>, y
 responde 400. Dentro de cada valor, en cambio, los datos opcionales sí pueden ir en <code>null</code>.</p>
-
-<div class="nota">
-<p><b>Un cuidado.</b> Hoy, sin el encabezado <code>Content-Type: application/json</code> el cuerpo se
-ignora, y el pedido se trata como vacío: AgilBank concilia sin valores y todos los renglones vuelven
-<code>pendiente</code>. Lo mismo pasa si el pedido va sin cuerpo.</p>
-</div>
 
 <div class="desborde"><table>
 <thead><tr><th>Clave</th><th>Qué es</th></tr></thead>
@@ -856,28 +851,30 @@ misma. Un extracto de otra empresa responde 404, igual que uno que no existe.</p
 <h4>Los controles del pedido</h4>
 
 <p>AgilBank controla el pedido en este orden y responde con el primer error que encuentra. Si el
-pedido no trae credencial, responde 401 antes de leer el cuerpo. Con una credencial que no vale, el
-cuerpo se lee primero, y las filas 2 a 4 se aplican en este orden: codificación no aceptada,
+pedido no trae credencial, responde 401 antes de leer el cuerpo, y si no trae
+<code>Content-Type: application/json</code>, 415 antes de leerlo. Con una credencial que no vale, el
+cuerpo se lee primero, y las filas 3 a 5 se aplican en este orden: codificación no aceptada,
 cuerpo demasiado grande y cuerpo mal formado.</p>
 
 <div class="desborde"><table>
 <thead><tr><th class="num">#</th><th>Control</th><th>HTTP</th><th>Código</th></tr></thead>
 <tbody>
 <tr><td class="num">1</td><td>El pedido no trae credencial</td><td>401</td><td><code>NO_AUTORIZADO</code></td></tr>
-<tr><td class="num">2</td><td>El cuerpo usa una codificación de contenido o un juego de caracteres que no se acepta</td><td>415</td><td><code>CUERPO_NO_SOPORTADO</code></td></tr>
-<tr><td class="num">3</td><td>El cuerpo pesa más de 16 MB</td><td>413</td><td><code>CUERPO_DEMASIADO_GRANDE</code></td></tr>
-<tr><td class="num">4</td><td>El cuerpo no es un JSON válido, o llegó incompleto</td><td>400</td><td><code>PEDIDO_INVALIDO</code>, con <code>"campo": null</code></td></tr>
-<tr><td class="num">5</td><td>La credencial es inválida, venció o fue revocada, o se dio de baja su usuario de servicio</td><td>401</td><td><code>NO_AUTORIZADO</code></td></tr>
-<tr><td class="num">6</td><td>La credencial no tiene el ámbito <code>ab:conciliar</code></td><td>403</td><td><code>AMBITO_INSUFICIENTE</code></td></tr>
-<tr><td class="num">7</td><td>La credencial no está asociada a una empresa, o no tiene usuario de servicio. No ocurre con credenciales emitidas por nosotros</td><td>403</td><td><code>SIN_EMPRESA</code>, <code>SIN_USUARIO_DE_SERVICIO</code></td></tr>
-<tr><td class="num">8</td><td>No hay un extracto con ese identificador en la empresa de la credencial</td><td>404</td><td><code>NO_ENCONTRADO</code></td></tr>
-<tr><td class="num">9</td><td>El extracto todavía no está leído: está <code>en-proceso</code> o <code>fallido</code></td><td>409</td><td><code>EXTRACTO_SIN_LEER</code></td></tr>
-<tr><td class="num">10</td><td>La lectura tiene el veredicto <code>sin-lectura</code> o <code>no-disponible</code>: no hay renglones con qué conciliar</td><td>409</td><td><code>SIN_LECTURA</code></td></tr>
-<tr><td class="num">11</td><td>La lectura trae el aviso <code>varias-cuentas</code> o <code>cuenta-distinta</code>: los valores son de otra cuenta. El <code>error</code> repite el detalle del aviso</td><td>409</td><td><code>OTRA_CUENTA</code></td></tr>
-<tr><td class="num">12</td><td>La lectura tiene más de 1.500 renglones. El tope vale para toda la lectura, aunque se pidan pocos renglones: manden el extracto partido</td><td>409</td><td><code>LECTURA_DEMASIADO_GRANDE</code></td></tr>
-<tr><td class="num">13</td><td>El pedido no tiene la forma indicada en esta sección, o pasa un tope</td><td>400</td><td><code>PEDIDO_INVALIDO</code>, con <code>campo</code> y, si el problema está en un valor, <code>idValor</code></td></tr>
-<tr><td class="num">14</td><td>Un renglón pedido no está en la lectura</td><td>400</td><td><code>PEDIDO_INVALIDO</code>, con <code>"campo": "renglones"</code></td></tr>
-<tr><td class="num">15</td><td>Un lote pedido no existe en la empresa</td><td>400</td><td><code>PEDIDO_INVALIDO</code>, con <code>"campo": "lotes"</code></td></tr>
+<tr><td class="num">2</td><td>El pedido no trae <code>Content-Type: application/json</code></td><td>415</td><td><code>CUERPO_NO_SOPORTADO</code></td></tr>
+<tr><td class="num">3</td><td>El cuerpo usa una codificación de contenido o un juego de caracteres que no se acepta</td><td>415</td><td><code>CUERPO_NO_SOPORTADO</code></td></tr>
+<tr><td class="num">4</td><td>El cuerpo pesa más de 16 MB</td><td>413</td><td><code>CUERPO_DEMASIADO_GRANDE</code></td></tr>
+<tr><td class="num">5</td><td>El cuerpo no es un JSON válido, o llegó incompleto</td><td>400</td><td><code>PEDIDO_INVALIDO</code>, con <code>"campo": null</code></td></tr>
+<tr><td class="num">6</td><td>La credencial es inválida, venció o fue revocada, o se dio de baja su usuario de servicio</td><td>401</td><td><code>NO_AUTORIZADO</code></td></tr>
+<tr><td class="num">7</td><td>La credencial no tiene el ámbito <code>ab:conciliar</code></td><td>403</td><td><code>AMBITO_INSUFICIENTE</code></td></tr>
+<tr><td class="num">8</td><td>La credencial no está asociada a una empresa, o no tiene usuario de servicio. No ocurre con credenciales emitidas por nosotros</td><td>403</td><td><code>SIN_EMPRESA</code>, <code>SIN_USUARIO_DE_SERVICIO</code></td></tr>
+<tr><td class="num">9</td><td>No hay un extracto con ese identificador en la empresa de la credencial</td><td>404</td><td><code>NO_ENCONTRADO</code></td></tr>
+<tr><td class="num">10</td><td>El extracto todavía no está leído: está <code>en-proceso</code> o <code>fallido</code></td><td>409</td><td><code>EXTRACTO_SIN_LEER</code></td></tr>
+<tr><td class="num">11</td><td>La lectura tiene el veredicto <code>sin-lectura</code> o <code>no-disponible</code>: no hay renglones con qué conciliar</td><td>409</td><td><code>SIN_LECTURA</code></td></tr>
+<tr><td class="num">12</td><td>La lectura trae el aviso <code>varias-cuentas</code> o <code>cuenta-distinta</code>: los valores son de otra cuenta. El <code>error</code> repite el detalle del aviso</td><td>409</td><td><code>OTRA_CUENTA</code></td></tr>
+<tr><td class="num">13</td><td>La lectura tiene más de 1.500 renglones. El tope vale para toda la lectura, aunque se pidan pocos renglones: manden el extracto partido</td><td>409</td><td><code>LECTURA_DEMASIADO_GRANDE</code></td></tr>
+<tr><td class="num">14</td><td>El pedido no tiene la forma indicada en esta sección, o pasa un tope</td><td>400</td><td><code>PEDIDO_INVALIDO</code>, con <code>campo</code> y, si el problema está en un valor, <code>idValor</code></td></tr>
+<tr><td class="num">15</td><td>Un renglón pedido no está en la lectura</td><td>400</td><td><code>PEDIDO_INVALIDO</code>, con <code>"campo": "renglones"</code></td></tr>
+<tr><td class="num">16</td><td>Un lote pedido no existe en la empresa</td><td>400</td><td><code>PEDIDO_INVALIDO</code>, con <code>"campo": "lotes"</code></td></tr>
 </tbody>
 </table></div>
 
@@ -913,7 +910,7 @@ medias: un solo dato inválido corta todo el pedido.</p>
 <tr><td><code>coincidencias</code></td><td>Lo que coincidió (abajo). Solo en <code>apareo</code>; en los demás tipos, <code>null</code></td></tr>
 <tr><td><code>marcas</code></td><td>Lista de avisos sobre cómo se llegó a la propuesta (abajo). Puede venir vacía. Un <code>a-revisar</code> nunca trae marcas</td></tr>
 <tr><td><code>motivo</code></td><td>En <code>a-revisar</code> y <code>pendiente</code>, el motivo en castellano, para mostrar. En <code>apareo</code>, <code>null</code></td></tr>
-<tr><td><code>candidatos</code></td><td>Solo en <code>a-revisar</code>: las combinaciones que encontró, cada una como <code>{ "valores": [...] }</code>. Puede venir vacía, si la búsqueda no alcanzó a terminar. En los demás tipos, <code>null</code></td></tr>
+<tr><td><code>candidatos</code></td><td>Solo en <code>a-revisar</code>: las combinaciones que encontró, cada una como <code>{ "valores": [...] }</code>. Puede venir vacía, si no se pudo buscar entero. En los demás tipos, <code>null</code></td></tr>
 </tbody>
 </table></div>
 
@@ -923,8 +920,8 @@ medias: un solo dato inválido corta todo el pedido.</p>
 <thead><tr><th>Tipo</th><th>Qué quiere decir</th></tr></thead>
 <tbody>
 <tr><td><code>apareo</code></td><td>AgilBank encontró el valor, o los valores, que le corresponden al renglón</td></tr>
-<tr><td><code>a-revisar</code></td><td>Hay más de una respuesta posible, o la búsqueda no terminó. No propone ningún valor: las posibilidades están en <code>candidatos</code>, para que las vea una persona</td></tr>
-<tr><td><code>pendiente</code></td><td>No hay en el pedido un valor que le corresponda. Todo renglón vuelve con una propuesta o con «a revisar»</td></tr>
+<tr><td><code>a-revisar</code></td><td>Hay más de una respuesta posible, o no se pudo buscar entero. No propone ningún valor: las posibilidades que encontró, si encontró alguna, están en <code>candidatos</code>, para que las vea una persona</td></tr>
+<tr><td><code>pendiente</code></td><td>Se buscó, y no hay en el pedido un valor que le corresponda. Un renglón que no se pudo buscar entero vuelve <code>a-revisar</code>, nunca <code>pendiente</code>. Todo renglón vuelve con una propuesta o con «a revisar»</td></tr>
 </tbody>
 </table></div>
 
@@ -985,17 +982,24 @@ que no conozcan, trátenlo como <code>pendiente</code>.</p>
 
 <h3>Los motivos</h3>
 
-<p>El <code>motivo</code> viene en castellano para mostrarlo. Estos son los seis:</p>
+<p>El <code>motivo</code> viene en castellano para mostrarlo. Estos son los once. Los cinco últimos dicen
+que no se pudo buscar y por qué: el renglón vuelve <code>a-revisar</code> sin candidatos, porque no
+se sabe si el valor falta.</p>
 
 <div class="desborde"><table>
 <thead><tr><th>Tipo</th><th>Motivo</th><th>Cuándo</th></tr></thead>
 <tbody>
-<tr><td><code>pendiente</code></td><td>«No hay un valor pendiente que coincida.»</td><td>Ningún valor del pedido le corresponde al renglón</td></tr>
+<tr><td><code>pendiente</code></td><td>«No hay un valor pendiente que coincida.»</td><td>Se buscó, y ningún valor del pedido le corresponde al renglón</td></tr>
 <tr><td><code>pendiente</code></td><td>«Transferencia entre cuentas propias sin valor cargado.»</td><td>El renglón es una transferencia entre cuentas propias y no aparece el valor. Trae la marca <code>cuentas-propias</code></td></tr>
 <tr><td><code>a-revisar</code></td><td>«Más de un renglón coincide con el mismo valor.»</td><td>Dos renglones reclaman el mismo valor y no son intercambiables</td></tr>
 <tr><td><code>a-revisar</code></td><td>«Hay más de una combinación de valores que suma el importe.»</td><td>Un renglón se puede explicar con valores distintos que suman lo mismo</td></tr>
 <tr><td><code>a-revisar</code></td><td>«Hay más de una combinación de renglones que suma un valor.»</td><td>Un valor se puede explicar con renglones distintos que suman lo mismo</td></tr>
-<tr><td><code>a-revisar</code></td><td>«La búsqueda de una suma de valores pasó el tiempo disponible: revisalo a mano.»</td><td>La búsqueda se cortó por el techo de tiempo (sección 10)</td></tr>
+<tr><td><code>a-revisar</code></td><td>«La búsqueda de una suma de valores pasó el tiempo disponible: hay que revisarlo a mano.»</td><td>La búsqueda de una suma de valores del renglón (paso 5) se cortó por el techo de tiempo. Trae como candidatos las combinaciones que alcanzó a ver (sección 10)</td></tr>
+<tr><td><code>a-revisar</code></td><td>«La búsqueda de una suma de renglones pasó el tiempo disponible: hay que revisarlo a mano.»</td><td>El renglón estaba en una búsqueda de una suma de renglones (paso 6) que se cortó por el techo de tiempo (sección 10)</td></tr>
+<tr><td><code>a-revisar</code></td><td>«No se terminó de buscar: el apareo pasó el tiempo disponible. Hay que revisarlo a mano.»</td><td>Se pasó el tiempo de todo el pedido antes de terminar los pasos para este renglón (sección 10)</td></tr>
+<tr><td><code>a-revisar</code></td><td>«No se pudo buscar un valor único: hay más de 50 del mismo importe que podrían ser de este renglón. Hay que revisarlo a mano.»</td><td>Con tantos valores del mismo importe en la ventana, o con el mismo número, ninguno puede quedar único (pasos 1 a 3). El renglón sigue entrando en los intercambiables y en las sumas</td></tr>
+<tr><td><code>a-revisar</code></td><td>«No se buscó una suma de valores: hay más de 200 en la ventana. Hay que revisarlo a mano.»</td><td>Un depósito de cheques o un pago masivo con más de 200 valores del mismo signo en la ventana (paso 5)</td></tr>
+<tr><td><code>a-revisar</code></td><td>«No se buscó una suma de renglones: el día tiene más de 40 del mismo grupo. Hay que revisarlo a mano.»</td><td>Un valor miraba un día con más de 40 renglones del mismo grupo y del mismo signo: los del mismo tipo de fondo, o los de una cuota (paso 6)</td></tr>
 </tbody>
 </table></div>
 
@@ -1097,7 +1101,8 @@ Si hay más de una combinación, el renglón va a <code>a-revisar</code>.</li>
 cualquiera de sus fechas (la ventana, abajo). Dentro de cada vuelta, los pasos 1 a 3 se repiten
 mientras resuelvan algo, porque lo resuelto puede dejar a otro renglón con un solo candidato.</p>
 
-<p>Un renglón que no apareó en ningún paso vuelve <code>pendiente</code>.</p>
+<p>Un renglón que no apareó en ningún paso vuelve <code>pendiente</code>. Uno que no se pudo buscar
+entero, por el tiempo o por un tope, vuelve <code>a-revisar</code> con el motivo que dice por qué.</p>
 
 <h3>La ventana de días</h3>
 
@@ -1130,15 +1135,20 @@ más valores del mismo importe para el mismo renglón. Si con el cambio sube la 
 
 <h3>Las sumas y el techo de tiempo</h3>
 
-<p>Buscar una suma exacta de valores o de renglones puede llevar mucho tiempo. AgilBank le pone un
-techo: hoy, 2 segundos por renglón y 6 segundos por pedido. Pasado el techo en la suma de valores
-(paso 5), el renglón vuelve <code>a-revisar</code> con el motivo. Pasado el techo en la suma de
-renglones (paso 6), los renglones vuelven <code>pendiente</code> y el valor queda sin proponer. La respuesta nunca queda colgada, y una búsqueda que no terminó nunca produce un
-apareo.</p>
+<p>Buscar una suma exacta de valores o de renglones puede llevar mucho tiempo, y un pedido con miles de
+valores del mismo importe también. AgilBank le pone un techo: hoy, 6 segundos para todo el pedido, y
+2 segundos para cada búsqueda de una suma. Pasado el techo en la suma de valores (paso 5), el renglón
+vuelve <code>a-revisar</code> con el motivo. Pasado el techo en la suma de renglones (paso 6), los
+renglones de esa búsqueda vuelven <code>a-revisar</code> y el valor queda sin proponer. Pasado el
+techo del pedido, en cualquier paso, ninguno propone un apareo más: los renglones que quedan vuelven
+<code>a-revisar</code> con el motivo de tiempo. La respuesta nunca queda colgada, y una búsqueda que
+no terminó nunca produce un apareo ni un <code>pendiente</code>.</p>
 
 <p>La suma de valores de la ventana se busca solo para los renglones de depósito de cheques y de pago
-masivo, y solo si en la ventana hay hasta 200 valores del mismo signo. Con más, no se busca. Buscar
-sumas para una comisión o un impuesto gastaría el techo.</p>
+masivo, y solo si en la ventana hay hasta 200 valores del mismo signo. Con más, no se busca, y el
+renglón vuelve <code>a-revisar</code> con su motivo. Buscar sumas para una comisión o un impuesto
+gastaría el techo. Los renglones de un día se suman contra un valor (paso 6) solo si su grupo tiene
+hasta 40; con más, tampoco se busca, y vuelven <code>a-revisar</code>.</p>
 
 <h3>El detalle de un pago masivo</h3>
 
@@ -1282,7 +1292,7 @@ cuando el problema está en un valor.</p>
 <tr><td><code>NO_ENCONTRADO</code></td><td class="num">404</td><td>No hay un extracto con ese identificador o esa huella, ni una conciliación con ese identificador, en la empresa de la credencial</td></tr>
 <tr><td><code>CORRECCION_INVALIDA</code></td><td class="num">400</td><td>La corrección no tiene la forma indicada, el cuerpo no es un JSON válido o llegó incompleto. Trae <code>campo</code></td></tr>
 <tr><td><code>CUERPO_DEMASIADO_GRANDE</code></td><td class="num">413</td><td>El cuerpo de una corrección pesa más de 64 KB, o el de un pedido de conciliación, más de 16 MB</td></tr>
-<tr><td><code>CUERPO_NO_SOPORTADO</code></td><td class="num">415</td><td>El cuerpo de una corrección o de un pedido de conciliación usa una codificación de contenido o un juego de caracteres que no se acepta. Se acepta JSON en UTF-8</td></tr>
+<tr><td><code>CUERPO_NO_SOPORTADO</code></td><td class="num">415</td><td>El cuerpo de una corrección o de un pedido de conciliación usa una codificación de contenido o un juego de caracteres que no se acepta, o un pedido de conciliación no trae <code>Content-Type: application/json</code>. Se acepta JSON en UTF-8</td></tr>
 <tr><td><code>PEDIDO_INVALIDO</code></td><td class="num">400</td><td>El pedido de conciliación no tiene la forma indicada, un renglón o un lote pedido no existe, o el cuerpo no es un JSON válido o llegó incompleto. Trae <code>campo</code> y, si el problema está en un valor, <code>idValor</code> (sección 08)</td></tr>
 <tr><td><code>EXTRACTO_SIN_LEER</code></td><td class="num">409</td><td>Se pidió conciliar un extracto que todavía no está leído: está <code>en-proceso</code> o <code>fallido</code></td></tr>
 <tr><td><code>SIN_LECTURA</code></td><td class="num">409</td><td>Se pidió conciliar un extracto cuya lectura tiene el veredicto <code>sin-lectura</code> o <code>no-disponible</code></td></tr>
@@ -1325,7 +1335,7 @@ cuando el problema está en un valor.</p>
 <tr><td>El cuerpo de un pedido de conciliación</td><td>16 MB</td></tr>
 <tr><td>Transferencias de un lote</td><td>5.000</td></tr>
 <tr><td>El archivo de un lote</td><td>10 MB</td></tr>
-<tr><td>La búsqueda de sumas de una conciliación</td><td>2 segundos por renglón y 6 segundos por pedido. Pasado el tiempo, la suma de valores vuelve <code>a-revisar</code> y la de renglones, <code>pendiente</code> (sección 10)</td></tr>
+<tr><td>El tiempo de una conciliación</td><td>6 segundos por pedido, y 2 segundos por cada búsqueda de una suma. Pasado el tiempo, lo que no se terminó de buscar vuelve <code>a-revisar</code> (sección 10)</td></tr>
 </tbody>
 </table></div>
 
