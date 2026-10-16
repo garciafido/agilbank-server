@@ -120,16 +120,17 @@ it("sube el extracto y lo lee", async () => {
   idCheque = read.lectura.renglones.find((r) => r.delBanco.texto.includes("CHEQUE"))!.id;
 });
 
-it("concilia: el cheque se aparea por número e importe, y los otros dos renglones quedan pendientes", async () => {
+it("concilia: el cheque se aparea por número e importe, la comisión sale como DBG sin cuenta (el pedido no trae catálogo) y la transferencia queda pendiente", async () => {
   const first = await reconcile(idExtracto, PEDIDO);
   expect(first.status).toBe(200);
-  const body = (await first.json()) as { idConciliacion: string; propuestas: Array<{ idRenglon: string; tipo: string; valores: unknown; coincidencias: unknown }> };
+  const body = (await first.json()) as { idConciliacion: string; propuestas: Array<{ idRenglon: string; tipo: string; valores: unknown; coincidencias: unknown; origen: unknown }> };
   expect(body.idConciliacion).toEqual(expect.any(String));
   expect(body.propuestas).toHaveLength(3);
   const apareos = body.propuestas.filter((p) => p.tipo === "apareo");
   expect(apareos).toHaveLength(1);
   expect(apareos[0]).toMatchObject({ idRenglon: idCheque, valores: [501], coincidencias: { importe: true, numero: "12345" } });
-  expect(body.propuestas.filter((p) => p.tipo === "pendiente")).toHaveLength(2);
+  expect(body.propuestas.filter((p) => p.tipo === "pendiente")).toHaveLength(1);
+  expect(body.propuestas.filter((p) => p.tipo === "dbg")).toEqual([expect.objectContaining({ origen: "ninguno" })]);
 
   const again = await reconcile(idExtracto, PEDIDO);
   expect(again.status).toBe(200);
