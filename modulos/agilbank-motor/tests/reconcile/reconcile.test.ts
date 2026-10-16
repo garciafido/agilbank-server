@@ -1,9 +1,10 @@
 import { reconcile } from "../../src/reconcile/reconcile";
 import { DEFAULT_RECONCILE_OPTIONS, type ReconcileContext } from "../../src/reconcile/types";
+import { PENDING_3B, PENDING_THIRD_PARTY } from "../../src/dbg/open";
 import { line, val } from "./fixtures";
 
-const ctx = (over: Partial<ReconcileContext> = {}): ReconcileContext => ({ lineIds: null, values: [], parties: [], ownAccounts: [], batchIds: [], windowDays: 5, ...over });
-const run = (lines: ReturnType<typeof line>[], context: ReconcileContext, readingWarning = false) => reconcile({ lines, context, batches: [], readingWarning }).proposals;
+const ctx = (over: Partial<ReconcileContext> = {}): ReconcileContext => ({ lineIds: null, values: [], parties: [], ownAccounts: [], batchIds: [], windowDays: 5, catalogs: null, history: [], ...over });
+const run = (lines: ReturnType<typeof line>[], context: ReconcileContext, readingWarning = false) => reconcile({ lines, context, batches: [], readingWarning, bankCode: null, decisions: [] }).proposals;
 
 describe("reconcile: uno a uno", () => {
   it("AC-12: un cheque, un ECHEQ, una transferencia, un depósito, un cupón y un DBG, cada uno con su renglón", () => {
@@ -79,7 +80,7 @@ describe("reconcile: uno a uno", () => {
 
 describe("reconcile: las pasadas por dentro", () => {
   it("lo que queda sin valor sale pendiente con su motivo y sin marcas", () => {
-    expect(run([line()], ctx())).toEqual([{ kind: "pending", lineId: "l1", reason: "No hay un valor pendiente que coincida.", marks: [] }]);
+    expect(run([line()], ctx())).toEqual([{ kind: "pending", lineId: "l1", reason: PENDING_THIRD_PARTY, marks: [] }]);
   });
   it("dos renglones con el mismo número reclaman el mismo valor: los dos a revisar, con el motivo", () => {
     const out = run([line({ id: "a", reference: "4512" }), line({ id: "b", reference: "4512", date: "2026-07-25" })], ctx({ values: [val({ number: "4512" })] }));
@@ -192,7 +193,7 @@ describe("reconcile: la ventana contra cualquier fecha del valor", () => {
     const out = run([line({ id: "A", date: "2026-07-20" }), line({ id: "B", date: "2026-07-10" })], ctx({ values: [val({ voucherDate: "2026-07-10", depositDate: "2026-07-20" })] }));
     expect(out).toEqual([
       { kind: "match", lineId: "A", groupLineIds: ["A"], valueIds: ["v1"], confidence: "grounded", coincidence: { amount: true, days: 0 }, marks: [] },
-      { kind: "pending", lineId: "B", reason: "No hay un valor pendiente que coincida.", marks: [] },
+      { kind: "pending", lineId: "B", reason: PENDING_THIRD_PARTY, marks: [] },
     ]);
   });
   it("un renglón que ve un valor por la referencia y otro solo por el comprobante aparea con el de la referencia", () => {
@@ -338,7 +339,7 @@ describe("reconcile: un CUIT distinto en una transferencia es un tercero que pag
     const parties = [{ id: "7", role: "supplier" as const, cuit: OTHER, cbu: null }];
     const batch = { id: "L1", transfers: [{ cuit: OTHER, number: null, amountCents: -30000, failed: false, payDate: "2026-07-10" }, { cuit: null, number: null, amountCents: -20000, failed: false, payDate: "2026-07-10" }] };
     const values = [val({ id: "a", amountCents: -30000, supplierId: "7" }), val({ id: "b", kind: "Orden de pago", amountCents: -20000 })];
-    const p = reconcile({ lines: [line({ amountCents: -50000, type: t("pago-masivo"), counterparty: X })], context: ctx({ values, parties, batchIds: ["L1"] }), batches: [batch], readingWarning: false }).proposals[0];
+    const p = reconcile({ lines: [line({ amountCents: -50000, type: t("pago-masivo"), counterparty: X })], context: ctx({ values, parties, batchIds: ["L1"] }), batches: [batch], readingWarning: false, bankCode: null, decisions: [] }).proposals[0];
     expect(p).toEqual(expect.objectContaining({ kind: "match", valueIds: ["a", "b"], confidence: "weak", coincidence: { amount: true, batch: "L1" }, marks: ["third-party"] }));
   });
   it("varios renglones: un valor de transferencia de un tercero agrupa, con la marca en cada renglón", () => {
@@ -385,7 +386,7 @@ describe("reconcile: importe único en el período", () => {
     // x e y disputan v1 por número; z, lejos de los dos valores, es el único renglón libre del importe y v2 el único valor libre.
     const lines = [line({ id: "x", reference: "4512" }), line({ id: "y", reference: "4512", date: "2026-07-25" }), line({ id: "z", date: "2026-08-30" })];
     const values = [val({ id: "v1", number: "4512" }), val({ id: "v2", voucherDate: "2026-06-01" })];
-    expect(run(lines, ctx({ values }))[2]).toEqual({ kind: "pending", lineId: "z", reason: "No hay un valor pendiente que coincida.", marks: [] });
+    expect(run(lines, ctx({ values }))[2]).toEqual({ kind: "pending", lineId: "z", reason: PENDING_THIRD_PARTY, marks: [] });
     expect(run(lines, ctx({ values: [values[0]] }))[2].kind).toBe("pending");
   });
   it("único en todo el extracto: el otro renglón del importe ya apareó en la ventana y aun así cuenta, no se lleva un valor de abril", () => {
@@ -407,7 +408,7 @@ describe("reconcile: importe único en el período", () => {
     const out = run([line({ id: "D", amountCents: 10000, type: t("deposito-cheques") }), line({ id: "L", amountCents: 3000, date: "2026-08-29" })], ctx({ values }));
     expect(out).toEqual([
       { kind: "review", lineId: "D", reason: "Hay más de una combinación de valores que suma el importe.", candidates: [["b", "a"], ["d", "c"]] },
-      { kind: "pending", lineId: "L", reason: "No hay un valor pendiente que coincida.", marks: [] },
+      { kind: "pending", lineId: "L", reason: PENDING_THIRD_PARTY, marks: [] },
     ]);
   });
   it("un valor candidato de una revisión por tiempo de la pasada 5 también queda en disputa", () => {
@@ -416,10 +417,10 @@ describe("reconcile: importe único en el período", () => {
     const clock = () => { let n = 0; return () => (n += 1); };
     const values = Array.from({ length: 40 }, (_, i) => val({ id: `w${i}`, amountCents: 1000 + i }));
     const lines = [line({ id: "D", amountCents: 1039 + 1038 + 1037, type: t("deposito-cheques") }), line({ id: "L", amountCents: 1039, date: "2026-08-29" })];
-    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false }, { now: clock(), budgetMsPerLine: 1, budgetMsTotal: 100000 }).proposals;
+    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(), budgetMsPerLine: 1, budgetMsTotal: 100000 }).proposals;
     expect(out).toEqual([
       { kind: "review", lineId: "D", reason: "La búsqueda de una suma de valores pasó el tiempo disponible: hay que revisarlo a mano.", candidates: [["w39", "w38", "w37"]] },
-      { kind: "pending", lineId: "L", reason: "No hay un valor pendiente que coincida.", marks: [] },
+      { kind: "pending", lineId: "L", reason: PENDING_THIRD_PARTY, marks: [] },
     ]);
   });
   it("dos sumas que comparten un valor: los otros valores de las dos también quedan en disputa", () => {
@@ -450,7 +451,7 @@ describe("reconcile: importe único en el período", () => {
     const clock = () => { let n = 0; return () => (n += 1); };
     const FCI = t("fci-rescate");
     const values = [val({ id: "v1", amountCents: 100000 }), val({ id: "w", amountCents: 60000, voucherDate: "2026-04-01" })];
-    const out = reconcile({ lines: [line({ id: "a", amountCents: 60000, type: FCI }), line({ id: "b", amountCents: 40000, type: FCI })], context: ctx({ values }), batches: [], readingWarning: false }, { now: clock(), budgetMsPerLine: 0, budgetMsTotal: 100000 }).proposals;
+    const out = reconcile({ lines: [line({ id: "a", amountCents: 60000, type: FCI }), line({ id: "b", amountCents: 40000, type: FCI })], context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(), budgetMsPerLine: 0, budgetMsTotal: 100000 }).proposals;
     expect(out).toEqual([{ kind: "review", lineId: "a", reason: SPLIT_CUT, candidates: [] }, { kind: "review", lineId: "b", reason: SPLIT_CUT, candidates: [] }]);
   });
   it("el valor de una búsqueda de la pasada 6 cortada por el techo queda en disputa: el renglón único de su importe no se lo lleva", () => {
@@ -458,7 +459,7 @@ describe("reconcile: importe único en el período", () => {
     const clock = () => { let n = 0; return () => (n += 1); };
     const FCI = t("fci-rescate");
     const lines = [line({ id: "a", amountCents: 60000, type: FCI }), line({ id: "b", amountCents: 40000, type: FCI }), line({ id: "L", amountCents: 100000, date: "2026-09-28" })];
-    const go = (budgetMsPerLine: number) => reconcile({ lines, context: ctx({ values: [val({ id: "v1", amountCents: 100000 })] }), batches: [], readingWarning: false }, { now: clock(), budgetMsPerLine, budgetMsTotal: 100000 }).proposals;
+    const go = (budgetMsPerLine: number) => reconcile({ lines, context: ctx({ values: [val({ id: "v1", amountCents: 100000 })] }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(), budgetMsPerLine, budgetMsTotal: 100000 }).proposals;
     expect(go(1000).map((p) => (p.kind === "match" ? p.valueIds : p.kind))).toEqual([["v1"], ["v1"], "pending"]);
     expect(go(0).map((p) => p.kind)).toEqual(["review", "review", "pending"]);
   });
@@ -467,7 +468,7 @@ describe("reconcile: importe único en el período", () => {
     const clock = () => { let n = 0; return () => (n += 1); };
     const values = [val({ id: "a", amountCents: 60000 }), val({ id: "b", amountCents: 40000 })];
     const lines = [line({ id: "D", amountCents: 100000, type: t("deposito-cheques") }), line({ id: "L", amountCents: 60000, date: "2026-09-28" })];
-    const go = (budgetMsPerLine: number) => reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false }, { now: clock(), budgetMsPerLine, budgetMsTotal: 100000 }).proposals;
+    const go = (budgetMsPerLine: number) => reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(), budgetMsPerLine, budgetMsTotal: 100000 }).proposals;
     expect(go(1000).map((p) => (p.kind === "match" ? p.valueIds : p.kind))).toEqual([["a", "b"], "pending"]);
     expect(go(0).map((p) => p.kind)).toEqual(["review", "pending"]);
   });
@@ -667,25 +668,25 @@ describe("reconcile: un renglón contra varios valores", () => {
   });
   it("pasado el techo por renglón, a revisar con el motivo, nunca un apareo", () => {
     const values = Array.from({ length: 40 }, (_, i) => val({ id: `v${i}`, amountCents: 1000 + i, voucherDate: "2026-07-10" }));
-    const out = reconcile({ lines: [line({ amountCents: 20_001, type: DEPOSIT })], context: ctx({ values }), batches: [], readingWarning: false }, { now: clock(1), budgetMsPerLine: 3, budgetMsTotal: 100 }).proposals;
+    const out = reconcile({ lines: [line({ amountCents: 20_001, type: DEPOSIT })], context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(1), budgetMsPerLine: 3, budgetMsTotal: 100 }).proposals;
     expect(out[0]).toEqual({ kind: "review", lineId: "l1", reason: "La búsqueda de una suma de valores pasó el tiempo disponible: hay que revisarlo a mano.", candidates: [] });
   });
   it("el techo por renglón se cuenta desde que empieza ese renglón", () => {
     const values = [val({ id: "a", amountCents: 3000 }), val({ id: "b", amountCents: 7000 })];
     const go = (budgetMsPerLine: number) =>
-      reconcile({ lines: [line({ amountCents: 10000, type: DEPOSIT })], context: ctx({ values }), batches: [], readingWarning: false }, { now: clock(20), budgetMsPerLine, budgetMsTotal: 1000 }).proposals[0].kind;
+      reconcile({ lines: [line({ amountCents: 10000, type: DEPOSIT })], context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(20), budgetMsPerLine, budgetMsTotal: 1000 }).proposals[0].kind;
     expect(go(100)).toBe("match");
     expect(go(15)).toBe("review");
   });
   it("pasado el techo del pedido, el renglón va a revisar aunque le sobre el suyo", () => {
     const values = [val({ id: "a", amountCents: 3000 }), val({ id: "b", amountCents: 7000 })];
-    const out = reconcile({ lines: [line({ amountCents: 10000, type: DEPOSIT })], context: ctx({ values }), batches: [], readingWarning: false }, { now: clock(1), budgetMsPerLine: 1000, budgetMsTotal: 1 }).proposals;
+    const out = reconcile({ lines: [line({ amountCents: 10000, type: DEPOSIT })], context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(1), budgetMsPerLine: 1000, budgetMsTotal: 1 }).proposals;
     expect(out[0]).toEqual({ kind: "review", lineId: "l1", reason: "La búsqueda de una suma de valores pasó el tiempo disponible: hay que revisarlo a mano.", candidates: [] });
   });
-  it("un renglón que no es depósito ni pago masivo no busca sumas: queda pendiente, no a revisar por tiempo", () => {
+  it("un renglón que no es depósito ni pago masivo no busca sumas: sale DBG, no a revisar por tiempo", () => {
     const values = Array.from({ length: 40 }, (_, i) => val({ id: `v${i}`, amountCents: 1000 + i, voucherDate: "2026-07-10" }));
     const p = run([line({ amountCents: 2001, type: { code: "comision", source: "table" } })], ctx({ values }))[0];
-    expect(p.kind).toBe("pending");
+    expect(p.kind).toBe("dbg");
   });
   it("un pago masivo también busca sumas", () => {
     const values = [val({ id: "a", amountCents: -3000 }), val({ id: "b", amountCents: -7000 })];
@@ -723,9 +724,9 @@ describe("reconcile: varios renglones contra un valor", () => {
     const out = run([line({ id: "a", amountCents: 60000 }), line({ id: "b", amountCents: 40000 })], ctx({ values: [val({ amountCents: 100000 })] }));
     expect(out.map((p) => p.kind)).toEqual(["pending", "pending"]);
   });
-  it("renglones de tipos distintos sin una cuota de leasing o préstamo no se agrupan: una comisión y su IVA no son un valor", () => {
+  it("renglones de tipos distintos sin una cuota de leasing o préstamo no se agrupan: una comisión y su IVA no son un valor: salen DBG", () => {
     const out = run([line({ id: "a", amountCents: -10000, type: t("comision") }), line({ id: "b", amountCents: -2100, type: t("iva") })], ctx({ values: [val({ amountCents: -12100 })] }));
-    expect(out.map((p) => p.kind)).toEqual(["pending", "pending"]);
+    expect(out.map((p) => p.kind)).toEqual(["dbg", "dbg"]);
   });
 });
 
@@ -734,8 +735,8 @@ describe("reconcile: varios renglones contra un valor, por dentro", () => {
   const t = (code: string) => ({ code, source: "table" as const });
   const DEPOSIT = t("deposito-cheques");
   const SPLIT_SEVERAL = "Hay más de una combinación de renglones que suma un valor.";
-  const NO_VALUE = "No hay un valor pendiente que coincida.";
-  const pending = (lineId: string) => ({ kind: "pending", lineId, reason: NO_VALUE, marks: [] });
+  // Lo que queda sin valor se abre: FCI, leasing y préstamo con el motivo del 3b; una transferencia, de terceros.
+  const pending = (lineId: string, reason = PENDING_3B) => ({ kind: "pending", lineId, reason, marks: [] });
   const DISPUTED = "Más de un renglón coincide con el mismo valor.";
   const X = { cuit: "20222222223", name: null, cbu: null };
   const clock = (step: number) => {
@@ -791,7 +792,7 @@ describe("reconcile: varios renglones contra un valor, por dentro", () => {
     const parts: Array<[string, string, number]> = [["c", "comision", -10000], ["i", "iva", -2100], ["l", "leasing", -9000], ["n", "intereses", -3100], ["p", "prestamo", -8000], ["s", "sellos", -4100]];
     const out = run(parts.map(([id, code, c]) => line({ id, amountCents: c, type: t(code) })), ctx({ values: [val({ amountCents: -12100 })] }));
     expect(out.map((p) => [p.lineId, p.kind, p.kind === "review" && p.reason])).toEqual([
-      ["c", "pending", false], ["i", "pending", false], ["l", "review", SPLIT_SEVERAL], ["n", "review", SPLIT_SEVERAL], ["p", "review", SPLIT_SEVERAL], ["s", "review", SPLIT_SEVERAL],
+      ["c", "dbg", false], ["i", "dbg", false], ["l", "review", SPLIT_SEVERAL], ["n", "review", SPLIT_SEVERAL], ["p", "review", SPLIT_SEVERAL], ["s", "review", SPLIT_SEVERAL],
     ]);
   });
   it("dos valores cuyas combinaciones comparten un renglón: todos sus renglones van a revisar", () => {
@@ -850,27 +851,27 @@ describe("reconcile: varios renglones contra un valor, por dentro", () => {
   };
   it("pasado el techo por búsqueda, la pasada no aparea: los renglones de la búsqueda van a revisar, no quedan pendientes", () => {
     const lines = [fci("a", 60000), fci("b", 40000), line({ id: "c", amountCents: -5000, type: t("fci-suscripcion") }), line({ id: "d", amountCents: 5000 }), fci("e", 1000, { date: "2026-07-12" })];
-    const go = (budgetMsPerLine: number) => reconcile({ lines, context: ctx({ values: [val({ amountCents: 100000 })] }), batches: [], readingWarning: false }, { now: clock(20), budgetMsPerLine, budgetMsTotal: 1000 }).proposals;
+    const go = (budgetMsPerLine: number) => reconcile({ lines, context: ctx({ values: [val({ amountCents: 100000 })] }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(20), budgetMsPerLine, budgetMsTotal: 1000 }).proposals;
     expect(go(100).map((p) => p.kind)).toEqual(["match", "match", "pending", "pending", "pending"]);
-    expect(go(15)).toEqual([unsearched("a", SPLIT_CUT), unsearched("b", SPLIT_CUT), pending("c"), pending("d"), pending("e")]);
+    expect(go(15)).toEqual([unsearched("a", SPLIT_CUT), unsearched("b", SPLIT_CUT), pending("c"), pending("d", PENDING_THIRD_PARTY), pending("e")]);
   });
   it("un renglón que entra en una búsqueda cortada por el techo no aparea aunque otro valor lo agrupe: la combinación pudo no ser única", () => {
     // v1 agrupa a y b; la búsqueda de v2 entre los mismos renglones se corta.
-    const out = reconcile({ lines: [fci("a", 60000), fci("b", 40000)], context: ctx({ values: [val({ id: "v1", amountCents: 100000 }), val({ id: "v2", amountCents: 50000 })] }), batches: [], readingWarning: false }, { now: jumpAt(5, 5000), budgetMsPerLine: 1000, budgetMsTotal: 100000 }).proposals;
+    const out = reconcile({ lines: [fci("a", 60000), fci("b", 40000)], context: ctx({ values: [val({ id: "v1", amountCents: 100000 }), val({ id: "v2", amountCents: 50000 })] }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: jumpAt(5, 5000), budgetMsPerLine: 1000, budgetMsTotal: 100000 }).proposals;
     expect(out).toEqual([unsearched("a", SPLIT_CUT), unsearched("b", SPLIT_CUT)]);
   });
   it("un renglón de la combinación única que quedó en una búsqueda cortada no aparea, aunque el otro no estuviera en ella: los tres van a revisar", () => {
     // v1 agrupa a y b; v2 no ve a b (su CUIT contradice) y su búsqueda entre a y c se corta.
     const lines = [fci("a", 60000), fci("b", 40000, { counterparty: X }), fci("c", 30000)];
     const values = [val({ id: "v1", amountCents: 100000 }), val({ id: "v2", kind: "Fondo de inversion", amountCents: 90000, drawerCuit: "27333333334" })];
-    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false }, { now: jumpAt(5, 5000), budgetMsPerLine: 1000, budgetMsTotal: 100000 }).proposals;
+    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: jumpAt(5, 5000), budgetMsPerLine: 1000, budgetMsTotal: 100000 }).proposals;
     expect(out).toEqual([unsearched("a", SPLIT_CUT), unsearched("b", SPLIT_CUT), unsearched("c", SPLIT_CUT)]);
   });
   it("con el plazo del pedido vencido en la pasada 6, no aparea ningún grupo: lo que queda sin resolver va a revisar por tiempo", () => {
     // v1 agrupa a y b; la búsqueda de v2 entre a y c vence el plazo del pedido. Sin el plazo, v1 aparearía a y b.
     const lines = [fci("a", 60000), fci("b", 40000, { counterparty: X }), fci("c", 30000)];
     const values = [val({ id: "v1", amountCents: 100000 }), val({ id: "v2", kind: "Fondo de inversion", amountCents: 90000, drawerCuit: "27333333334" })];
-    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false }, { now: clock(1), budgetMsPerLine: 1000, budgetMsTotal: 3 }).proposals;
+    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(1), budgetMsPerLine: 1000, budgetMsTotal: 3 }).proposals;
     expect(out).toEqual([unsearched("a", SPLIT_CUT), unsearched("b", TIMED_OUT), unsearched("c", SPLIT_CUT)]);
   });
   // Con clock(1) y un techo del pedido de 2, alcanza para una sola búsqueda: la de v1, si nadie busca antes.
@@ -881,7 +882,7 @@ describe("reconcile: varios renglones contra un valor, por dentro", () => {
   ])("lo que no puede sumar no gasta el techo: %s", (_name, others, cents, voucherDate) => {
     const values = [val({ id: "vX", amountCents: cents as number, voucherDate: voucherDate as string }), val({ id: "v1", amountCents: 100000 })];
     const lines = [fci("a", 60000), fci("b", 40000), ...(others as ReturnType<typeof line>[])];
-    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false }, { now: clock(1), budgetMsPerLine: 1000, budgetMsTotal: 2 }).proposals;
+    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(1), budgetMsPerLine: 1000, budgetMsTotal: 2 }).proposals;
     expect(out.slice(0, 2).map((p) => p.kind === "match" && p.valueIds)).toEqual([["v1"], ["v1"]]);
   });
   describe("los gastos de un día sin cuota y el techo de la pasada de varios valores", () => {
@@ -895,17 +896,17 @@ describe("reconcile: varios renglones contra un valor, por dentro", () => {
     ]);
     const near = days.map((d, i) => val({ id: `n${i}`, amountCents: -12600 - 2 * i, voucherDate: `2026-07-${d}` }));
     const go = (budgetMsPerLine: number, budgetMsTotal: number) =>
-      reconcile({ lines: [line({ id: "D", amountCents: 20_001, date: "2026-07-01", type: DEPOSIT }), ...costs], context: ctx({ values: [...far, ...near] }), batches: [], readingWarning: false }, { now: clock(1), budgetMsPerLine, budgetMsTotal }).proposals;
-    it("si D gasta solo su techo, ningún gasto ni impuesto va a revisar: no se buscan sumas para ellos", () => {
-      expect(go(50, 100000).slice(1)).toEqual(costs.map((l) => pending(l.id)));
+      reconcile({ lines: [line({ id: "D", amountCents: 20_001, date: "2026-07-01", type: DEPOSIT }), ...costs], context: ctx({ values: [...far, ...near] }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(1), budgetMsPerLine, budgetMsTotal }).proposals;
+    it("si D gasta solo su techo, ningún gasto ni impuesto va a revisar: no se buscan sumas para ellos y salen DBG", () => {
+      expect(go(50, 100000).slice(1).map((p) => [p.lineId, p.kind])).toEqual(costs.map((l) => [l.id, "dbg"]));
     });
     it("si D gasta el plazo del pedido, los gastos que quedan van a revisar por tiempo", () => {
       expect(go(1000, 100).slice(1)).toEqual(costs.map((l) => unsearched(l.id, TIMED_OUT)));
     });
   });
-  it("un día sin cuota no agrupa sus gastos aunque sumen un valor", () => {
+  it("un día sin cuota no agrupa sus gastos en un apareo aunque sumen un valor: salen DBG", () => {
     const out = run([line({ id: "c", amountCents: -10000, type: t("comision") }), line({ id: "i", amountCents: -2100, type: t("iva") }), line({ id: "s", amountCents: -500, type: t("sellos") })], ctx({ values: [val({ amountCents: -12600 })] }));
-    expect(out).toEqual([pending("c"), pending("i"), pending("s")]);
+    expect(out.map((p) => p.kind)).toEqual(["dbg", "dbg", "dbg"]);
   });
   it("un renglón que entra en las combinaciones de muchos valores va a revisar con dos candidatos como mucho", () => {
     // 1.000, 2.000, 4.000 y 8.000: cada suma es de una sola combinación. a entra en las de los cuatro valores.
@@ -955,7 +956,7 @@ describe("reconcile: varios renglones contra un valor, por dentro", () => {
     const far = Array.from({ length: 40 }, (_, i) => val({ id: `w${i}`, amountCents: 1000 + i, voucherDate: "2026-07-01" }));
     const values = [...far, val({ id: "v1", amountCents: 100000, voucherDate: "2026-07-20" })];
     const fcis = [fci("a", 60000, { date: "2026-07-20" }), fci("b", 40000, { date: "2026-07-20" })];
-    const go = (lines: ReturnType<typeof line>[]) => reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false }, { now: clock(1), budgetMsPerLine: 1000, budgetMsTotal: 100 }).proposals;
+    const go = (lines: ReturnType<typeof line>[]) => reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(1), budgetMsPerLine: 1000, budgetMsTotal: 100 }).proposals;
     expect(go(fcis).map((p) => p.kind)).toEqual(["match", "match"]);
     expect(go([line({ id: "D", amountCents: 20_001, date: "2026-07-01", type: DEPOSIT }), ...fcis]).map((p) => p.kind === "review" && p.reason)).toEqual([
       "La búsqueda de una suma de valores pasó el tiempo disponible: hay que revisarlo a mano.", TIMED_OUT, TIMED_OUT,
@@ -991,7 +992,7 @@ describe("reconcile: cuentas propias y pendiente (RF-20, RNF-01)", () => {
   });
   it("un CBU que no es de una cuenta propia no lleva la marca", () => {
     const other = { cuit: null, name: null, cbu: "0170000000000000000001" };
-    expect(run([line({ counterparty: other })], ctx({ ownAccounts: own }))).toEqual([{ kind: "pending", lineId: "l1", reason: "No hay un valor pendiente que coincida.", marks: [] }]);
+    expect(run([line({ counterparty: other })], ctx({ ownAccounts: own }))).toEqual([{ kind: "pending", lineId: "l1", reason: PENDING_THIRD_PARTY, marks: [] }]);
     expect(run([line({ counterparty: other })], ctx({ values: [val()], ownAccounts: own }))[0]).toEqual(expect.objectContaining({ kind: "match", marks: [] }));
   });
   it("en un grupo, la marca va solo en el renglón de la cuenta propia", () => {
@@ -1014,7 +1015,7 @@ describe("reconcile: un lote subido (RF-18)", () => {
     ] };
     const parties = [{ id: "7", role: "supplier" as const, cuit: "20222222223", cbu: null }, { id: "8", role: "supplier" as const, cuit: "27333333334", cbu: null }, { id: "9", role: "supplier" as const, cuit: "23444444449", cbu: null }];
     const values = [val({ id: "op7", amountCents: -30000, supplierId: "7" }), val({ id: "op8", amountCents: -20000, supplierId: "8" }), val({ id: "op9", amountCents: -10000, supplierId: "9" })];
-    const p = reconcile({ lines: [line({ amountCents: -50000 })], context: ctx({ values, parties, batchIds: ["L1"] }), batches: [batch], readingWarning: false }).proposals[0];
+    const p = reconcile({ lines: [line({ amountCents: -50000 })], context: ctx({ values, parties, batchIds: ["L1"] }), batches: [batch], readingWarning: false, bankCode: null, decisions: [] }).proposals[0];
     expect(p).toEqual(expect.objectContaining({ kind: "match", confidence: "grounded", coincidence: { amount: true, batch: "L1" } }));
     expect(p.kind === "match" && [...p.valueIds].sort()).toEqual(["op7", "op8"]);
   });
@@ -1030,7 +1031,7 @@ describe("reconcile: un lote subido, por dentro", () => {
   const L1 = { id: "L1", transfers: [t(A, 30000), t(B, 20000)] };
   const ops = () => [val({ id: "op7", amountCents: -30000, supplierId: "7" }), val({ id: "op8", amountCents: -20000, supplierId: "8" })];
   const go = (lines: ReturnType<typeof line>[], values: ReturnType<typeof val>[], batches = [L1], over: Partial<ReconcileContext> = {}, readingWarning = false) =>
-    reconcile({ lines, context: ctx({ values, parties, batchIds: batches.map((b) => b.id), ...over }), batches, readingWarning }).proposals;
+    reconcile({ lines, context: ctx({ values, parties, batchIds: batches.map((b) => b.id), ...over }), batches, readingWarning, bankCode: null, decisions: [] }).proposals;
 
   it("la propuesta completa: el renglón, los valores en el orden del lote, grounded y el lote entre lo que coincidió", () => {
     expect(go([line({ amountCents: -50000 })], ops())).toEqual([
@@ -1146,7 +1147,7 @@ describe("reconcile: el plazo del pedido cubre todo el apareo", () => {
   };
   const day = (i: number) => new Date(Date.UTC(2026, 6, 1) + i * 86_400_000).toISOString().slice(0, 10);
   const go = (lines: ReturnType<typeof line>[], values: ReturnType<typeof val>[], options = expiresAt(2)) =>
-    reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false }, options).proposals;
+    reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, options).proposals;
 
   it("vencido en las pasadas de la ventana, ningún renglón aparea: todos van a revisar por tiempo", () => {
     // 1.100 renglones, cada uno con su único valor en la ventana: sin plazo, todos grounded.
@@ -1159,7 +1160,7 @@ describe("reconcile: el plazo del pedido cubre todo el apareo", () => {
     // Una escalera: cada vuelta libera un renglón. El plazo vence en algún momento de las vueltas.
     const lines = Array.from({ length: 1200 }, (_, i) => line({ id: `L${i}`, order: i + 1, date: day(2 * i), amountCents: -5000 }));
     const values = lines.map((_, i) => val({ id: `v${i}`, amountCents: -5000, voucherDate: day(2 * i + 1) }));
-    const out = reconcile({ lines, context: ctx({ values, windowDays: 1 }), batches: [], readingWarning: false }, expiresAt(40)).proposals;
+    const out = reconcile({ lines, context: ctx({ values, windowDays: 1 }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, expiresAt(40)).proposals;
     const matched = out.filter((p) => p.kind === "match");
     expect(matched.length).toBeGreaterThan(0);
     expect(matched.length).toBeLessThan(1200);
@@ -1184,7 +1185,7 @@ describe("reconcile: el plazo del pedido cubre todo el apareo", () => {
   it("vencido el plazo, una cuenta propia sin valor también va a revisar: no se sabe si el valor falta", () => {
     const own = [{ id: "B", cbu: "1910000000000000000002", number: null }];
     const lines = Array.from({ length: 1100 }, (_, i) => line({ id: `r${i}`, order: i + 1, amountCents: 1000 + i, counterparty: { cuit: null, name: null, cbu: "1910000000000000000002" } }));
-    const out = reconcile({ lines, context: ctx({ values: lines.map((l, i) => val({ id: `v${i}`, amountCents: l.amountCents })), ownAccounts: own }), batches: [], readingWarning: false }, expiresAt(2)).proposals;
+    const out = reconcile({ lines, context: ctx({ values: lines.map((l, i) => val({ id: `v${i}`, amountCents: l.amountCents })), ownAccounts: own }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, expiresAt(2)).proposals;
     expect(out[0]).toEqual(timedOut("r0"));
   });
 });
@@ -1225,7 +1226,6 @@ describe("reconcile: un renglón con más candidatos de los que pueden darle un 
 
 describe("reconcile: un renglón con varios valores que no se pudieron separar va a revisar con ellos", () => {
   const SEVERAL_VALUES = "Hay más de un valor que coincide con el renglón.";
-  const NO_VALUE = "No hay un valor pendiente que coincida.";
   const many = (n: number, over = {}) => Array.from({ length: n }, (_, i) => val({ id: `v${i}`, ...over }));
   const each = (ids: string[]) => ids.map((id) => [id]);
   const X = { cuit: "20222222223", name: null, cbu: null };
@@ -1242,7 +1242,7 @@ describe("reconcile: un renglón con varios valores que no se pudieron separar v
   });
   it("sin ningún candidato en la ventana sigue pendiente, aunque haya valores del importe afuera o de otro importe", () => {
     const values = [...many(2, { voucherDate: "2026-06-01" }), val({ id: "other", amountCents: 100001 })];
-    expect(run([line()], ctx({ values }))).toEqual([{ kind: "pending", lineId: "l1", reason: NO_VALUE, marks: [] }]);
+    expect(run([line()], ctx({ values }))).toEqual([{ kind: "pending", lineId: "l1", reason: PENDING_THIRD_PARTY, marks: [] }]);
   });
   it("los candidatos son los de la ventana, en el orden del pedido: ni los de afuera, ni los de un CUIT que contradice, ni los ya apareados", () => {
     const values = [
@@ -1280,14 +1280,14 @@ describe("reconcile: un renglón con varios valores que no se pudieron separar v
     const deposit = (id: string, date: string, order: number) => line({ id, order, date, amountCents: 150000, type: { code: "deposito-cheques", source: "table" } });
     const out = run([line({ id: "L" }), deposit("D", "2026-07-16", 2), deposit("E", "2026-07-04", 3)], ctx({ values }));
     expect(out.slice(1).map((p) => p.kind === "match" && p.valueIds)).toEqual([["a", "c"], ["b", "e"]]);
-    expect(out[0]).toEqual({ kind: "pending", lineId: "L", reason: NO_VALUE, marks: [] });
+    expect(out[0]).toEqual({ kind: "pending", lineId: "L", reason: PENDING_THIRD_PARTY, marks: [] });
   });
   it("pasado el plazo, va a revisar por tiempo y no por sus candidatos", () => {
     let n = 0;
     const options = { now: () => (++n >= 2 ? 1e12 : 0), budgetMsPerLine: 2000, budgetMsTotal: 6000 };
     const lines = Array.from({ length: 1100 }, (_, i) => line({ id: `r${i}`, order: i + 1, amountCents: 1000 + i }));
     const values = lines.flatMap((l, i) => [val({ id: `v${i}`, amountCents: l.amountCents }), val({ id: `w${i}`, amountCents: l.amountCents })]);
-    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false }, options).proposals;
+    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, options).proposals;
     expect(out.every((p) => p.kind === "review" && p.reason.startsWith("No se terminó de buscar") && p.candidates.length === 0)).toBe(true);
   });
 });
@@ -1310,7 +1310,7 @@ describe("reconcile: el plazo y los topes, en los bordes", () => {
     const lines = Array.from({ length: 1100 }, (_, i) => line({ id: `r${i}`, order: i + 1, amountCents: 1000 + i }));
     const values = lines.map((l, i) => val({ id: `v${i}`, amountCents: l.amountCents }));
     let n = 0;
-    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false }, { now: () => (++n === 1 ? 0 : 6000), budgetMsPerLine: 2000, budgetMsTotal: 6000 }).proposals;
+    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: () => (++n === 1 ? 0 : 6000), budgetMsPerLine: 2000, budgetMsTotal: 6000 }).proposals;
     expect(out.every((p) => p.kind === "match")).toBe(true);
   });
   it("vencido el plazo en la pasada 5, no aparea lo que ya encontró ni manda a revisar lo que no miró", () => {
@@ -1321,7 +1321,7 @@ describe("reconcile: el plazo y los topes, en los bordes", () => {
       val({ id: "y1", amountCents: 12000, depositId: "B1" }), val({ id: "y2", amountCents: 8000, depositId: "B1" }), val({ id: "y3", amountCents: 15000, depositId: "B2" }), val({ id: "y4", amountCents: 5000, depositId: "B2" }),
     ];
     const lines = [line({ id: "X", amountCents: 10000 }), line({ id: "D", amountCents: 20_001, date: "2026-07-01", type: t("deposito-cheques") }), line({ id: "Y", amountCents: 20000, order: 3 })];
-    const go = (budgetMsTotal: number) => reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false }, { now: clock(1), budgetMsPerLine: 1000, budgetMsTotal }).proposals;
+    const go = (budgetMsTotal: number) => reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(1), budgetMsPerLine: 1000, budgetMsTotal }).proposals;
     expect(go(1e9).map((p) => (p.kind === "review" ? p.reason : p.kind))).toEqual(["match", OVER_BUDGET, "Hay más de una combinación de valores que suma el importe."]);
     expect(go(100)).toEqual([unsearched("X", TIMED_OUT), { kind: "review", lineId: "D", reason: OVER_BUDGET, candidates: [] }, unsearched("Y", TIMED_OUT)]);
   });
@@ -1329,7 +1329,7 @@ describe("reconcile: el plazo y los topes, en los bordes", () => {
     // La búsqueda de v2 vence el plazo; v3 agruparía c y d, otro día.
     const lines = [line({ id: "a", amountCents: 60000, type: FCI }), line({ id: "b", amountCents: 40000, type: FCI }), line({ id: "c", amountCents: 7000, date: "2026-07-20", type: FCI }), line({ id: "d", amountCents: 3000, date: "2026-07-20", type: FCI })];
     const values = [val({ id: "v2", amountCents: 50000 }), val({ id: "v3", amountCents: 10000, voucherDate: "2026-07-20" })];
-    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false }, { now: clock(1), budgetMsPerLine: 1000, budgetMsTotal: 1 }).proposals;
+    const out = reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: clock(1), budgetMsPerLine: 1000, budgetMsTotal: 1 }).proposals;
     expect(out).toEqual([unsearched("a", SPLIT_CUT), unsearched("b", SPLIT_CUT), unsearched("c", TIMED_OUT), unsearched("d", TIMED_OUT)]);
   });
   it("vencido en una pasada de intercambiables con un solo grupo grande, el grupo no se empareja", () => {
@@ -1339,7 +1339,7 @@ describe("reconcile: el plazo y los topes, en los bordes", () => {
     const values = lines.map((_, i) => val({ id: `v${i}` }));
     const outs = Array.from({ length: 40 }, (_, k) => {
       let n = 0;
-      return reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false }, { now: () => (++n >= k + 50 ? 1e12 : 0), budgetMsPerLine: 2000, budgetMsTotal: 6000 }).proposals;
+      return reconcile({ lines, context: ctx({ values }), batches: [], readingWarning: false, bankCode: null, decisions: [] }, { now: () => (++n >= k + 50 ? 1e12 : 0), budgetMsPerLine: 2000, budgetMsTotal: 6000 }).proposals;
     });
     for (const out of outs) expect(new Set(out.map((p) => p.kind)).size).toBe(1);
     expect(outs.some((out) => out[0].kind === "match")).toBe(true);
@@ -1391,4 +1391,16 @@ describe("reconcile: el plazo y los topes, en los bordes", () => {
     expect(run(lines, ctx({ values: [val({ amountCents: 100000 })] }))[0]).toEqual(expect.objectContaining({ kind: "pending" }));
   });
   const fci = (id: string, amountCents: number, over = {}) => line({ id, amountCents, type: FCI, ...over });
+});
+
+describe("reconcile abre los pendientes", () => {
+  it("un renglón de comisión sin valor sale dbg; uno de transferencia sin valor, pendiente", () => {
+    const out = reconcile({ lines: [line({ id: "c", type: { code: "comision", source: "table" }, amountCents: -1000 }), line({ id: "t", amountCents: 5000 })], context: ctx(), batches: [], readingWarning: false, bankCode: "191", decisions: [] }).proposals;
+    expect(out.map((p) => p.kind)).toEqual(["dbg", "pending"]);
+  });
+  it("el techo vencido no abre nada: todo a revisar por tiempo", () => {
+    let t = 0;
+    const out = reconcile({ lines: [line({ id: "c", type: { code: "comision", source: "table" }, amountCents: -1000 })], context: ctx(), batches: [], readingWarning: false, bankCode: "191", decisions: [] }, { now: () => (t += 10_000), budgetMsPerLine: 1, budgetMsTotal: 1 }).proposals;
+    expect(out[0].kind).toBe("review");
+  });
 });

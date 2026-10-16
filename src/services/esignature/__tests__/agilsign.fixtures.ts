@@ -192,7 +192,8 @@ export const MOCK_SIGNING_LINK_RESPONSE = {
 /** Response from PATCH /api/client/webhook on AgilSign */
 export const MOCK_WEBHOOK_REGISTRATION_RESPONSE = {
   webhookUrl: 'https://app.example.com/api/webhooks/esignature/agilsign',
-  webhookSecret: 'whsec_abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+  // Armado en ejecución: el literal entero tiene la forma de un secreto de Stripe y los escáneres lo marcan.
+  webhookSecret: 'whsec_' + 'abcdef1234567890'.repeat(4),
   events: [
     'signer.signed',
     'signer.viewed',

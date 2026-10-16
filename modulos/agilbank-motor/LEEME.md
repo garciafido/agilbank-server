@@ -30,7 +30,8 @@ cosas:
 - `agilbankRoutes(transport, pieces)`: devuelve el router de express con las rutas del contrato:
   `POST /v1/extractos`, `GET /v1/extractos/:idExtracto`, `GET /v1/extractos/por-huella/:huella` y
   `POST /v1/correcciones`, y las del apareo (abajo): `POST /v1/extractos/:idExtracto/conciliacion`,
-  `GET /v1/conciliaciones/:idConciliacion` y `POST /v1/lotes`. Se monta bajo `/api`. El `transport`
+  `GET /v1/conciliaciones/:idConciliacion` y `POST /v1/lotes`, y la de las decisiones,
+  `POST /v1/decisiones`. Se monta bajo `/api`. El `transport`
   es `{ Router, json }` de express.
 - `readStatementStage`: el paso `read` del pipeline `AbStatementRead`. Baja el archivo, lo lee con
   las correcciones de la empresa y guarda la lectura. No toca un extracto ya leído: un trabajo
@@ -65,9 +66,9 @@ cambios: el reenvío del mismo archivo lo vuelve a leer cuando pasaron más de `
 `readStarts` a cero; el de uno en proceso perdido lo conserva.
 
 Los ámbitos de la credencial son `ab:leer` (enviar y consultar extractos), `ab:corregir`
-(correcciones) y `ab:conciliar` (las tres rutas del apareo). Se comparan exactos. Una credencial sin
-empresa no pasa, y para enviar, corregir, conciliar o subir un lote tiene que traer usuario de
-servicio; las consultas no lo piden.
+(correcciones), `ab:conciliar` (las tres rutas del apareo) y `ab:decidir` (las decisiones). Se
+comparan exactos. Una credencial sin empresa no pasa, y para enviar, corregir, conciliar, subir un lote
+o informar decisiones tiene que traer usuario de servicio; las consultas no lo piden.
 
 La referencia para BDL es `agilbank-server/docs/api-agilbank.html`.
 
@@ -96,6 +97,48 @@ referencia para BDL, con las reglas en llano, es `agilbank-server/docs/api-agilb
   200 valores, un día con más de 40 renglones del grupo). `pendiente` queda para «se buscó y no hay»: un
   renglón con varios valores en la ventana que ningún paso pudo separar vuelve `a-revisar` con ellos.
 - Ningún dato de un caso de BDL va al código, a las pruebas ni a los informes: se inventan.
+
+## Los DBG y el aprendizaje
+
+`src/dbg/` abre los renglones que el apareo dejó `pendiente` y que son de la familia banco en
+propuestas `dbg`: un cargo con su IVA y su percepción de IVA, con el tipo de gasto y la cuenta. Es parte
+de `reconcile`, que llama a `openPending` al final. La traducción del contrato (en castellano) a los
+nombres del motor está en los mismos tres lugares de siempre: `src/reconcile/request.ts` (los
+catálogos y la historia que entran), `src/reconcile/publicReconciliation.ts` (la propuesta que sale) y
+`src/api/decisions.ts` (la decisión que llega). La referencia para BDL es
+`agilbank-server/docs/api-agilbank.html` (secciones 08, 09, 13 y 14); el diseño,
+`docs/superpowers/specs/2026-10-16-agilbank-dbg-y-aprendizaje-design.md`.
+
+- `grouping.ts`: arma los grupos (RF-25). Un IVA o una percepción de IVA se pega al cargo con el que
+  comparte número, o con el único cargo cercano que cierra con la alícuota; el IVA del día puede ir con
+  varios cargos del mismo día y tipo cuya suma cierra. Con más de una forma de agrupar no elige: el IVA
+  queda solo. Los impuestos y las recaudaciones van siempre solos.
+- `learning.ts`: aporta cada fuente de la cuenta: lo que la empresa decidió, su historia
+  (`historiaDbg`) y el catálogo por nombre. La historia y las decisiones pesan lo reciente: el
+  peso cae a la mitad cada 180 días.
+- `open.ts`: junta todo. `pairOf` decide el orden de firmeza de la cuenta (decisión, historia, catálogo
+  por nombre, sin cuenta) y la confianza. Un DBG que sale de las decisiones baja a `weak` si la
+  cuenta de IVA o de percepción que necesita no vino de ellas, y también si un renglón del grupo no
+  encadena o si otro cargo del día aprendió otro par.
+- `src/api/decisions.ts`: `POST /v1/decisiones`. Guarda una decisión por renglón de cada conciliación;
+  la de un grupo DBG se guarda con el renglón del cargo, así que decidir cualquier renglón del grupo es
+  decidir el grupo, y repetirla la reemplaza.
+
+**La regla del aprendizaje:** una decisión enseña solo si es sobre un `dbg` o un `pendiente` y lo
+elegido es un `dbg` o un `pendiente`. Una sobre un `apareo` o un `a-revisar` se registra y no enseña. La
+cuenta aprendida es `grounded` con 3 decisiones o más sobre el mismo concepto, el 80 % o más del peso en
+el mismo par y la última (que no sea una rechazada) de menos de un año; si no, el par de más peso sale
+`weak`. La misma regla decide entre `dbg` y `pendiente`. Una rechazada no enseña: le resta su peso al par
+que se había propuesto. Solo cuentan las decisiones de la misma empresa y del mismo banco.
+
+El resultado guardado de una conciliación se reusa mientras no cambien el pedido (con los catálogos y la
+historia) ni las decisiones de la empresa y el banco. Con decisiones, dura hasta el día siguiente: su
+peso depende de la edad.
+
+- `npm run bench:dbg`: el banco de DBG. Lee el extracto de cada caso de BDL (`AB_IEB_DIR`), concilia
+  en arranque en frío (sin decisiones, con la historia y los catálogos del caso) y mide qué parte de la
+  familia banco sale como `dbg` y qué parte del importe lleva la cuenta correcta. Imprime solo conteos y
+  porcentajes, nunca un dato del caso, y falla si algún caso baja de su piso.
 
 ## La lectura visual
 

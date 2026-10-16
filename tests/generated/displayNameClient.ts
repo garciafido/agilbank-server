@@ -106,6 +106,13 @@ export function abPaymentBatchDisplayId(
   return String(source.originalName ?? _langStore.emptyStringSymbol);
 }
 
+export function abDecisionDisplayId(
+  source: any,
+  _langStore: ClientLangStore
+): string {
+  return String(source.decisionKey ?? _langStore.emptyStringSymbol);
+}
+
 export function userDisplayId(
   source: any,
   _langStore: ClientLangStore

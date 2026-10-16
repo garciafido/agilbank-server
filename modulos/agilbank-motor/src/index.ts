@@ -8,6 +8,7 @@ export type {
 } from "./types";
 export type { Verdict } from "./verdict";
 export { agilbankRoutes, type ProductPieces, type Transport } from "./api/routes";
+export { SCOPE_DECIDE } from "./api/decisions";
 export { configureBackgroundReading, markStatementFailed, readStatementStage, type BackgroundStorage } from "./backgroundReading";
 export { reconcile, type ReconcileInput } from "./reconcile/reconcile";
 export { readBatch, type BatchReading } from "./reconcile/batch";
@@ -16,3 +17,7 @@ export type {
   Batch, BatchTransfer, Coincidence, Confidence, Mark, OwnAccount, Party, PendingValue, Proposal, ReconcileContext,
   ReconcileOptions, Reconciliation,
 } from "./reconcile/types";
+export { openPending, type OpenInput } from "./dbg/open";
+export type {
+  Account, AccountPair, Catalogs, ChosenKind, DecisionResult, DecisionRow, HistoryDbg, MovementType, Origin, ProposedKind,
+} from "./dbg/types";

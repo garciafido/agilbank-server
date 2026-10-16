@@ -22,6 +22,7 @@ import { abStatementTypeDefs } from "./abStatement/schemas";
 import { abConceptCorrectionTypeDefs } from "./abConceptCorrection/schemas";
 import { abReconciliationTypeDefs } from "./abReconciliation/schemas";
 import { abPaymentBatchTypeDefs } from "./abPaymentBatch/schemas";
+import { abDecisionTypeDefs } from "./abDecision/schemas";
 import { userTypeDefs } from "./user/schemas";
 import { roleTypeDefs } from "./role/schemas";
 import { permissionTypeDefs } from "./permission/schemas";
@@ -37,6 +38,7 @@ import { abStatementResolvers } from "./abStatement/resolvers/abStatementResolve
 import { abConceptCorrectionResolvers } from "./abConceptCorrection/resolvers/abConceptCorrectionResolvers";
 import { abReconciliationResolvers } from "./abReconciliation/resolvers/abReconciliationResolvers";
 import { abPaymentBatchResolvers } from "./abPaymentBatch/resolvers/abPaymentBatchResolvers";
+import { abDecisionResolvers } from "./abDecision/resolvers/abDecisionResolvers";
 import { userResolvers } from "./user/resolvers/userResolvers";
 import { roleResolvers } from "./role/resolvers/roleResolvers";
 import { permissionResolvers } from "./permission/resolvers/permissionResolvers";
@@ -64,6 +66,7 @@ export * from "./abStatement/resolvers/displayId";
 export * from "./abConceptCorrection/resolvers/displayId";
 export * from "./abReconciliation/resolvers/displayId";
 export * from "./abPaymentBatch/resolvers/displayId";
+export * from "./abDecision/resolvers/displayId";
 export * from "./user/resolvers/displayId";
 export * from "./role/resolvers/displayId";
 export * from "./permission/resolvers/displayId";
@@ -90,6 +93,7 @@ const resolvers = merge(
   abConceptCorrectionResolvers,
   abReconciliationResolvers,
   abPaymentBatchResolvers,
+  abDecisionResolvers,
   userResolvers,
   roleResolvers,
   permissionResolvers,
@@ -116,6 +120,7 @@ export const schema: GraphQLSchema = makeExecutableSchema({
     abConceptCorrectionTypeDefs,
     abReconciliationTypeDefs,
     abPaymentBatchTypeDefs,
+    abDecisionTypeDefs,
     userTypeDefs,
     roleTypeDefs,
     permissionTypeDefs,

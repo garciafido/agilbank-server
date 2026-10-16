@@ -60,12 +60,12 @@ const model = (rows: Row[], wheres: Where[], unique?: (a: Row, b: Row) => boolea
     const found = rows.find((r) => matches(r, where));
     return found ? project(found, select) : null;
   },
-  findMany: async ({ where, orderBy, select }: any): Promise<Row[]> => {
+  findMany: async ({ where, orderBy, select, take }: any): Promise<Row[]> => {
     wheres.push(where);
     const found = rows.filter((r) => matches(r, where));
     const [key, dir] = (Object.entries(orderBy ?? {}) as Array<[string, "asc" | "desc"]>)[0] ?? [];
     if (key) found.sort((a, b) => (a[key] < b[key] ? -1 : a[key] > b[key] ? 1 : 0) * (dir === "desc" ? -1 : 1));
-    return found.map((r) => project(r, select));
+    return (take === undefined ? found : found.slice(0, take)).map((r) => project(r, select));
   },
   create: async ({ data, select }: any): Promise<Row> => {
     const row = { id: randomUUID(), ...flatten(data) };
@@ -81,10 +81,10 @@ const model = (rows: Row[], wheres: Where[], unique?: (a: Row, b: Row) => boolea
   },
 });
 
-export const fakeDb = (seed: { abStatement?: Row[]; abConceptCorrection?: Row[]; workerEvent?: Row[]; abReconciliation?: Row[]; abPaymentBatch?: Row[] } = {}) => {
+export const fakeDb = (seed: { abStatement?: Row[]; abConceptCorrection?: Row[]; workerEvent?: Row[]; abReconciliation?: Row[]; abPaymentBatch?: Row[]; abDecision?: Row[] } = {}) => {
   const rows = {
     abStatement: [...(seed.abStatement ?? [])], abConceptCorrection: [...(seed.abConceptCorrection ?? [])], workerEvent: [...(seed.workerEvent ?? [])],
-    abReconciliation: [...(seed.abReconciliation ?? [])], abPaymentBatch: [...(seed.abPaymentBatch ?? [])],
+    abReconciliation: [...(seed.abReconciliation ?? [])], abPaymentBatch: [...(seed.abPaymentBatch ?? [])], abDecision: [...(seed.abDecision ?? [])],
   };
   const wheres: Where[] = [];
   const db = {
@@ -93,6 +93,7 @@ export const fakeDb = (seed: { abStatement?: Row[]; abConceptCorrection?: Row[];
     workerEvent: model(rows.workerEvent, wheres),
     abReconciliation: model(rows.abReconciliation, wheres, (a, b) => a.tenant_id_ === b.tenant_id_ && a.requestKey === b.requestKey),
     abPaymentBatch: model(rows.abPaymentBatch, wheres, (a, b) => a.tenant_id_ === b.tenant_id_ && a.contentHash === b.contentHash),
+    abDecision: model(rows.abDecision, wheres, (a, b) => a.tenant_id_ === b.tenant_id_ && a.decisionKey === b.decisionKey),
   };
   return { db, rows, wheres };
 };

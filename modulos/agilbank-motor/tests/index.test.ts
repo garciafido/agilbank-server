@@ -10,10 +10,12 @@ describe("el índice público", () => {
     expect(typeof api.reconcile).toBe("function");
     expect(typeof api.readBatch).toBe("function");
     expect(typeof api.toPublicReconciliation).toBe("function");
+    expect(typeof api.openPending).toBe("function");
+    expect(api.SCOPE_DECIDE).toBe("ab:decidir");
     expect(api.catalog.types.length).toBeGreaterThan(0);
   });
 
   it("no exporta los detalles del motor", () => {
-    expect(Object.keys(api).sort()).toEqual(["agilbankRoutes", "catalog", "catalogProblems", "configureBackgroundReading", "fingerprintOf", "markStatementFailed", "readBatch", "readStatement", "readStatementStage", "reconcile", "toPublicReading", "toPublicReconciliation"]);
+    expect(Object.keys(api).sort()).toEqual(["SCOPE_DECIDE", "agilbankRoutes", "catalog", "catalogProblems", "configureBackgroundReading", "fingerprintOf", "markStatementFailed", "openPending", "readBatch", "readStatement", "readStatementStage", "reconcile", "toPublicReading", "toPublicReconciliation"]);
   });
 });

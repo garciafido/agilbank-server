@@ -13,6 +13,7 @@
     "bench": "ts-node --transpile-only bench/measure.ts",
     "bench:visual": "ts-node --transpile-only bench/visualSpeed.ts",
     "bench:apareo": "ts-node --transpile-only bench/apareo.ts",
+    "bench:dbg": "ts-node --transpile-only bench/dbg.ts",
     "inventory": "ts-node --transpile-only bench/inventory.ts"
   },
   "dependencies": {

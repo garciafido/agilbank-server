@@ -1,0 +1,100 @@
+type AbDecision {
+  id: String!
+  displayId: String!
+  version_: String!
+  createdAt_: DateTime!
+  createdBy_: User!
+  lastUpdatedAt_: DateTime
+  lastUpdatedBy_: User
+  decisionKey: String!
+  reconciliationId: String!
+  proposalId: String!
+  statementId: String!
+  lineId: String!
+  bankCode: String
+  conceptKey: String!
+  canonicalType: String!
+  result: String!
+  proposedKind: String!
+  proposedPair: Json
+  chosenKind: String!
+  chosenPair: Json
+  chosen: Json!
+  decidedAt: DateTime!
+}
+
+extend type Mutation {
+  abDecisionDelete(id: String!): AbDecision!
+}
+
+extend type Query {
+  abDecisionOne(id: String!): AbDecision!
+  abDecisionListWithOffset(
+    where: AbDecision_Filter
+    orderBy: [AbDecision_OrderBy!]
+    offset: Int!
+    take: Int!
+  ): [AbDecision]!
+  abDecisionListWithCursor(
+    where: AbDecision_Filter
+    orderBy: AbDecision_OrderByCursor!
+    cursorKey: String
+    take: Int!
+  ): [AbDecision]!
+}
+
+input AbDecision_Filter {
+  id: FilterString
+  version_: FilterString
+  createdAt_: FilterDateTime
+  createdBy_: User_Filter
+  lastUpdatedAt_: FilterDateTime
+  lastUpdatedBy_: User_Filter
+  displayId: FilterString
+  decisionKey: FilterString
+  reconciliationId: FilterString
+  proposalId: FilterString
+  statementId: FilterString
+  lineId: FilterString
+  bankCode: FilterString
+  conceptKey: FilterString
+  canonicalType: FilterString
+  result: FilterString
+  proposedKind: FilterString
+  proposedPair: FilterJson
+  chosenKind: FilterString
+  chosenPair: FilterJson
+  chosen: FilterJson
+  decidedAt: FilterDateTime
+  AND: [AbDecision_Filter!]
+  OR: [AbDecision_Filter!]
+  NOT: [AbDecision_Filter!]
+}
+
+input AbDecision_OrderBy {
+  id: SortOrder
+  version_: SortOrder
+  createdAt_: SortOrder
+  createdBy_: User_OrderBy
+  lastUpdatedAt_: SortOrder
+  lastUpdatedBy_: User_OrderBy
+  decisionKey: SortOrder
+  reconciliationId: SortOrder
+  proposalId: SortOrder
+  statementId: SortOrder
+  lineId: SortOrder
+  bankCode: SortOrder
+  conceptKey: SortOrder
+  canonicalType: SortOrder
+  result: SortOrder
+  proposedKind: SortOrder
+  proposedPair: SortOrder
+  chosenKind: SortOrder
+  chosenPair: SortOrder
+  chosen: SortOrder
+  decidedAt: SortOrder
+}
+
+input AbDecision_OrderByCursor {
+  id: SortOrder
+}

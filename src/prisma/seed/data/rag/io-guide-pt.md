@@ -40,7 +40,7 @@ iO é o motor de consultas deste sistema. Permite consultar dados internos e doc
 #### AbReconciliation
 
 
-**Campos consultáveis:** requestKey, statementId, request, result, proposalCount
+**Campos consultáveis:** requestKey, statementId, bankCode, request, result, proposalCount
 
 **Relações:** N/A
 
@@ -48,6 +48,13 @@ iO é o motor de consultas deste sistema. Permite consultar dados internos e doc
 
 
 **Campos consultáveis:** originalName, contentHash, transfers, transferCount, failedCount
+
+**Relações:** N/A
+
+#### AbDecision
+
+
+**Campos consultáveis:** decisionKey, reconciliationId, proposalId, statementId, lineId, bankCode, conceptKey, canonicalType, result, proposedKind, proposedPair, chosenKind, chosenPair, chosen, decidedAt
 
 **Relações:** N/A
 
@@ -112,6 +119,9 @@ Consultar conteúdo de PDFs e documentos indexados.
 - "Quantos/as AbPaymentBatch há?"
   - "Total de AbPaymentBatch"
   - "Número de AbPaymentBatch"
+- "Quantos/as AbDecision há?"
+  - "Total de AbDecision"
+  - "Número de AbDecision"
 - "Quantos/as Usuários há?"
   - "Total de Usuários"
   - "Número de Usuários"
@@ -136,6 +146,9 @@ Consultar conteúdo de PDFs e documentos indexados.
 - "Lista de AbPaymentBatch"
   - "Mostrar AbPaymentBatch"
   - "Me dê os/as AbPaymentBatch"
+- "Lista de AbDecision"
+  - "Mostrar AbDecision"
+  - "Me dê os/as AbDecision"
 - "Lista de Usuários"
   - "Mostrar Usuários"
   - "Me dê os/as Usuários"

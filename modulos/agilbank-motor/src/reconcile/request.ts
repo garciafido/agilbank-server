@@ -1,3 +1,4 @@
+import { DBG_LIMITS, type Account, type Catalogs, type HistoryDbg, type MovementType } from "../dbg/types";
 import { WINDOW_DAYS } from "./match";
 import { LIMITS, type OwnAccount, type Party, type PendingValue, type ReconcileContext } from "./types";
 
@@ -90,6 +91,50 @@ const ownAccount = (raw: unknown): OwnAccount => {
   return { id: id(raw.id, "cuentasPropias"), cbu: digits(raw.cbu), number: text(raw.numero) };
 };
 
+const coefficient = (x: unknown, field: string): 1 | -1 => {
+  if (x !== 1 && x !== -1) throw new Invalid(field);
+  return x;
+};
+/** Pesos sin signo (la historia y los catálogos no traen signo): centavos, cero o más. */
+const unsignedCents = (x: unknown, field: string, valueId?: string | number): number => {
+  if (x === undefined || x === null) return 0;
+  const c = cents(x, field, valueId);
+  if (c < 0) throw new Invalid(field, valueId);
+  return c;
+};
+const movementType = (raw: unknown): MovementType => {
+  if (!isObject(raw)) throw new Invalid("tiposGastoBancario");
+  return { id: id(raw.id, "tiposGastoBancario"), description: text(raw.descripcion) ?? "", coefficient: coefficient(raw.coeficiente, "tiposGastoBancario") };
+};
+const account = (field: string) => (raw: unknown): Account => {
+  if (!isObject(raw)) throw new Invalid(field);
+  const code = raw.codigo === undefined || raw.codigo === null ? null : id(raw.codigo, field);
+  if (code === null) throw new Invalid(field);
+  return { id: id(raw.id, field), code, description: text(raw.descripcion) ?? "" };
+};
+const historyDbg = (raw: unknown): HistoryDbg => {
+  if (!isObject(raw)) throw new Invalid("historiaDbg");
+  const original = raw.idValor as string | number;
+  const d = date(raw.fecha, "historiaDbg", original);
+  if (!d) throw new Invalid("historiaDbg", original);
+  return {
+    id: id(raw.idValor, "historiaDbg", original), date: d, movementType: text(raw.tipoGasto) ?? "", coefficient: coefficient(raw.coeficiente, "historiaDbg"),
+    amountCents: unsignedCents(raw.importe, "historiaDbg", original), vatCents: unsignedCents(raw.iva, "historiaDbg", original), perceptionCents: unsignedCents(raw.percepcionIva, "historiaDbg", original),
+    accountCode: raw.cuentaContableCodigo === undefined || raw.cuentaContableCodigo === null ? null : id(raw.cuentaContableCodigo, "historiaDbg", original),
+    accountName: text(raw.cuentaContable) ?? "", detail: text(raw.detalle),
+  };
+};
+const catalogsOf = (body: Record<string, unknown>): Catalogs | null => {
+  if (body.tiposGastoBancario === undefined && body.cuentasImputables === undefined && body.cuentasIvaYPercepciones === undefined) return null;
+  const movementTypes = list(body.tiposGastoBancario, "tiposGastoBancario").map(movementType);
+  if (movementTypes.length > DBG_LIMITS.movementTypes) throw new Invalid("tiposGastoBancario");
+  const accounts = list(body.cuentasImputables, "cuentasImputables").map(account("cuentasImputables"));
+  if (accounts.length > DBG_LIMITS.accounts) throw new Invalid("cuentasImputables");
+  const taxAccounts = list(body.cuentasIvaYPercepciones, "cuentasIvaYPercepciones").map(account("cuentasIvaYPercepciones"));
+  if (accounts.length + taxAccounts.length > DBG_LIMITS.accounts) throw new Invalid("cuentasIvaYPercepciones");
+  return { movementTypes, accounts, taxAccounts };
+};
+
 export const parseReconcileRequest = (body: unknown): ParsedRequest => {
   try {
     if (!isObject(body)) throw new Invalid("cuerpo");
@@ -116,7 +161,11 @@ export const parseReconcileRequest = (body: unknown): ParsedRequest => {
     const rawBatches = list(body.lotes, "lotes");
     if (rawBatches.length > LIMITS.batches) throw new Invalid("lotes");
     const batchIds = rawBatches.map((x) => id(x, "lotes"));
-    return { ok: true, context: { lineIds, values, parties, ownAccounts, batchIds, windowDays: windowDays(body.ventanaDias) }, originalIds };
+    const catalogs = catalogsOf(body);
+    const rawHistory = list(body.historiaDbg, "historiaDbg");
+    if (rawHistory.length > DBG_LIMITS.history) throw new Invalid("historiaDbg");
+    const history = rawHistory.map(historyDbg);
+    return { ok: true, context: { lineIds, values, parties, ownAccounts, batchIds, windowDays: windowDays(body.ventanaDias), catalogs, history }, originalIds };
   } catch (e) {
     if (e instanceof Invalid) return e.valueId === undefined ? { ok: false, field: e.field } : { ok: false, field: e.field, valueId: e.valueId };
     throw e;

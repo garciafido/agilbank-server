@@ -1,0 +1,87 @@
+#################
+# decision.hk — Lo que el usuario decidió sobre cada propuesta
+#
+# Una decisión por empresa, conciliación y renglón (la clave): repetirla la reemplaza. En un grupo DBG el
+# renglón es el del cargo, así que decidir el cargo, su IVA o su percepción es la misma decisión. El
+# aprendizaje lee solo las decisiones de la empresa y el banco (RNF-06).
+# Spec: agilbank-motor/docs/superpowers/specs/2026-10-16-agilbank-dbg-y-aprendizaje-design.md
+#################
+
+AbDecision: entity
+  .unique(decisionKey)
+  .labels(es=["Decisión", "Decisiones", "F"])
+  .description(es=["Lo que el usuario aceptó, corrigió o rechazó de una propuesta, y lo que eligió."])
+  .displayId(decisionKey)
+  .listDisplay(bankCode, conceptKey, result, chosenKind, decidedAt)
+  .defaultOrderBy(decidedAt, Desc)
+  .skipCreate
+  .skipUpdate
+{
+  decisionKey: string
+    .fillingOnServer
+    .labels(es=["Clave", "La conciliación y el renglón decidido (el cargo, si es un DBG)", "F"])
+    .index
+
+  reconciliationId: string
+    .fillingOnServer
+    .labels(es=["Conciliación", "El id de la conciliación", "M"])
+
+  proposalId: string
+    .fillingOnServer
+    .labels(es=["Propuesta", "El id de la propuesta decidida", "F"])
+
+  # El renglón del extracto (el cargo, si es un DBG): el aprendizaje cuenta un renglón una vez, aunque se decida en varias conciliaciones.
+  statementId: string
+    .fillingOnServer
+    .labels(es=["Extracto", "El id del extracto", "M"])
+    .index
+
+  lineId: string
+    .fillingOnServer
+    .labels(es=["Renglón", "El id del renglón del extracto", "M"])
+
+  bankCode: maybe(string)
+    .fillingOnServer
+    .labels(es=["Banco", "Código de entidad del extracto", "M"])
+    .index
+
+  conceptKey: string
+    .fillingOnServer
+    .labels(es=["Concepto", "Banco, código de operación y texto normalizado", "F"])
+
+  canonicalType: string
+    .fillingOnServer
+    .labels(es=["Tipo Canónico", "El tipo del renglón", "M"])
+
+  result: string
+    .fillingOnServer
+    .labels(es=["Resultado", "accepted, corrected o rejected", "M"])
+
+  proposedKind: string
+    .fillingOnServer
+    .labels(es=["Propuesto", "match, dbg o pending", "M"])
+
+  proposedPair: maybe(json)
+    .fillingOnServer
+    .labels(es=["Par Propuesto", "Tipo y cuenta propuestos", "F"])
+    .editor(json)
+
+  chosenKind: string
+    .fillingOnServer
+    .labels(es=["Elegido", "match, dbg o pending", "M"])
+
+  chosenPair: maybe(json)
+    .fillingOnServer
+    .labels(es=["Par Elegido", "Tipo y cuenta elegidos", "F"])
+    .editor(json)
+
+  chosen: json
+    .fillingOnServer
+    .labels(es=["Lo Elegido", "La decisión tal como llegó", "F"])
+    .editor(json)
+
+  decidedAt: dateTime
+    .fillingOnServer
+    .labels(es=["Decidida el", "Cuándo se registró", "M"])
+    .index
+}

@@ -37,7 +37,7 @@ const main = async (): Promise<void> => {
     const parsed = parseReconcileRequest({ valores: json("valores_pendientes.json").valores, contrapartes: { proveedores: cp.proveedores ?? [], clientes: cp.clientes ?? [] }, cuentasPropias: json("catalogos.json").cuentasBancariasPropias ?? [] });
     if (!parsed.ok) { failures.push(`caso ${c.n}: el pedido no valida (${parsed.field})`); continue; }
     const readingWarning = reading.warnings.some((w) => w.code === "no-cierra" || w.code === "lectura-parcial");
-    const out = reconcile({ lines: reading.lines, context: parsed.context, batches: [], readingWarning });
+    const out = reconcile({ lines: reading.lines, context: parsed.context, batches: [], readingWarning, bankCode: reading.header?.bankCode ?? null, decisions: [] });
     const ms = Date.now() - t0;
     const matched = new Set(out.proposals.flatMap((p) => (p.kind === "match" ? p.valueIds : [])));
     const exp = json("resultado_esperado.json");
