@@ -910,10 +910,11 @@ los DBG son parte del pedido: si cambia cualquiera, es otro pedido. Si la lectur
 cambia, el pedido da otra conciliación. Si dos pedidos iguales llegan a la vez, los dos reciben la
 misma. Un extracto de otra empresa responde 404, igual que uno que no existe.</p>
 
-<p>Las decisiones de la empresa para ese banco (sección 14) también cuentan, aunque no viajan en el
-pedido. Después de informar una decisión nueva, o de cambiar una, el mismo pedido da otra
-conciliación, con otros <code>idConciliacion</code> e <code>idPropuesta</code>. Mientras la empresa tenga
-decisiones para ese banco, la conciliación guardada vale hasta el día siguiente: las decisiones pesan
+<p>Las decisiones de la empresa para ese banco sobre los conceptos del extracto (sección 14) también
+cuentan, aunque no viajan en el pedido. Después de informar una decisión nueva sobre uno de esos
+conceptos, o de cambiar una, el mismo pedido da otra conciliación, con otros <code>idConciliacion</code> e
+<code>idPropuesta</code>. Mientras la empresa tenga decisiones sobre esos conceptos, la conciliación guardada
+vale hasta el día siguiente: las decisiones pesan
 según su edad, y al cambiar el día UTC (a las 21:00 en la Argentina) el mismo pedido se concilia de nuevo. Las conciliaciones
 anteriores siguen consultables.</p>
 
@@ -1445,7 +1446,7 @@ AgilBank lo agrupa con ellas si se cumple todo esto:</p>
 
 <ul>
 <li>Son dos o más cargos del <b>mismo día, del mismo signo y del mismo tipo</b>, y están todos los de ese tipo ese día.</li>
-<li>Ninguno tiene ya un IVA o una percepción propios.</li>
+<li>Ninguno puede llevar un IVA o una percepción propios: ni uno que ya tiene, ni uno que cierra con él y con otro cargo y por eso quedó solo. Si no, ese IVA se contaría dos veces.</li>
 <li>La <b>suma</b> de sus importes cierra con la alícuota del IVA, con la tolerancia de un centavo.</li>
 <li>Hay una sola forma de agrupar: el IVA no cierra con las sumas de dos tipos distintos (cuenta también un tipo de un solo cargo), y ningún otro IVA del día cierra con la misma suma.</li>
 </ul>
@@ -1491,9 +1492,9 @@ queda con el primero que sirve. El <code>origen</code> dice cuál fue.</p>
 <div class="desborde"><table>
 <thead><tr><th>Origen</th><th>De dónde sale</th><th>Confianza</th></tr></thead>
 <tbody>
-<tr><td><code>decision</code></td><td><b>Lo que la empresa decidió.</b> El tipo de gasto y las cuentas que el usuario eligió para este concepto en decisiones anteriores (sección 14). Gana aunque haya pocas decisiones. Se usa si el tipo de gasto, con el coeficiente del renglón, y la cuenta siguen en los catálogos del pedido; si no, se pasa a lo que sigue. Si la decisión no trae la cuenta de IVA o la de percepción, se toma la del catálogo por nombre</td><td><code>grounded</code> con decisiones suficientes, si no <code>weak</code></td></tr>
-<tr><td><code>historia</code></td><td><b>Su historia.</b> De <code>historiaDbg</code>, el par (tipo de gasto, cuenta) con más importe acumulado para ese tipo de cargo y ese coeficiente. Lo reciente pesa más: cada DBG vale su importe por <code>0,5</code> elevado a los días que pasaron sobre 180, contados hasta el día de la conciliación (día UTC). Si la empresa cambió de cuenta, gana la nueva</td><td><code>weak</code></td></tr>
-<tr><td><code>catalogo</code></td><td><b>El catálogo, por nombre.</b> La única cuenta de <code>cuentasImputables</code> cuyo nombre trae las palabras del tipo de cargo (comisión, intereses, sellos, impuesto con débito o crédito, SIRCREB, IIBB), y el único tipo de gasto con ese coeficiente. Si hay más de una o ninguna, no elige</td><td><code>weak</code></td></tr>
+<tr><td><code>decision</code></td><td><b>Lo que la empresa decidió.</b> El tipo de gasto y las cuentas que el usuario eligió para este concepto en decisiones anteriores (sección 14). Gana aunque haya pocas decisiones. Se usa si el tipo de gasto, con el coeficiente del renglón, y la cuenta siguen en los catálogos del pedido; si no, se pasa a lo que sigue. Si ninguna de esas decisiones trae la cuenta de IVA o la de percepción, se toma la del catálogo por nombre</td><td><code>grounded</code> con decisiones suficientes, si no <code>weak</code></td></tr>
+<tr><td><code>historia</code></td><td><b>Su historia.</b> De <code>historiaDbg</code>, el par (tipo de gasto, cuenta) con más importe acumulado para ese tipo de cargo y ese coeficiente. Lo reciente pesa más: cada DBG vale su importe por <code>0,5</code> elevado a los días que pasaron sobre 180, contados hasta el día de la conciliación (día UTC). Si la empresa cambió de cuenta, gana la nueva. Si la empresa ya rechazó ese par para el concepto (sección 14), se pasa a lo que sigue</td><td><code>weak</code></td></tr>
+<tr><td><code>catalogo</code></td><td><b>El catálogo, por nombre.</b> La única cuenta de <code>cuentasImputables</code> cuyo nombre trae las palabras del tipo de cargo (comisión, intereses, sellos, impuesto con débito o crédito, SIRCREB, IIBB), y el único tipo de gasto con ese coeficiente. Si hay más de una o ninguna, no elige. Si la empresa ya rechazó ese par para el concepto (sección 14), tampoco</td><td><code>weak</code></td></tr>
 <tr><td><code>ninguno</code></td><td><b>Sin cuenta.</b> <code>cuenta</code> en <code>null</code>. El <code>tipoMovimiento</code> puede venir igual, si el catálogo tiene uno solo con ese coeficiente</td><td><code>weak</code></td></tr>
 </tbody>
 </table></div>
@@ -1547,7 +1548,7 @@ AgilBank registra cada decisión y aprende de las que sirven, para proponer mejo
 <tr><td><code>idConciliacion</code></td><td><span class="oblig">Sí</span></td><td>El <code>idConciliacion</code> de la respuesta de la conciliación. Texto de hasta 100 caracteres, o un entero</td></tr>
 <tr><td><code>idPropuesta</code></td><td><span class="oblig">Sí</span></td><td>El <code>idPropuesta</code> de la propuesta decidida. Tiene que ser de esa conciliación</td></tr>
 <tr><td><code>resultado</code></td><td><span class="oblig">Sí</span></td><td><code>aceptada</code> (el usuario dejó lo propuesto), <code>corregida</code> (eligió otra cosa) o <code>rechazada</code> (no era eso)</td></tr>
-<tr><td><code>elegido</code></td><td><span class="oblig">Sí</span></td><td>Lo que quedó, con el <code>tipo</code> y los campos de abajo. Se informa también en una <code>aceptada</code>: AgilBank aprende de lo elegido, no de lo propuesto. En una <code>rechazada</code> también es obligatorio: lleva lo que quedó en su lugar, por ejemplo <code>{ "tipo": "pendiente" }</code></td></tr>
+<tr><td><code>elegido</code></td><td><span class="oblig">Sí</span></td><td>Lo que quedó, con el <code>tipo</code> y los campos de abajo. Se informa también en una <code>aceptada</code>: AgilBank aprende de lo elegido, no de lo propuesto. En una <code>rechazada</code> también es obligatorio: lleva lo que quedó en su lugar, por ejemplo <code>{ "tipo": "pendiente" }</code>, y eso cuenta para decidir si el concepto sale <code>dbg</code> o <code>pendiente</code> (abajo)</td></tr>
 </tbody>
 </table></div>
 
@@ -1558,7 +1559,7 @@ AgilBank registra cada decisión y aprende de las que sirven, para proponer mejo
 <thead><tr><th>Tipo</th><th>Campos</th></tr></thead>
 <tbody>
 <tr><td><code>apareo</code></td><td><code>valores</code>: los <code>idValor</code> elegidos, o <code>null</code> si faltan. Cada uno, texto de hasta 100 caracteres o un entero. Hasta 20.000</td></tr>
-<tr><td><code>dbg</code></td><td><code>tipoMovimiento</code> y <code>cuenta</code>, <span class="oblig">obligatorios</span>: el <code>id</code> del tipo de gasto y el <code>id</code> de la cuenta, tal como están en los catálogos de la conciliación. Van como un texto o un entero, no como el objeto <code>{ "id": … }</code> de la propuesta. <code>cuentaIva</code> y <code>cuentaPercepcion</code> pueden faltar o ir en <code>null</code>. Un DBG sin cuenta no enseña nada, por eso se exigen</td></tr>
+<tr><td><code>dbg</code></td><td><code>tipoMovimiento</code> y <code>cuenta</code>, <span class="oblig">obligatorios</span>: el <code>id</code> del tipo de gasto y el <code>id</code> de la cuenta, tal como están en los catálogos de la conciliación. Van como un texto o un entero, no como el objeto <code>{ "id": … }</code> de la propuesta. <code>cuentaIva</code> y <code>cuentaPercepcion</code> pueden faltar, ir en <code>null</code> o ir vacías (<code>""</code>): las tres formas son la cuenta que falta. Un DBG sin cuenta no enseña nada, por eso se exigen</td></tr>
 <tr><td><code>pendiente</code></td><td>Ningún campo más</td></tr>
 </tbody>
 </table></div>
@@ -1643,7 +1644,8 @@ informan las tres, la última reemplaza a las anteriores. Para el aprendizaje ta
 <code>dbg</code> o <code>pendiente</code>. <b>Una decisión sobre un <code>apareo</code> o un <code>a-revisar</code> se
 registra, pero no enseña</b>, y tampoco una decisión que termina en un <code>apareo</code>. Lo aprendido
 es de <b>esa empresa y de ese banco</b>: nada cruza de una empresa a otra, ni de un banco a otro. Se leen las
-5.000 decisiones más recientes de la empresa en ese banco.</p>
+5.000 decisiones más recientes de la empresa en ese banco sobre los conceptos del extracto: un concepto de
+muchos renglones no le quita lugar a uno que aparece una vez por trimestre.</p>
 
 <p>El aprendizaje es por <b>concepto</b>: el banco, el código de operación y el texto del concepto sin sus
 números. Todos los renglones con el mismo concepto cuentan juntos. Un renglón cuenta una sola vez, con su
@@ -1657,21 +1659,35 @@ que lo viejo, y si la empresa cambia de criterio, el criterio nuevo termina gana
 
 <ul>
 <li>Hay <b>3 decisiones</b> o más sobre el concepto.</li>
-<li>El <b>80 %</b> o más del peso está en el mismo par: el mismo tipo de gasto y las mismas cuentas de cargo, de IVA y de percepción.</li>
+<li>El <b>80 %</b> o más del peso está en el mismo par: el mismo tipo de gasto y la misma cuenta.</li>
 <li>La última decisión, sin contar las rechazadas, es de <b>menos de un año</b>.</li>
 </ul>
 
 <p>Si no se cumplen, se usa igual el par de más peso, pero la propuesta sale <code>weak</code>.</p>
 
+<p>Las cuentas de IVA y de percepción no votan en el par. Dentro del par que ganó, la cuenta de IVA es la de
+más peso entre las decisiones de ese par que la informaron, y la de percepción, lo mismo por separado. Una
+decisión que no informa la cuenta de percepción, porque ese renglón no tenía percepción, no vota contra la
+que informaron las otras.</p>
+
 <p>La misma regla de 3 decisiones y 80 % decide si un concepto sale <code>dbg</code> o <code>pendiente</code>.
+Acá cuentan también las rechazadas, con lo que quedó en su lugar, y el año se cuenta desde la última
+decisión, rechazada o no.
 Un concepto de terceros que la empresa siempre crea como DBG pasa a proponerse como <code>dbg</code>. Un gasto
 del banco que siempre deja pendiente pasa a <code>pendiente</code>, con el motivo «La empresa lo registra como
 pendiente de contabilidad.».</p>
 
 <p>La decisión sobre un cargo vale para todo su grupo: el IVA y la percepción lo siguen.</p>
 
-<p><b>Una decisión rechazada no enseña.</b> Cuenta en el total de las decisiones, pero no suma a ningún
-par, y le resta su peso al par que se había propuesto.</p>
+<p><b>Una decisión rechazada no enseña un par.</b> Cuenta en el total de las decisiones, pero no suma a
+ningún par, y le resta su peso al par (tipo de gasto y cuenta) que se había propuesto. Lo que quedó en su
+lugar sí cuenta para decidir entre <code>dbg</code> y <code>pendiente</code>: rechazar un <code>dbg</code> y
+dejarlo pendiente enseña pendiente.</p>
+
+<p>Lo rechazado tampoco vuelve por la historia ni por el catálogo. Si sobre un concepto hay 3 rechazadas o
+más de propuestas <code>dbg</code>, el 80 % o más de su peso es del mismo par y la última es de menos de un año, la historia y el catálogo
+no vuelven a proponer ese par: se pasa al que sigue, y si no queda ninguno, la propuesta sale sin cuenta, con
+<code>origen</code> <code>ninguno</code>.</p>
 
 <p>La decisión de la empresa pasa por encima de la historia y del catálogo (sección 13). Un DBG que sale
 de las decisiones baja a <code>weak</code> si la cuenta de IVA o de percepción que necesita no vino de esas
@@ -1756,7 +1772,7 @@ cuando el problema está en un valor.</p>
 <tr><td><code>historiaDbg</code></td><td>5.000 DBG</td></tr>
 <tr><td>Decisiones de un pedido</td><td>1.500, de hasta 50 conciliaciones distintas</td></tr>
 <tr><td><code>valores</code> de lo elegido en una decisión</td><td>20.000. Con más, la decisión se rechaza con su motivo</td></tr>
-<tr><td>Decisiones que se leen para aprender</td><td>Las 5.000 más recientes de la empresa en el banco del extracto</td></tr>
+<tr><td>Decisiones que se leen para aprender</td><td>Las 5.000 más recientes de la empresa en el banco del extracto, sobre los conceptos del extracto</td></tr>
 <tr><td>Transferencias de un lote</td><td>5.000</td></tr>
 <tr><td>El archivo de un lote</td><td>10 MB</td></tr>
 <tr><td>El tiempo de una conciliación</td><td>6 segundos por pedido, y 2 segundos por cada búsqueda de una suma. Pasado el tiempo, lo que no se terminó de buscar vuelve <code>a-revisar</code> (sección 10)</td></tr>
