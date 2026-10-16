@@ -417,9 +417,9 @@ autenticación va antes de leer el cuerpo.</p>
 <thead><tr><th class="num">#</th><th>Control</th><th>HTTP</th><th>Código</th></tr></thead>
 <tbody>
 <tr><td class="num">1</td><td>La credencial falta, es inválida, venció o fue revocada, o se dio de baja su usuario de servicio</td><td>401</td><td><code>NO_AUTORIZADO</code></td></tr>
-<tr><td class="num">2</td><td>El cuerpo usa una codificación de contenido o un juego de caracteres que no se acepta</td><td>415</td><td><code>CUERPO_NO_SOPORTADO</code></td></tr>
-<tr><td class="num">3</td><td>El cuerpo pesa más de 16 MB</td><td>413</td><td><code>CUERPO_DEMASIADO_GRANDE</code></td></tr>
-<tr><td class="num">4</td><td>El cuerpo no es un JSON válido, o llegó incompleto</td><td>400</td><td><code>PEDIDO_INVALIDO</code>, con <code>"campo": null</code></td></tr>
+<tr><td class="num">2</td><td>La credencial no tiene el ámbito <code>ab:leer</code></td><td>403</td><td><code>AMBITO_INSUFICIENTE</code></td></tr>
+<tr><td class="num">3</td><td>La credencial no está asociada a una empresa. No ocurre con credenciales emitidas por nosotros</td><td>403</td><td><code>SIN_EMPRESA</code></td></tr>
+<tr><td class="num">4</td><td>La credencial no tiene usuario de servicio. No ocurre con credenciales emitidas por nosotros</td><td>403</td><td><code>SIN_USUARIO_DE_SERVICIO</code></td></tr>
 <tr><td class="num">5</td><td>El pedido no es <code>multipart/form-data</code></td><td>415</td><td><code>ENVIO_NO_MULTIPART</code></td></tr>
 <tr><td class="num">6</td><td>El cuerpo está mal formado o cortado, o trae más de una parte de archivo, sea cual sea su nombre (por ejemplo, la <code>cuenta</code> enviada como archivo), o la parte <code>archivo</code> no trae <code>filename</code></td><td>400</td><td><code>ENVIO_INVALIDO</code></td></tr>
 <tr><td class="num">7</td><td>Falta la parte <code>archivo</code>, o llegó vacía</td><td>400</td><td><code>FALTA_ARCHIVO</code></td></tr>
@@ -864,9 +864,9 @@ cuerpo demasiado grande y cuerpo mal formado.</p>
 <thead><tr><th class="num">#</th><th>Control</th><th>HTTP</th><th>Código</th></tr></thead>
 <tbody>
 <tr><td class="num">1</td><td>El pedido no trae credencial</td><td>401</td><td><code>NO_AUTORIZADO</code></td></tr>
-<tr><td class="num">2</td><td>El cuerpo pesa más de 16 MB</td><td>413</td><td><code>CUERPO_DEMASIADO_GRANDE</code></td></tr>
-<tr><td class="num">3</td><td>El cuerpo no es un JSON válido, o llegó incompleto</td><td>400</td><td><code>PEDIDO_INVALIDO</code>, con <code>"campo": null</code></td></tr>
-<tr><td class="num">4</td><td>El cuerpo usa una codificación de contenido o un juego de caracteres que no se acepta</td><td>415</td><td><code>CUERPO_NO_SOPORTADO</code></td></tr>
+<tr><td class="num">2</td><td>El cuerpo usa una codificación de contenido o un juego de caracteres que no se acepta</td><td>415</td><td><code>CUERPO_NO_SOPORTADO</code></td></tr>
+<tr><td class="num">3</td><td>El cuerpo pesa más de 16 MB</td><td>413</td><td><code>CUERPO_DEMASIADO_GRANDE</code></td></tr>
+<tr><td class="num">4</td><td>El cuerpo no es un JSON válido, o llegó incompleto</td><td>400</td><td><code>PEDIDO_INVALIDO</code>, con <code>"campo": null</code></td></tr>
 <tr><td class="num">5</td><td>La credencial es inválida, venció o fue revocada, o se dio de baja su usuario de servicio</td><td>401</td><td><code>NO_AUTORIZADO</code></td></tr>
 <tr><td class="num">6</td><td>La credencial no tiene el ámbito <code>ab:conciliar</code></td><td>403</td><td><code>AMBITO_INSUFICIENTE</code></td></tr>
 <tr><td class="num">7</td><td>La credencial no está asociada a una empresa, o no tiene usuario de servicio. No ocurre con credenciales emitidas por nosotros</td><td>403</td><td><code>SIN_EMPRESA</code>, <code>SIN_USUARIO_DE_SERVICIO</code></td></tr>
@@ -1133,8 +1133,7 @@ más valores del mismo importe para el mismo renglón. Si con el cambio sube la 
 <p>Buscar una suma exacta de valores o de renglones puede llevar mucho tiempo. AgilBank le pone un
 techo: hoy, 2 segundos por renglón y 6 segundos por pedido. Pasado el techo en la suma de valores
 (paso 5), el renglón vuelve <code>a-revisar</code> con el motivo. Pasado el techo en la suma de
-renglones (paso 6), los renglones vuelven <code>pendiente</code> y el valor queda reclamado por más de
-un renglón. La respuesta nunca queda colgada, y una búsqueda que no terminó nunca produce un
+renglones (paso 6), los renglones vuelven <code>pendiente</code> y el valor queda sin proponer. La respuesta nunca queda colgada, y una búsqueda que no terminó nunca produce un
 apareo.</p>
 
 <p>La suma de valores de la ventana se busca solo para los renglones de depósito de cheques y de pago
