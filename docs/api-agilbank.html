@@ -573,7 +573,7 @@ las páginas leídas, trae su propio motivo (ver «Cuánto tarda la lectura»).<
 <tr><td><code>banco.codigo</code>, <code>banco.nombre</code></td><td>El código de entidad (los tres primeros dígitos del CBU) y el nombre. Si el banco todavía no está en nuestra tabla, viene el código y <code>nombre</code> en <code>null</code>. Si el CBU no trae un código de entidad válido, el código sale de buscar el banco que mandaron en <code>cuenta.banco</code> en nuestra tabla; si no aparece, <code>codigo</code> y <code>nombre</code> vienen en <code>null</code></td></tr>
 <tr><td><code>cuenta</code>, <code>moneda</code></td><td>Los que mandaron</td></tr>
 <tr><td><code>cbu</code></td><td>El del archivo si lo trae; si no, el que mandaron</td></tr>
-<tr><td><code>periodoDesde</code>, <code>periodoHasta</code></td><td>La fecha del primer y del último renglón. <b>Describen el archivo, no el resumen del mes</b>: un extracto diario cubre unos días y uno mensual puede cruzar de mes</td></tr>
+<tr><td><code>periodoDesde</code>, <code>periodoHasta</code></td><td>La fecha del primer y del último renglón. <b>Describen el archivo, no el resumen del mes</b>: un extracto diario cubre unos días y uno mensual puede cruzar de mes. Con el aviso <code>lectura-parcial</code>, <code>periodoHasta</code> viene <code>null</code>: el último renglón leído no es el fin del extracto, y su fecha afirmaría un período que no se vio. <code>periodoDesde</code> no cambia</td></tr>
 <tr><td><code>saldoInicial</code>, <code>saldoFinal</code></td><td>Los leídos o, si el archivo no los imprime, los que salen del primer y del último saldo de renglón. <code>null</code> si no hay ninguno</td></tr>
 </tbody>
 </table></div>
@@ -637,7 +637,7 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <tr><td><code>sentido</code></td><td><code>cronologico</code> o <code>inverso</code>: si el más nuevo está arriba</td></tr>
 <tr><td><code>saldoDeLaFila</code></td><td><code>despues</code> o <code>antes</code>: si el saldo impreso es el que queda después del movimiento o el que había antes, como el saldo de apertura del día</td></tr>
 <tr><td><code>renglonesConSaldo</code>, <code>renglonesQueEncadenan</code></td><td>Cuántos renglones tienen saldo y cuántos encadenan</td></tr>
-<tr><td><code>cierraConSusSaldos</code>, <code>cierraConProntoNet</code></td><td>Si los saldos cierran con los del archivo y con los que mandaron. <code>null</code> si no hay con qué comparar: no mandaron el período o alguno de los dos saldos, o el archivo no cubre el período</td></tr>
+<tr><td><code>cierraConSusSaldos</code>, <code>cierraConProntoNet</code></td><td>Si los saldos cierran con los del archivo y con los que mandaron. <code>null</code> si no hay con qué comparar: no mandaron el período o alguno de los dos saldos, o el archivo no cubre el período. <code>cierraConSusSaldos</code> también es <code>null</code> cuando el saldo inicial y el final salen del mismo saldo de renglón y el archivo no imprime ninguno de los dos: la resta da cero por construcción, y no se controló nada</td></tr>
 </tbody>
 </table></div>
 
