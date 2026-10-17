@@ -625,7 +625,7 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <tr><td><code>sin-saldos</code></td><td>Ningún renglón se pudo controlar contra el saldo anterior: el archivo no trae saldos, trae solo los saldos inicial y final, trae un solo saldo, tiene una columna de saldo que no encadena con los importes, o sus saldos no se controlan entre sí. También sale cuando solo se pudo controlar un renglón, con el detalle «El archivo trae un solo saldo con qué controlar: se controla el total, no cada renglón.». <code>verificada</code> pide al menos dos renglones controlados. En los demás casos, <code>detalle</code> dice cuál</td><td>No</td></tr>
 <tr><td><code>no-encadena</code></td><td>Hay renglones cuyo saldo no encadena con el anterior</td><td>No</td></tr>
 <tr><td><code>concepto-nuevo</code></td><td>Un concepto que no está en la tabla. <code>datos.texto</code> trae el texto del banco, <code>datos.codigo</code> su código de operación (o <code>null</code>) y <code>datos.tipo</code> lo que se propuso</td><td>No</td></tr>
-<tr><td><code>lectura-parcial</code></td><td>La lectura de un PDF se cortó a mitad. <code>datos.paginas</code> es la cantidad de páginas del archivo, <code>datos.paginasLeidas</code> las que se leyeron, y <code>datos.causa</code> por qué se cortó: <code>tiempo</code> (pasaron 10 minutos), <code>render</code> (una página no se pudo preparar para leerla), <code>ocr</code> (el lector de imágenes falló en una página) o <code>paginas</code> (el archivo tiene más de 60). Las tres primeras son fallas nuestras: enviar el archivo de nuevo lo lee de nuevo. <code>detalle</code> lo dice para el usuario. Los renglones de las otras páginas no están en la lectura</td><td>Sí</td></tr>
+<tr><td><code>lectura-parcial</code></td><td>La lectura de un PDF se cortó a mitad. <code>datos.paginas</code> es la cantidad de páginas del archivo, <code>datos.paginasLeidas</code> las que se leyeron, y <code>datos.causa</code> por qué se cortó: <code>tiempo</code> (pasaron 10 minutos), <code>render</code> (una página no se pudo preparar para leerla), <code>ocr</code> (el lector de imágenes falló en una página) o <code>paginas</code> (el archivo tiene más de 60). Las tres primeras son fallas nuestras: enviar el archivo de nuevo lo lee de nuevo. <code>detalle</code> lo dice para el usuario. Los renglones de las otras páginas no están en la lectura. Mientras dure el aviso, <code>encabezado.periodoHasta</code> y <code>controles.cierraConSusSaldos</code> vienen <code>null</code>: el último renglón leído no es el fin del extracto, y no se afirma un período ni un cierre de saldos que no se vieron</td><td>Sí</td></tr>
 </tbody>
 </table></div>
 
@@ -637,7 +637,7 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <tr><td><code>sentido</code></td><td><code>cronologico</code> o <code>inverso</code>: si el más nuevo está arriba</td></tr>
 <tr><td><code>saldoDeLaFila</code></td><td><code>despues</code> o <code>antes</code>: si el saldo impreso es el que queda después del movimiento o el que había antes, como el saldo de apertura del día</td></tr>
 <tr><td><code>renglonesConSaldo</code>, <code>renglonesQueEncadenan</code></td><td>Cuántos renglones tienen saldo y cuántos encadenan</td></tr>
-<tr><td><code>cierraConSusSaldos</code>, <code>cierraConProntoNet</code></td><td>Si los saldos cierran con los del archivo y con los que mandaron. <code>null</code> si no hay con qué comparar: no mandaron el período o alguno de los dos saldos, o el archivo no cubre el período. <code>cierraConSusSaldos</code> también es <code>null</code> cuando el saldo inicial y el final salen del mismo saldo de renglón y el archivo no imprime ninguno de los dos: la resta da cero por construcción, y no se controló nada</td></tr>
+<tr><td><code>cierraConSusSaldos</code>, <code>cierraConProntoNet</code></td><td>Si los saldos cierran con los del archivo y con los que mandaron. <code>null</code> si no hay con qué comparar: no mandaron el período o alguno de los dos saldos, o el archivo no cubre el período. <code>cierraConSusSaldos</code> también es <code>null</code> cuando el saldo inicial y el final salen del mismo saldo de renglón y el archivo no imprime ninguno de los dos: la resta da cero por construcción, y no se controló nada. Y es <code>null</code> con el aviso <code>lectura-parcial</code>, tanto si cerraba como si no</td></tr>
 </tbody>
 </table></div>
 
@@ -646,10 +646,87 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <ul>
 <li><code>encabezado</code> y <code>controles</code> son <code>null</code> cuando el veredicto es <code>sin-lectura</code> o <code>no-disponible</code>. En ese caso <code>renglones</code> viene vacío.</li>
 <li><code>controles.saldoDeLaFila</code> es <code>null</code> cuando el archivo no trae saldos.</li>
+<li><code>encabezado.periodoHasta</code> es <code>null</code> cuando la lectura trae el aviso <code>lectura-parcial</code>.</li>
+<li><code>controles.cierraConSusSaldos</code> es <code>null</code> cuando la lectura trae el aviso <code>lectura-parcial</code>, cuando no hay saldo inicial o final con qué sumar, y cuando el saldo inicial y el final salen del mismo saldo de renglón y el archivo no imprime ninguno (no se controló nada).</li>
+<li><code>controles.cierraConProntoNet</code> es <code>null</code> cuando no hay con qué comparar (arriba).</li>
 <li><code>banco.codigo</code> y <code>banco.nombre</code> son <code>null</code> cuando no se pudo identificar el banco (arriba).</li>
 <li><code>contraparte</code> es <code>null</code> cuando el renglón no trae ni CUIT ni CBU. Cuando viene, <code>nombre</code> puede ser <code>null</code>.</li>
 <li><code>motivo</code> viene siempre con <code>sin-lectura</code> y con <code>no-disponible</code>. Con <code>verificada</code> y <code>a-revisar</code> es <code>null</code>.</li>
 </ul>
+
+<h4>Dos ejemplos con <code>null</code></h4>
+
+<p>Un PDF de 70 páginas, cortado por el tope de 60. Los renglones de las últimas diez páginas no están,
+y por eso ni el fin del período ni el cierre de los saldos se afirman:</p>
+
+<div class="desborde"><pre><code>{
+  "huella": "4be1…",
+  "veredicto": "a-revisar",
+  "motivo": null,
+  "encabezado": {
+    "banco": { "codigo": "191", "nombre": "Banco Credicoop Cooperativo Limitado" },
+    "cuenta": null,
+    "cbu": "1910001800005555555556",
+    "moneda": "Pesos",
+    "periodoDesde": "2026-07-01",
+    "periodoHasta": null,
+    "saldoInicial": 1250432.15,
+    "saldoFinal": 1103221.40
+  },
+  "renglones": [ … ],
+  "avisos": [
+    {
+      "codigo": "lectura-parcial",
+      "detalle": "Se leyeron 60 de 70 páginas: el archivo pasa el tope de 60 páginas. …",
+      "frenaPropuestas": true,
+      "datos": { "paginas": 70, "paginasLeidas": 60, "causa": "paginas" }
+    }
+  ],
+  "controles": {
+    "sentido": "cronologico",
+    "saldoDeLaFila": "despues",
+    "renglonesConSaldo": 1180,
+    "renglonesQueEncadenan": 1179,
+    "cierraConSusSaldos": null,
+    "cierraConProntoNet": null
+  }
+}</code></pre></div>
+
+<p>Un extracto con un solo saldo de renglón y sin saldos inicial ni final impresos. Los dos saldos del
+encabezado salen de ese único saldo, así que la suma cierra siempre y no controla nada:
+<code>cierraConSusSaldos</code> viene <code>null</code> y no <code>true</code>:</p>
+
+<div class="desborde"><pre><code>{
+  "huella": "a07d…",
+  "veredicto": "a-revisar",
+  "motivo": null,
+  "encabezado": {
+    "banco": { "codigo": "191", "nombre": "Banco Credicoop Cooperativo Limitado" },
+    "cuenta": null,
+    "cbu": "1910001800005555555556",
+    "moneda": "Pesos",
+    "periodoDesde": "2026-07-01",
+    "periodoHasta": "2026-07-03",
+    "saldoInicial": 1000.00,
+    "saldoFinal": 1050.00
+  },
+  "renglones": [ … ],
+  "avisos": [
+    {
+      "codigo": "sin-saldos",
+      "detalle": "El archivo trae un solo saldo: no alcanza para controlar la lectura renglón por renglón.",
+      "frenaPropuestas": false
+    }
+  ],
+  "controles": {
+    "sentido": "cronologico",
+    "saldoDeLaFila": "despues",
+    "renglonesConSaldo": 1,
+    "renglonesQueEncadenan": 0,
+    "cierraConSusSaldos": null,
+    "cierraConProntoNet": null
+  }
+}</code></pre></div>
 
 <p>Para la conciliación, «frena las propuestas» no quiere decir lo mismo en todos los avisos. La
 sección 10 dice qué pasa con cada uno al conciliar: con <code>no-cierra</code> y
