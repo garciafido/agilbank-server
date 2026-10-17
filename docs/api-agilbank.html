@@ -694,7 +694,8 @@ y por eso no se afirman ni el fin del período, ni el saldo final que saldría d
 }</code></pre></div>
 
 <p>Un extracto con un solo saldo de renglón y sin saldos inicial ni final impresos. Los dos saldos del
-encabezado salen de ese único saldo, así que la suma cierra siempre y no controla nada:
+encabezado salen de ese único saldo: el inicial, restándole los movimientos hasta ese renglón, y el final,
+sumándole los que vienen después. Por eso son distintos, y por eso la suma cierra siempre y no controla nada:
 <code>cierraConSusSaldos</code> viene <code>null</code> y no <code>true</code>:</p>
 
 <div class="desborde"><pre><code>{
