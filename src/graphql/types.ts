@@ -1191,7 +1191,7 @@ export type MutationUserCreateArgs = {
   idempotencyKey_?: InputMaybe<Scalars['String']['input']>;
   language: Language;
   name: Scalars['String']['input'];
-  rolesIds?: InputMaybe<Array<Scalars['String']['input']>>;
+  roleId?: InputMaybe<Scalars['String']['input']>;
   targetTenantId?: InputMaybe<Scalars['String']['input']>;
   twoFaseAuth?: InputMaybe<Scalars['Boolean']['input']>;
 };
@@ -1247,7 +1247,7 @@ export type MutationUserUpdateArgs = {
   language?: InputMaybe<Language>;
   name?: InputMaybe<Scalars['String']['input']>;
   profile?: InputMaybe<Scalars['Json']['input']>;
-  rolesIds?: InputMaybe<InputMultipleRef>;
+  roleId?: InputMaybe<Scalars['String']['input']>;
   twoFaseAuth?: InputMaybe<Scalars['Boolean']['input']>;
   version_: Scalars['String']['input'];
 };
@@ -2043,7 +2043,7 @@ export type User = {
   lastUpdatedBy_?: Maybe<User>;
   name: Scalars['String']['output'];
   profile?: Maybe<Scalars['Json']['output']>;
-  roles?: Maybe<Array<Role>>;
+  role?: Maybe<Role>;
   targetTenant?: Maybe<Tenant>;
   tenantDisplayName?: Maybe<Scalars['String']['output']>;
   tenant_id_?: Maybe<Scalars['String']['output']>;
@@ -2219,7 +2219,7 @@ export type User_CreateInput = {
   email: Scalars['String']['input'];
   language: Language;
   name: Scalars['String']['input'];
-  rolesIds?: InputMaybe<Array<Scalars['String']['input']>>;
+  roleId?: InputMaybe<Scalars['String']['input']>;
   targetTenantId?: InputMaybe<Scalars['String']['input']>;
   twoFaseAuth?: InputMaybe<Scalars['Boolean']['input']>;
 };
@@ -2241,7 +2241,7 @@ export type User_Filter = {
   lastUpdatedBy_?: InputMaybe<User_Filter>;
   name?: InputMaybe<FilterString>;
   profile?: InputMaybe<FilterJson>;
-  roles?: InputMaybe<User_Roles_Filter>;
+  role?: InputMaybe<Role_Filter>;
   targetTenant?: InputMaybe<Tenant_Filter>;
   tenantDisplayName?: InputMaybe<FilterString>;
   twoFaseAuth?: InputMaybe<FilterBoolean>;
@@ -2261,7 +2261,7 @@ export type User_OrderBy = {
   lastUpdatedBy_?: InputMaybe<User_OrderBy>;
   name?: InputMaybe<SortOrder>;
   profile?: InputMaybe<SortOrder>;
-  roles?: InputMaybe<OrderByMultiple>;
+  role?: InputMaybe<Role_OrderBy>;
   targetTenant?: InputMaybe<Tenant_OrderBy>;
   tenantDisplayName?: InputMaybe<SortOrder>;
   twoFaseAuth?: InputMaybe<SortOrder>;
@@ -2282,15 +2282,9 @@ export type User_UpdateInput = {
   language?: InputMaybe<Language>;
   name?: InputMaybe<Scalars['String']['input']>;
   profile?: InputMaybe<Scalars['Json']['input']>;
-  rolesIds?: InputMaybe<InputMultipleRef>;
+  roleId?: InputMaybe<Scalars['String']['input']>;
   twoFaseAuth?: InputMaybe<Scalars['Boolean']['input']>;
   version_: Scalars['String']['input'];
-};
-
-export type User_Roles_Filter = {
-  every?: InputMaybe<Role_Filter>;
-  none?: InputMaybe<Role_Filter>;
-  some?: InputMaybe<Role_Filter>;
 };
 
 export type WorkerEvent = {
@@ -2595,7 +2589,6 @@ export type ResolversTypes = {
   User_OrderBy: User_OrderBy;
   User_OrderByCursor: User_OrderByCursor;
   User_UpdateInput: User_UpdateInput;
-  User_roles_Filter: User_Roles_Filter;
   WorkerEvent: ResolverTypeWrapper<WorkerEvent>;
   WorkerEventRetryInfo: ResolverTypeWrapper<WorkerEventRetryInfo>;
   WorkerEventRetryResult: ResolverTypeWrapper<WorkerEventRetryResult>;
@@ -2725,7 +2718,6 @@ export type ResolversParentTypes = {
   User_OrderBy: User_OrderBy;
   User_OrderByCursor: User_OrderByCursor;
   User_UpdateInput: User_UpdateInput;
-  User_roles_Filter: User_Roles_Filter;
   WorkerEvent: WorkerEvent;
   WorkerEventRetryInfo: WorkerEventRetryInfo;
   WorkerEventRetryResult: WorkerEventRetryResult;
@@ -3254,7 +3246,7 @@ export type UserResolvers<ContextType = MyApolloContext, ParentType extends Reso
   lastUpdatedBy_?: Resolver<Maybe<ResolversTypes['User']>, ParentType, ContextType>;
   name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   profile?: Resolver<Maybe<ResolversTypes['Json']>, ParentType, ContextType>;
-  roles?: Resolver<Maybe<Array<ResolversTypes['Role']>>, ParentType, ContextType>;
+  role?: Resolver<Maybe<ResolversTypes['Role']>, ParentType, ContextType>;
   targetTenant?: Resolver<Maybe<ResolversTypes['Tenant']>, ParentType, ContextType>;
   tenantDisplayName?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   tenant_id_?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
