@@ -159,26 +159,26 @@ let store: SchemaMetadataStore;
 const ALL: string[] = [];
 const chosen: string[] = [];
 
-/** Un contexto de servicio: todos los permisos (menos `without`) y los roles dados. */
+/** Un contexto de servicio: todos los permisos (menos `without`) y el rol dado (uno, o ninguno con null). */
 const context = (
   tenant: string,
   user: string,
-  options: { roles?: string[]; without?: string[] } = {}
+  options: { role?: string | null; without?: string[] } = {}
 ): any => {
   const permissions = new Set(
     ALL.filter((p) => !(options.without ?? []).includes(p))
   );
-  const roles = options.roles ?? ["User"];
+  const role = options.role === undefined ? "User" : options.role;
   return {
     prisma: basePrisma,
     currentUser: {
       id: user,
       tenant_id_: tenant,
       tenant_: { id: tenant },
-      roles: roles.map((id) => ({ id, permissions: [] })),
+      role: role === null ? null : { id: role, permissions: [] },
     },
     permissions: () => permissions,
-    hasRole: (...wanted: string[]) => wanted.some((r) => roles.includes(r)),
+    hasRole: (...wanted: string[]) => role !== null && wanted.includes(role),
     isSystemMode: false,
     req: {},
   };
@@ -1126,8 +1126,9 @@ describe("el alta: el mismo alta reintentado no se duplica", () => {
 
 describe("el alta en otra empresa (.tenantSelectableBy): el reintento encuentra el registro donde nació", () => {
   let c: TenantCreateCase | undefined;
+  // Un usuario tiene un solo rol: el primero de los que pueden elegir la empresa.
   const admin = (cs: TenantCreateCase) =>
-    context(ids.A, ids.uA, { roles: cs.roles });
+    context(ids.A, ids.uA, { role: cs.roles[0] });
   const create = (cs: TenantCreateCase, args: Args) =>
     service(cs.entity, "Create", admin(cs))[`create${cs.entity}`](args, {
       id: true,

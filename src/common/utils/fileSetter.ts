@@ -2,6 +2,7 @@ import { UploadedFile } from "../../graphql/types";
 import { Prisma } from "../../prisma/generated-client/client";
 import { keyGenerator } from "../storage";
 import { ValidationError } from "../errors";
+import { assertSafeFileName } from "./storageKey";
 
 export const getDatePath = (date: Date) => {
   const year = date.getFullYear();
@@ -47,12 +48,16 @@ export const fileServerDataSetter = (
     );
   }
 
+  // El nombre llega del cliente y va a la clave de storage (storageKeyFor): un
+  // solo tramo de ruta, sin "../" ni separadores. Se valida antes de encolar el
+  // archivo para moverlo y antes de guardarlo.
+  const filename = assertSafeFileName(uploadedFile.filename);
   const fileUuid = uuid || uploadedFile.ticket;
 
   filesToMove.push({ name: baseName, uploadedFile, uuid: fileUuid });
   return {
     baseName,
-    filename: uploadedFile.filename,
+    filename,
     mimetype: uploadedFile.mimetype,
     size: uploadedFile.size,
     uuid: fileUuid,

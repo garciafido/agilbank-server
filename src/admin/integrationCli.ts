@@ -181,7 +181,10 @@ export async function issueCredential(db: any, opts: IssueOptions, now: Date = n
       );
     }
     // Nadie conoce esta contraseña: el usuario de servicio no entra por la
-    // pantalla, escribe a través de la credencial.
+    // pantalla, escribe a través de la credencial. Queda sin rol: lo que puede
+    // hacer lo dicen los ámbitos de la credencial. La regla «un usuario activo
+    // tiene que tener rol» (ACTIVE_USER_NEEDS_ROLE) no aplica acá: la imponen los
+    // services de User, y esto escribe con el cliente crudo.
     user = await db.user.create({
       data: {
         name: displayName,

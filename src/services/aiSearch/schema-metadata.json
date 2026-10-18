@@ -1126,23 +1126,22 @@
           "groupable": false
         },
         {
-          "name": "roles",
+          "name": "role",
           "type": "ref",
           "labels": {
             "en": {
-              "s": "Roles"
+              "s": "Role"
             },
             "es": {
-              "s": "Roles"
+              "s": "Rol"
             },
             "pt": {
-              "s": "Funções"
+              "s": "Função"
             }
           },
           "groupable": true,
-          "countable": true,
           "targetEntity": "Role",
-          "multi": true
+          "multi": false
         },
         {
           "name": "createdAt_",
@@ -1310,19 +1309,19 @@
           "groupable": false
         },
         {
-          "name": "User_roles",
+          "name": "User_role",
           "type": "subentity",
           "labels": {
             "es": {
-              "s": "Roles",
+              "s": "Rol",
               "d": "Registros de Usuario que referencian a este registro"
             },
             "en": {
-              "s": "Roles",
+              "s": "Role",
               "d": "User records that reference this record"
             },
             "pt": {
-              "s": "Funções",
+              "s": "Função",
               "d": "Registros de Usuário que referenciam este registro"
             }
           },
@@ -1338,8 +1337,8 @@
       "inverseRelations": [
         {
           "sourceEntity": "User",
-          "sourceField": "roles",
-          "prismaField": "User_roles",
+          "sourceField": "role",
+          "prismaField": "User_role",
           "multi": true
         }
       ]
@@ -1677,7 +1676,7 @@
     "setRelations": [
       {
         "parent": "Role",
-        "setField": "User_roles",
+        "setField": "User_role",
         "junction": "User",
         "groupByField": "targetTenant",
         "targetEntity": "Tenant"
@@ -1706,9 +1705,9 @@
       },
       {
         "entity": "User",
-        "refField": "roles",
+        "refField": "role",
         "targetEntity": "Role",
-        "orderByExample": "roles.id"
+        "orderByExample": "role.id"
       },
       {
         "entity": "Role",
@@ -1719,12 +1718,6 @@
     ],
     "countableRelations": [
       {
-        "entity": "User",
-        "entityLabel": "usuario",
-        "setField": "roles",
-        "targetLabel": "rol"
-      },
-      {
         "entity": "Role",
         "entityLabel": "rol",
         "setField": "permissions",
@@ -1733,7 +1726,7 @@
       {
         "entity": "Role",
         "entityLabel": "rol",
-        "setField": "User_roles",
+        "setField": "User_role",
         "targetLabel": "usuario"
       },
       {
@@ -1750,16 +1743,6 @@
       }
     ],
     "groupByCountFilters": [
-      {
-        "entity": "User",
-        "entityLabel": "usuario",
-        "entityLabelPlural": "usuarios",
-        "groupByField": "targetTenant",
-        "groupByLabel": "empresa",
-        "countField": "roles",
-        "countLabel": "rol",
-        "countLabelPlural": "roles"
-      },
       {
         "entity": "Role",
         "entityLabel": "rol",

@@ -282,7 +282,7 @@ async function notifySiteAdmins(args: {
     const shown = row ? String(evConfig.displayName(row) ?? '').replace(/∅/g, '').replace(/\s+/g, ' ').trim() : '';
     const contactName = shown || email;
     const admins: { id: string }[] = await basePrisma.user.findMany({
-      where: { tenant_id_: tenantId, active: true, roles: { some: { id: 'SiteAdmin' } } },
+      where: { tenant_id_: tenantId, active: true, role: { id: "SiteAdmin" } },
       select: { id: true },
     });
     if (admins.length === 0) {
@@ -1080,7 +1080,7 @@ router.post('/public/external-validation/submit', async (req, res) => {
                   id: 'SYSTEM',
                   tenant_id_: record.tenant_id_,
                   tenant_: { id: record.tenant_id_ },
-                  roles: [],
+                  role: null,
                 },
                 // El UpdateService corre adentro de esta transacción (executeUpdate con txPrisma).
                 txPrisma: tx,

@@ -36,8 +36,8 @@ export const botRunCancelResolvers: Resolvers = {
       // sin que nada lo diga. El escape es el `crossTenantForRoles` declarado.
       const botRunMeta = generatedSchemaMetadata.get("BotRun" as any) as any;
       const ct = botRunMeta?.crossTenantForRoles;
-      const roles = context.currentUser?.roles?.map((r: any) => r.id) ?? [];
-      const crossesTenants = !!ct && roles.some((r: string) => ct.roles.includes(r));
+      const rol = context.currentUser?.role?.id;
+      const crossesTenants = !!ct && !!rol && ct.roles.includes(rol);
       const callerTenant = context.currentUser?.tenant_id_;
       // Sin empresa y sin privilegio: inalcanzable. `tenant_id_: undefined` en un
       // where de Prisma OMITE la condición, que acá sería cancelar el bot de cualquiera.

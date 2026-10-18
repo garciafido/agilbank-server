@@ -402,13 +402,20 @@ const todosLosPermisos = () => {
   return p;
 };
 
+/**
+ * Un rol que no nombra ningún atributo del DSL: ni cruza empresas ni acota por
+ * usuario. Sin rol, las entidades acotadas por rol filtrarían además por quien
+ * creó la fila, y ese filtro taparía en ellas una fuga de empresa.
+ */
+const ROL_SIN_ATRIBUTOS = { id: "MZ_ROL_SIN_ATRIBUTOS", permissions: [] };
+
 const contextoDe = (empresa: Empresa): any => ({
   isSystemMode: false,
   currentUser: {
     id: usuarioDe(empresa),
     tenant_id_: empresa,
     active: true,
-    roles: [],
+    role: ROL_SIN_ATRIBUTOS,
   },
   permissions: todosLosPermisos,
 });

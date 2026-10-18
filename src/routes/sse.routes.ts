@@ -35,15 +35,16 @@ router.get('/events', async (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
 
   const clientId = uuidv4();
-  const userId = context.currentUser.id;
-  const tenantId = context.currentUser.tenant_id_;
-  const roles = context.currentUser.roles?.map(r => r.id) || [];
+  const currentUser = context.currentUser;
+  const userId = currentUser.id;
+  const tenantId = currentUser.tenant_id_;
 
   sseManager.addClient({
     id: clientId,
     userId,
     tenantId,
-    roles,
+    // El SSEManager filtra por una lista de roles; el usuario tiene uno o ninguno.
+    roles: currentUser.role ? [currentUser.role.id] : [],
     res,
     lastHeartbeat: Date.now()
   });

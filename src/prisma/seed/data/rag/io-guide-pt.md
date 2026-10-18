@@ -63,7 +63,7 @@ iO é o motor de consultas deste sistema. Permite consultar dados internos e doc
 
 **Campos consultáveis:** Organização, Email, Nome, Está ativo?, Idioma, Avatar, Celular, Requer 2FA, twoFaSecret, twoFaBackupCodes, twoFaVerifiedAt, passwordResetToken, passwordResetExpiresAt, Perfil
 
-**Relações:** Empresa, Funções
+**Relações:** Empresa, Função
 
 #### Papel
 
@@ -164,30 +164,29 @@ Consultar conteúdo de PDFs e documentos indexados.
 - "Usuários por Empresa"
   - "Quantos/as Usuários há por Empresa?"
   - "Distribuição de Usuários por Empresa"
+- "Usuários por Função"
+  - "Quantos/as Usuários há por Função?"
+  - "Distribuição de Usuários por Função"
 
 #### Filtros
 
 - "Usuários com Empresa "X""
   - "Buscar Usuários onde Empresa seja "X""
+- "Usuários com Função "X""
+  - "Buscar Usuários onde Função seja "X""
 
 #### Contagens de Relações
 
-- "Quantidade de Funções por Usuário"
-  - "Quantos/as Funções cada Usuário tem?"
 - "Quantidade de Permissões por Papel"
   - "Quantos/as Permissões cada Papel tem?"
 
 #### Filtros em Relações
 
-- "Usuários com Papel "X""
-  - "Usuários que tenham Papel "X""
 - "Funções com Permisão "X""
   - "Funções que tenham Permisão "X""
 
 #### Filtros Negativos
 
-- "Usuários sem Funções"
-  - "Usuários que não têm Funções"
 - "Funções sem Permissões"
   - "Funções que não têm Permissões"
 

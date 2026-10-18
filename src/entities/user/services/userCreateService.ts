@@ -34,6 +34,7 @@ import {
 import { ApiError } from "../../../common/errors";
 import { hash } from "bcrypt";
 import { enqueueWelcomeEmail } from "../../../workers/queues/emailQueue";
+import { assertRolesAssignable } from "../../../common/utils/roleAssignment";
 import {
   deriveCreateId,
   saveAttemptOf,
@@ -191,16 +192,27 @@ export class UserCreateService {
       avatar: args.avatar?.filename,
       cellphone: args.cellphone,
       twoFaseAuth: args.twoFaseAuth,
-      roles: args.rolesIds
-        ? {
-            connect: args.rolesIds.map((x: any) => {
-              return { id: x };
-            }),
-          }
-        : undefined,
+      ...(args.roleId ? { role: { connect: { id: args.roleId } } } : {}),
     };
 
     // Hook para posible lógica adicional de relleno/modificación de 'data'
+    // Un usuario activo tiene que tener un rol (User.role, uno como máximo). En
+    // modo sistema no aplica. ValidationError lo importa el template genérico.
+    if (!this.context.isSystemMode && args.active === true && !args.roleId) {
+      throw new ValidationError("Un usuario activo tiene que tener un rol.", {
+        code: "ACTIVE_USER_NEEDS_ROLE",
+      });
+    }
+    // La regla de no elevación (common/utils/roleAssignment): en el alta, el
+    // rol pedido es un cambio, y exige tener todos sus permisos. Antes del hash
+    // de la contraseña: un rechazo no gasta ese trabajo.
+    await assertRolesAssignable(
+      this.context,
+      this.prisma,
+      this.schemaMetaStore,
+      args.roleId ? [args.roleId] : []
+    );
+
     const password = await generatePassword(12);
     const hashedPassword = await hash(password, 10);
     const normalizedEmail = emailOrNull(args.email);

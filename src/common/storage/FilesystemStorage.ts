@@ -24,12 +24,30 @@ export class FilesystemStorage implements IStorageProvider {
     this.rootDir = config.rootDir;
   }
 
+  /**
+   * La ruta en disco de una clave, si queda dentro de rootDir.
+   *
+   * Las claves se arman con datos que pueden venir de afuera (el nombre de un
+   * archivo subido): con `path.join(rootDir, key)`, un `..` salía de la raíz y se
+   * escribía, leía o borraba cualquier archivo del disco. Se resuelve la ruta y
+   * se exige que quede adentro; una clave absoluta queda afuera. Solo `list` puede
+   * pedir la raíz misma (`allowRoot`). Lanza antes de tocar el disco.
+   */
+  private resolveInsideRoot(key: string, allowRoot = false): string {
+    const root = path.resolve(this.rootDir);
+    const resolved = path.resolve(root, key);
+    if (!(resolved.startsWith(root + path.sep) || (allowRoot && resolved === root))) {
+      throw new Error("Clave de storage fuera de la raíz");
+    }
+    return resolved;
+  }
+
   async upload(
     sourcePath: string,
     destinationKey: string,
     options?: UploadOptions
   ): Promise<StoredFileReference> {
-    const destPath = path.join(this.rootDir, destinationKey);
+    const destPath = this.resolveInsideRoot(destinationKey);
     const destDir = path.dirname(destPath);
 
     await fs.promises.mkdir(destDir, { recursive: true });
@@ -63,7 +81,7 @@ export class FilesystemStorage implements IStorageProvider {
     destinationKey: string,
     options?: UploadOptions
   ): Promise<StoredFileReference> {
-    const destPath = path.join(this.rootDir, destinationKey);
+    const destPath = this.resolveInsideRoot(destinationKey);
     const destDir = path.dirname(destPath);
 
     await fs.promises.mkdir(destDir, { recursive: true });
@@ -85,7 +103,7 @@ export class FilesystemStorage implements IStorageProvider {
   }
 
   async download(key: string): Promise<string> {
-    const filePath = path.join(this.rootDir, key);
+    const filePath = this.resolveInsideRoot(key);
 
     try {
       await fs.promises.access(filePath, fs.constants.R_OK);
@@ -96,7 +114,7 @@ export class FilesystemStorage implements IStorageProvider {
   }
 
   async downloadBuffer(key: string): Promise<Buffer> {
-    const filePath = path.join(this.rootDir, key);
+    const filePath = this.resolveInsideRoot(key);
     return fs.promises.readFile(filePath);
   }
 
@@ -106,11 +124,11 @@ export class FilesystemStorage implements IStorageProvider {
   }
 
   getPublicUrl(key: string): string {
-    return path.join(this.rootDir, key);
+    return this.resolveInsideRoot(key);
   }
 
   async delete(key: string): Promise<void> {
-    const filePath = path.join(this.rootDir, key);
+    const filePath = this.resolveInsideRoot(key);
 
     try {
       await fs.promises.unlink(filePath);
@@ -126,7 +144,7 @@ export class FilesystemStorage implements IStorageProvider {
   }
 
   async exists(key: string): Promise<boolean> {
-    const filePath = path.join(this.rootDir, key);
+    const filePath = this.resolveInsideRoot(key);
 
     try {
       await fs.promises.access(filePath, fs.constants.F_OK);
@@ -137,7 +155,7 @@ export class FilesystemStorage implements IStorageProvider {
   }
 
   async list(prefix: string, maxKeys: number = 1000): Promise<ListResult> {
-    const dirPath = path.join(this.rootDir, prefix);
+    const dirPath = this.resolveInsideRoot(prefix, true);
     const keys: string[] = [];
 
     const listRecursive = async (currentPath: string, relativePath: string = '') => {
@@ -176,8 +194,8 @@ export class FilesystemStorage implements IStorageProvider {
   }
 
   async copy(sourceKey: string, destinationKey: string): Promise<void> {
-    const sourcePath = path.join(this.rootDir, sourceKey);
-    const destPath = path.join(this.rootDir, destinationKey);
+    const sourcePath = this.resolveInsideRoot(sourceKey);
+    const destPath = this.resolveInsideRoot(destinationKey);
     const destDir = path.dirname(destPath);
 
     await fs.promises.mkdir(destDir, { recursive: true });
@@ -190,7 +208,7 @@ export class FilesystemStorage implements IStorageProvider {
   }
 
   async getMetadata(key: string): Promise<FileMetadata> {
-    const filePath = path.join(this.rootDir, key);
+    const filePath = this.resolveInsideRoot(key);
 
     try {
       const stats = await fs.promises.stat(filePath);

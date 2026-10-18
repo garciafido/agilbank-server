@@ -50,6 +50,7 @@ import { EmailVerificationOneService } from "../../../src/entities/emailVerifica
 import { EmailVerificationCreateService } from "../../../src/entities/emailVerification/services/emailVerificationCreateService";
 import { EmailVerificationUpdateService } from "../../../src/entities/emailVerification/services/emailVerificationUpdateService";
 import { EmailVerificationDeleteService } from "../../../src/entities/emailVerification/services/emailVerificationDeleteService";
+import { abStatementReadResolver } from "../../../src/pipelines/abStatementRead/abStatementReadResolver";
 
 /**
  * Prisma que grita si alguien lo toca. El permiso se verifica ANTES de la
@@ -83,7 +84,7 @@ const contextoSinPermisos = (): any => ({
     id: "RBAC_USER",
     tenant_id_: "RBAC_TENANT",
     active: true,
-    roles: [],
+    role: null,
   },
   permissions: () => new Set<string>(),
 });
@@ -558,6 +559,73 @@ describe("ninguna operación se ejecuta sin su permiso", () => {
       // doble de Prisma tira primero y esto no llega a comparar nada.
       expect(detalle).toContain(permiso);
       expect(detalle).toContain(entidad);
+    }
+  );
+});
+
+/** La mutation de cada pipeline expuesto, llamada directo a su resolver. */
+const PIPELINES: Array<{
+  pipeline: string;
+  permiso: string;
+  ejecutar: (ctx: any) => Promise<unknown>;
+}> = [
+  {
+    pipeline: "AbStatementRead",
+    permiso: "abStatementRead_run",
+    ejecutar: (ctx: any) =>
+      (abStatementReadResolver.Mutation.abStatementRead as any)(
+        null,
+        {},
+        ctx,
+        null
+      ),
+  },
+];
+
+describe("ningún pipeline se ejecuta sin su permiso", () => {
+  it("hay pipelines expuestos que probar", () => {
+    // El mismo guard que ENTIDADES: con la lista vacía, `it.each` no corre nada.
+    expect(PIPELINES.length).toBeGreaterThan(0);
+  });
+
+  it.each(PIPELINES)(
+    "$pipeline exige $permiso",
+    async ({ pipeline, permiso, ejecutar }) => {
+      // Si el resolver resuelve el service sin haber verificado el permiso, el
+      // contenedor grita: no alcanza con que algo lance, tiene que lanzar el chequeo.
+      const resolve = jest.fn(() => {
+        throw new Error(
+          `Se resolvió el service de ${pipeline} sin verificar el permiso`
+        );
+      });
+      const ctx = { ...contextoSinPermisos(), container: { resolve } };
+
+      const error = await ejecutar(ctx).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(UnauthorizedError);
+      const detalle = (error as UnauthorizedError).customMessage ?? "";
+      expect(detalle).toContain(permiso);
+      expect(detalle).toContain(pipeline);
+      expect(resolve).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(PIPELINES)(
+    "$pipeline con $permiso llega al service",
+    async ({ permiso, ejecutar }) => {
+      // Con el permiso, el resolver delega en el service con los args y el
+      // contexto: si exigiera otro id que el que emite el seed, esto lanza.
+      const execute = jest.fn().mockResolvedValue(null);
+      const ctx = {
+        ...contextoSinPermisos(),
+        permissions: () => new Set<string>([permiso]),
+        container: { resolve: () => ({ execute }) },
+      };
+
+      await ejecutar(ctx);
+
+      expect(execute).toHaveBeenCalledTimes(1);
+      expect(execute).toHaveBeenCalledWith({}, ctx);
     }
   );
 });

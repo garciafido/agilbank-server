@@ -7,13 +7,13 @@
 
 import { randomUUID } from 'crypto';
 import { SearchContext } from '../types';
-import { ServiceContext, UserWithRolesAndPermissions } from '../../../types/context.types';
+import { ServiceContext, UserWithRoleAndPermissions } from '../../../types/context.types';
 import { PrismaClient } from '../../../prisma/generated-client/client';
 
 /**
  * Cache for user data to avoid repeated DB queries
  */
-const userCache = new Map<string, { user: UserWithRolesAndPermissions; expires: number }>();
+const userCache = new Map<string, { user: UserWithRoleAndPermissions; expires: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
@@ -37,11 +37,11 @@ export async function createServiceContextFromSearch(
     return buildContext(cached.user, tenantId, permissions, prisma);
   }
 
-  // Fetch user with roles (needed for hasRole helper)
+  // Fetch user with its role, one at most (needed for hasRole helper)
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
-      roles: {
+      role: {
         include: {
           permissions: true,
         },
@@ -55,31 +55,30 @@ export async function createServiceContextFromSearch(
 
   // Cache the user
   userCache.set(cacheKey, {
-    user: user as UserWithRolesAndPermissions,
+    user: user as UserWithRoleAndPermissions,
     expires: Date.now() + CACHE_TTL_MS,
   });
 
-  return buildContext(user as UserWithRolesAndPermissions, tenantId, permissions, prisma);
+  return buildContext(user as UserWithRoleAndPermissions, tenantId, permissions, prisma);
 }
 
 /**
  * Build ServiceContext from user data
  */
 function buildContext(
-  user: UserWithRolesAndPermissions,
+  user: UserWithRoleAndPermissions,
   tenantId: string,
   permissions: string[],
   prisma: PrismaClient
 ): ServiceContext {
   const permissionSet = new Set(permissions);
-  const userRoles = user.roles?.map(r => r.id) ?? [];
+  // Without a role, hasRole is false for every role
+  const rolDelUsuario = user.role?.id;
 
   return {
     prisma,
     currentUser: user,
-    hasRole: (...rolesToCheck) => {
-      return rolesToCheck.some(role => userRoles.includes(role));
-    },
+    hasRole: (...rolesToCheck) => !!rolDelUsuario && rolesToCheck.includes(rolDelUsuario),
     permissions: () => permissionSet,
     req: {} as any, // Not needed for tool execution
     isSystemMode: false,

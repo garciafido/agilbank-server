@@ -449,6 +449,14 @@ const data: Prisma.PermissionCreateInput[] = [
     createdAt_: new Date(),
     version_: "0",
     createdBy_: { connect: { id: "SYSADMIN" } },
+    id: "abStatementRead_run",
+    name: "AbStatementRead: Ejecutar",
+  },
+
+  {
+    createdAt_: new Date(),
+    version_: "0",
+    createdBy_: { connect: { id: "SYSADMIN" } },
     id: "simulation_run",
     name: "Ejecutar Simulaciones",
   },

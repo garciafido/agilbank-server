@@ -126,8 +126,8 @@ export class SimulationService {
     if (!tenantField) return tenantId;
 
     const ct = meta.crossTenantForRoles;
-    const roles = this.context.currentUser?.roles?.map((r: any) => r.id) ?? [];
-    const crossesTenants = !!ct && roles.some((r: string) => ct.roles.includes(r));
+    const rol = this.context.currentUser?.role?.id;
+    const crossesTenants = !!ct && !!rol && ct.roles.includes(rol);
 
     const delegate = relatedEntityType.charAt(0).toLowerCase() + relatedEntityType.slice(1);
     const row = await (this.context.prisma as any)[delegate]?.findFirst({
@@ -227,8 +227,8 @@ export class SimulationService {
     const ct = (generatedSchemaMetadata.get('SimulationSession' as any) as any)
       ?.crossTenantForRoles;
     if (!ct) return false;
-    const roles = this.context.currentUser?.roles?.map((r: any) => r.id) ?? [];
-    return roles.some((r: string) => ct.roles.includes(r));
+    const rol = this.context.currentUser?.role?.id;
+    return !!rol && ct.roles.includes(rol);
   }
 
   /**

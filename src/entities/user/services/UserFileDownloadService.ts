@@ -2,7 +2,7 @@ import { PrismaClient } from "../../../prisma/generated-client/client";
 import { ServiceContext } from "../../../service-context";
 import { getStorageProvider } from "../../../common/storage";
 import { injectable, inject } from "tsyringe";
-import * as path from "path";
+import { storageKeyFor } from "../../../common/utils/storageKey";
 
 @injectable()
 export class UserFileDownloadService {
@@ -37,7 +37,9 @@ export class UserFileDownloadService {
     if (user !== null && data_field in user) {
       const file_data: any = user[data_field as keyof typeof user];
       const storage = getStorageProvider();
-      const key = path.join(
+      // storageKeyFor valida el nombre y el uuid guardados: una fila vieja con un
+      // nombre que sale de su carpeta falla cerrada en vez de leer fuera de ella.
+      const key = storageKeyFor(
         file_data.baseName,
         file_data.uuid,
         file_data.filename

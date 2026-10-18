@@ -63,7 +63,7 @@ Lo que el usuario aceptó, corrigió o rechazó de una propuesta, y lo que eligi
 
 **Campos consultables:** Organización, Email, Nombre, Está activo?, Idioma, Avatar, Celular, Requiere 2FA, twoFaSecret, twoFaBackupCodes, twoFaVerifiedAt, passwordResetToken, passwordResetExpiresAt, Perfil
 
-**Relaciones:** Empresa, Roles
+**Relaciones:** Empresa, Rol
 
 #### Rol
 
@@ -164,35 +164,18 @@ Consultar contenido de PDFs y documentos indexados.
 - "Usuarios por Empresa"
   - "¿Cuántos/as Usuarios hay por Empresa?"
   - "Distribución de Usuarios por Empresa"
+- "Usuarios por Rol"
+  - "¿Cuántos/as Usuarios hay por Rol?"
+  - "Distribución de Usuarios por Rol"
 
 #### Filtros
 
 - "Usuarios de Empresa "X""
   - "Usuarios con Empresa "X""
   - "Buscar Usuarios donde Empresa sea "X""
-
-#### Conteos de Relaciones
-
-- "Cantidad de Roles por Usuario"
-  - "¿Cuántos/as Roles tiene cada Usuario?"
-  - "Usuarios con más Roles"
-- "Cantidad de Permisos por Rol"
-  - "¿Cuántos/as Permisos tiene cada Rol?"
-  - "Roles con más Permisos"
-
-#### Filtros en Relaciones
-
-- "Usuarios con Rol "X""
-  - "Usuarios que tengan Rol "X""
-- "Roles con Permiso "X""
-  - "Roles que tengan Permiso "X""
-
-#### Filtros Negativos
-
-- "Usuarios sin Roles"
-  - "Usuarios que no tienen Roles"
-- "Roles sin Permisos"
-  - "Roles que no tienen Permisos"
+- "Usuarios de Rol "X""
+  - "Usuarios con Rol "X""
+  - "Buscar Usuarios donde Rol sea "X""
 
 #### Navegación Profunda
 
@@ -207,6 +190,22 @@ Consultar contenido de PDFs y documentos indexados.
 - "Roles con Rol → Permiso → Rol → Usuario"
 - "Roles con Rol → Permiso → Rol → Permiso → Rol"
 - "Roles con Rol → Permiso → Rol → Usuario → Empresa"
+
+#### Conteos de Relaciones
+
+- "Cantidad de Permisos por Rol"
+  - "¿Cuántos/as Permisos tiene cada Rol?"
+  - "Roles con más Permisos"
+
+#### Filtros en Relaciones
+
+- "Roles con Permiso "X""
+  - "Roles que tengan Permiso "X""
+
+#### Filtros Negativos
+
+- "Roles sin Permisos"
+  - "Roles que no tienen Permisos"
 
 #### Relaciones Inversas
 

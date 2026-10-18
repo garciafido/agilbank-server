@@ -9,6 +9,7 @@ import {
   createDecipheriv,
 } from "crypto";
 import { sign, verify } from "jsonwebtoken";
+import { UnauthorizedError } from "../../common/errors";
 
 // El secreto de 2FA NO se hornea. Antes caía a una constante horneada —pública, commiteada en
 // el repo— cuando el entorno no traía APP_SECRET. El env de ejemplo trae solo JWT_SECRET, así
@@ -146,19 +147,22 @@ export class TwoFaService {
    * Los códigos de respaldo sí se regeneran al reusar: se guardan hasheados y
    * no se pueden re-mostrar — los válidos son los de la última respuesta, que
    * es la que la pantalla conserva.
+   *
+   * Un 2FA ya VERIFICADO no se reconfigura desde acá: se rechaza antes de leer
+   * su secreto. Antes el reclamo también ganaba con el 2FA verificado y lo
+   * rotaba; como el login daba el mismo token temporal para configurar que para
+   * verificar, con solo la contraseña se llegaba a un secreto nuevo y, con un
+   * código de ese secreto, a la sesión: el segundo factor se salteaba.
    */
   async generateSetup(userId: string) {
     const secret = new OTPAuth.Secret();
     const { backupCodes, hashed } = this.generateBackupCodes();
     const encryptedSecret = this.encryptSecret(secret.base32);
 
-    // Reclama solo si no hay un setup a medias: sin secreto, o con el 2FA ya
-    // verificado (reconfiguración explícita, que sí debe rotar el secreto).
+    // Reclama solo si el usuario no tiene secreto: ni un setup a medias ni un
+    // 2FA verificado (ése no se rota con solo la contraseña).
     const claimed = await this.prisma.user.updateMany({
-      where: {
-        id: userId,
-        OR: [{ twoFaSecret: null }, { NOT: { twoFaVerifiedAt: null } }],
-      },
+      where: { id: userId, twoFaSecret: null },
       data: {
         twoFaSecret: encryptedSecret,
         twoFaBackupCodes: JSON.stringify(hashed),
@@ -167,11 +171,15 @@ export class TwoFaService {
 
     let activeSecret = secret;
     if (claimed.count === 0) {
-      // Otra llamada ya dejó un secreto pendiente: ese es el que vale.
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { twoFaSecret: true },
+        select: { twoFaSecret: true, twoFaVerifiedAt: true },
       });
+      // Ya verificado: se rechaza antes de descifrar nada.
+      if (user?.twoFaVerifiedAt) {
+        throw new UnauthorizedError("Operación de 2FA no disponible.");
+      }
+      // Otra llamada ya dejó un secreto pendiente: ese es el que vale.
       try {
         activeSecret = OTPAuth.Secret.fromBase32(
           this.decryptSecret(user!.twoFaSecret!)
@@ -268,15 +276,27 @@ export class TwoFaService {
     return !!user.twoFaseAuth && !!user.twoFaVerifiedAt;
   }
 
-  createTempToken(userId: string): string {
-    return sign({ userId, type: "twofa_pending" }, APP_SECRET, {
-      expiresIn: "5m",
-    });
+  // Dos tipos de token temporal: el de CONFIGURAR (login de un 2FA sin verificar;
+  // vale para setupTwoFa y confirmTwoFaSetup) y el de VERIFICAR (login de un 2FA
+  // verificado; vale para verifyTwoFa y verifyTwoFaBackupCode). Uno no sirve
+  // para lo del otro: con el de verificar no se llega a configurar un secreto.
+  // Un kind que no es ninguno de los dos lanza: nunca se compara contra un tipo
+  // vacío (pasaría un JWT sin tipo firmado con el mismo secreto).
+  private static tempTokenType(kind: "setup" | "verify"): string {
+    if (kind === "setup") return "twofa_setup";
+    if (kind === "verify") return "twofa_verify";
+    throw new Error("Invalid token type");
   }
 
-  verifyTempToken(token: string): { userId: string } {
+  createTempToken(userId: string, kind: "setup" | "verify"): string {
+    const type = TwoFaService.tempTokenType(kind);
+    return sign({ userId, type }, APP_SECRET, { expiresIn: "5m" });
+  }
+
+  verifyTempToken(token: string, kind: "setup" | "verify"): { userId: string } {
+    const expected = TwoFaService.tempTokenType(kind);
     const payload = verify(token, APP_SECRET) as any;
-    if (payload.type !== "twofa_pending") {
+    if (payload.type !== expected) {
       throw new Error("Invalid token type");
     }
     return { userId: payload.userId };

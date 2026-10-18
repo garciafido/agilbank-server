@@ -87,7 +87,7 @@ const ctxA = (without: string[] = []): any => {
       id: ids.uA,
       tenant_id_: ids.A,
       tenant_: { id: ids.A },
-      roles: [{ id: "User", permissions: [] }],
+      role: { id: "User", permissions: [] },
     },
     permissions: () => permissions,
     hasRole: (...wanted: string[]) => wanted.includes("User"),

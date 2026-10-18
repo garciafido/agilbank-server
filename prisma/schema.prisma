@@ -340,7 +340,8 @@ model User {
   passwordResetToken String? @map("password_reset_token")
   passwordResetExpiresAt DateTime? @map("password_reset_expires_at")
   profile Json?
-  roles Role[] @relation("User_roles")
+  role Role? @relation("User_role", fields: [role_id], references: [id])
+  role_id String? @map("role__id")
   password String
   welcomeEmailsentAt DateTime? @map("welcome_email_sent_at__")
   passwordResetEmailsentAt DateTime? @map("password_reset_email_sent_at__")
@@ -381,6 +382,7 @@ model User {
   EmailVerification_requestedBy EmailVerification[] @relation("EmailVerification_requestedBy")
   EmailVerification_createdBy_ EmailVerification[] @relation("EmailVerification_createdBy_")
   EmailVerification_lastUpdatedBy_ EmailVerification[]  @relation("EmailVerification_lastUpdatedBy_")
+  @@index([role_id])
 
   @@map(name: "user")
 }
@@ -399,7 +401,7 @@ model Role {
   name String
   permissions Permission[] @relation("Role_permissions")
   isForAllTenants Boolean @map("is_for_all_tenants")
-  User_roles User[] @relation("User_roles")
+  User_role User[] @relation("User_role")
   @@index([tenant_id_])
   @@unique([tenant_id_, name])
 

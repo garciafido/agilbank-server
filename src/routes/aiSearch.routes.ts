@@ -266,17 +266,8 @@ router.post('/ai-search/stream', async (req, res) => {
     return;
   }
 
-  // Extract permissions from roles
-  const permissions: string[] = [];
-  if (context.currentUser.roles) {
-    for (const role of context.currentUser.roles) {
-      if (role.permissions) {
-        for (const perm of role.permissions) {
-          permissions.push(perm.id);
-        }
-      }
-    }
-  }
+  // Permissions of the user's role (one at most): without a role, none
+  const permissions: string[] = (context.currentUser.role?.permissions ?? []).map((p) => p.id);
 
   // Build search context
   const searchContext = {

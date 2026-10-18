@@ -46,11 +46,7 @@ export class BotNotificationService implements IBotNotificationService {
       where: {
         tenant_id_: this.tenantId,
         active: true,
-        roles: {
-          some: {
-            name_es: 'SysAdmin',
-          },
-        },
+        role: { id: "SysAdmin" },
       },
       select: {
         id: true,

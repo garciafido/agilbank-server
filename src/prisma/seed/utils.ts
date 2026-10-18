@@ -5,6 +5,7 @@ export const fakeContext = (userId: string, tenantId: string) => {
     currentUser: {
       id: userId,
       tenantId: tenantId,
+      role: null,
     },
   };
 };

@@ -63,7 +63,7 @@ iO is the query engine for this system. It allows querying internal data and ind
 
 **Queryable fields:** Organization, Email, Name, Is active?, Language, Avatar, Cellphone, Requires 2FA, twoFaSecret, twoFaBackupCodes, twoFaVerifiedAt, passwordResetToken, passwordResetExpiresAt, Profile
 
-**Relations:** Company, Roles
+**Relations:** Company, Role
 
 #### Role
 
@@ -164,30 +164,29 @@ Query content from PDFs and indexed documents.
 - "Users by Company"
   - "How many Users per Company?"
   - "Distribution of Users by Company"
+- "Users by Role"
+  - "How many Users per Role?"
+  - "Distribution of Users by Role"
 
 #### Filters
 
 - "Users with Company "X""
   - "Search Users where Company is "X""
+- "Users with Role "X""
+  - "Search Users where Role is "X""
 
 #### Relation Counts
 
-- "Number of Roles per User"
-  - "How many Roles does each User have?"
 - "Number of Permissions per Role"
   - "How many Permissions does each Role have?"
 
 #### Relation Filters
 
-- "Users with Role "X""
-  - "Users that have Role "X""
 - "Roles with Permission "X""
   - "Roles that have Permission "X""
 
 #### Negative Filters
 
-- "Users without Roles"
-  - "Users that don't have Roles"
 - "Roles without Permissions"
   - "Roles that don't have Permissions"
 

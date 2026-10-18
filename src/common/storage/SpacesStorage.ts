@@ -58,7 +58,18 @@ export class SpacesStorage implements IStorageProvider {
     });
   }
 
+  /**
+   * La clave real en el bucket: la pedida, con el prefijo de entorno adelante.
+   *
+   * Las claves se arman con datos que pueden venir de afuera (el nombre de un
+   * archivo subido), y `path.posix.join` normaliza: con un tramo `..` la clave
+   * salía del prefijo y apuntaba a lo de otro entorno del mismo bucket. Una clave
+   * con un tramo `..` o que empieza con `/` se rechaza antes de anteponerlo.
+   */
   private getKey(key: string): string {
+    if (key.startsWith("/") || key.split("/").includes("..")) {
+      throw new Error("Clave de storage fuera de la raíz");
+    }
     if (this.envPrefix) {
       return path.posix.join(this.envPrefix, key);
     }
@@ -85,10 +96,11 @@ export class SpacesStorage implements IStorageProvider {
     destinationKey: string,
     options?: UploadOptions
   ): Promise<StoredFileReference> {
+    // La clave primero: una que sale del prefijo no abre el archivo de origen.
+    const fullKey = this.getKey(destinationKey);
+
     const fileStream = fs.createReadStream(sourcePath);
     const stats = await fs.promises.stat(sourcePath);
-
-    const fullKey = this.getKey(destinationKey);
 
     const command = new PutObjectCommand({
       Bucket: this.bucket,
@@ -122,6 +134,9 @@ export class SpacesStorage implements IStorageProvider {
     destinationKey: string,
     options?: UploadOptions
   ): Promise<StoredFileReference> {
+    // La clave primero: una que sale del prefijo no consume el stream.
+    const fullKey = this.getKey(destinationKey);
+
     const chunks: Buffer[] = [];
 
     for await (const chunk of stream) {
@@ -129,8 +144,6 @@ export class SpacesStorage implements IStorageProvider {
     }
 
     const buffer = Buffer.concat(chunks);
-
-    const fullKey = this.getKey(destinationKey);
 
     const command = new PutObjectCommand({
       Bucket: this.bucket,
