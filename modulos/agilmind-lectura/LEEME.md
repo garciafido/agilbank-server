@@ -17,9 +17,11 @@ geometría y del orden de lectura están acá y también en el motor, que prueba
 
 `mutate` lista archivos enteros. Lo que queda afuera es E/S, y se cubre con los tests que mockean el
 motor, con los que corren poppler y con los bancos de los dos motores: `paddleOcr.ts` (cargar el
-modelo ONNX y leer con él), `pdf.ts` (pdftoppm y pdfinfo), `pdfTextGeometry.ts` (pdftotext) y
+modelo ONNX y leer con él), `paddleOficial.ts` (la detección y el reconocimiento oficiales de PaddleX
+con onnxruntime, OpenCV y Clipper), `pdf.ts` (pdftoppm y pdfinfo), `pdfTextGeometry.ts` (pdftotext) y
 `pdfPaginas.ts` (pdftotext y pdftoppm sobre un rango de páginas) y `foto.ts` (sharp: enderezar por EXIF,
-achicar y girar una foto, los píxeles en grises de una imagen y cuántas páginas tiene). Lo que esos cinco deciden sobre
-datos está en `ordenDeLectura.ts`, `paginasDePdf.ts`, `pdfGeometry.ts` y `paginasDelPdf.ts` (las
-palabras por página, el número de página de un render y el tamaño de un PNG), que sí se miden. Una
-función nueva con E/S va en uno de los cinco; una que solo transforma datos, en uno de los otros.
+achicar y girar una foto, los píxeles en grises de una imagen y cuántas páginas tiene). Lo que esos seis deciden sobre
+datos está en `ordenDeLectura.ts`, `paginasDePdf.ts`, `pdfGeometry.ts`, `paginasDelPdf.ts` (las
+palabras por página, el número de página de un render y el tamaño de un PNG), `deteccionDeTexto.ts` y
+`reconocimientoDeRenglones.ts` (las cuentas del pre y el post-proceso de PP-OCR) y `orientacionDeLaPagina.ts` (el voto de los renglones), que sí se miden.
+Una función nueva con E/S va en uno de los seis; una que solo transforma datos, en uno de los otros.

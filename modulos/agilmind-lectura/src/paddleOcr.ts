@@ -46,6 +46,15 @@
  *
  * Kill-switch: AP_PADDLE_OCR=off. «Apagado» y «no disponible» dan los dos null, y
  * son cosas distintas.
+ *
+ * ── Las dos detecciones ──
+ *
+ * «gutenye» es la de @gutenye/ocr-common 1.4.8: la imagen entera, sin normalizar, umbral 0,03 y sin
+ * filtro por puntaje de caja. «oficial» (`paddleOficial.ts`) es la de PaddleX 3.0: la red a 960 de
+ * lado mayor, con la detección PP-OCRv5 mobile de la carpeta y el pre-proceso oficial del
+ * reconocimiento. Corre en menos de la mitad del tiempo y con un tercio de la memoria por página.
+ * La elige la llamada (`{ deteccion }`) o AP_PADDLE_DETECCION; sin ninguna, gutenye. Cada una arma
+ * su motor una vez por proceso, y las dos comparten el turno.
  */
 
 import { existsSync } from "fs";
@@ -54,6 +63,10 @@ import * as os from "os";
 import * as path from "path";
 import { agruparEnOrdenDeLectura } from "./ordenDeLectura";
 import type { PaddleWord } from "./ordenDeLectura";
+import type { OpcionesDeteccion } from "./deteccionDeTexto";
+import type { ModoReconocimiento } from "./reconocimientoDeRenglones";
+import type { MotorOficial } from "./paddleOficial";
+import type { VotoDeRenglones } from "./orientacionDeLaPagina";
 
 interface PaddleLine {
   mean: number;
@@ -101,9 +114,58 @@ async function getEngine(): Promise<any | null> {
   return enginePromise;
 }
 
-/** Si PP-OCR carga en este proceso: con `AP_PADDLE_OCR=off` o sin sus modelos, no. */
-export async function paddleDisponible(): Promise<boolean> {
-  return (await getEngine()) !== null;
+let motorOficial: Promise<MotorOficial | null> | null = null;
+
+/** PP-OCRv5_mobile_det convertida a ONNX: la detección que acompaña a la oficial (ver modelos/LEEME.md). */
+const DETECCION_V5 = "PP-OCRv5_mobile_det.onnx";
+
+/** La detección oficial (`paddleOficial.ts`), con los mismos modelos que tomaría gutenye. */
+function getMotorOficial(): Promise<MotorOficial | null> {
+  if (process.env.AP_PADDLE_OCR === "off") return Promise.resolve(null);
+  if (!motorOficial) {
+    const dir = process.env.AP_PADDLE_MODELS_DIR;
+    motorOficial = import("./paddleOficial")
+      .then(({ crearMotorOficial, modelosDelPaquete, deteccionDelPaquete }) => {
+        // La detección v5 de la carpeta es solo de la oficial: gutenye sigue con det.onnx o la del paquete.
+        const propia = dir ? [path.join(dir, DETECCION_V5), path.join(dir, "det.onnx")].find((f) => existsSync(f)) : undefined;
+        const deteccion = propia ?? deteccionDelPaquete();
+        const delPaquete = modelosDelPaquete();
+        const modelos = dir
+          ? { deteccion, reconocimiento: path.join(dir, "rec.onnx"), diccionario: path.join(dir, "dict.txt"), orientacion: delPaquete.orientacion }
+          : delPaquete;
+        return crearMotorOficial(modelos, { logSeverityLevel: 3 });
+      })
+      .catch((error) => {
+        console.warn("[paddleOcr] no disponible:", error instanceof Error ? error.message : String(error));
+        return null;
+      });
+  }
+  return motorOficial;
+}
+
+/**
+ * Qué detección usa una lectura.
+ *  - «gutenye»: la de @gutenye/ocr-common 1.4.8, la de siempre.
+ *  - «oficial»: el pre y el post-proceso de PaddleX 3.0 (`paddleOficial.ts`), sobre los mismos modelos.
+ * Sin opción en la llamada decide `AP_PADDLE_DETECCION` («oficial»); sin variable, gutenye.
+ */
+export type DeteccionPaddle = "gutenye" | "oficial";
+
+export interface OpcionesPaddle {
+  deteccion?: DeteccionPaddle;
+  /** Solo con la oficial: lo que cambia de DETECCION_OFICIAL. */
+  parametros?: Partial<OpcionesDeteccion>;
+  /** Solo con la oficial: el pre-proceso del reconocimiento («oficial» por defecto). */
+  reconocimiento?: ModoReconocimiento;
+}
+
+function deteccionElegida(opciones: OpcionesPaddle): DeteccionPaddle {
+  return opciones.deteccion ?? (process.env.AP_PADDLE_DETECCION === "oficial" ? "oficial" : "gutenye");
+}
+
+/** Si PP-OCR carga en este proceso con esa detección: con `AP_PADDLE_OCR=off` o sin sus modelos, no. */
+export async function paddleDisponible(opciones: OpcionesPaddle = {}): Promise<boolean> {
+  return (await (deteccionElegida(opciones) === "oficial" ? getMotorOficial() : getEngine())) !== null;
 }
 
 /**
@@ -128,30 +190,63 @@ export type LecturaPaddle =
  * la vez: sin turno, se multiplica. El turno es del proceso — dos workers no
  * se coordinan, y entre ellos el límite es la memoria de la máquina.
  */
-export function runPaddleOcr(png: Buffer, scale = 1): Promise<{ text: string; words: PaddleWord[] } | null> {
-  return leerConPaddleDetallado(png, scale).then((r) => ("palabras" in r ? r.palabras : null));
+export function runPaddleOcr(png: Buffer, scale = 1, opciones: OpcionesPaddle = {}): Promise<{ text: string; words: PaddleWord[] } | null> {
+  return leerConPaddleDetallado(png, scale, opciones).then((r) => ("palabras" in r ? r.palabras : null));
 }
 
 /** Como `runPaddleOcr`, en el mismo turno, separando la página vacía de la falla. */
-export function leerConPaddleDetallado(png: Buffer, scale = 1): Promise<LecturaPaddle> {
-  const esta = turno.then(() => leerConPaddle(png, scale));
+export function leerConPaddleDetallado(png: Buffer, scale = 1, opciones: OpcionesPaddle = {}): Promise<LecturaPaddle> {
+  const esta = turno.then(() => leerConPaddle(png, scale, opciones));
   turno = esta.catch(() => undefined);
   return esta;
 }
 
 let turno: Promise<unknown> = Promise.resolve();
 
+/**
+ * Cuántos renglones tiene la página y qué parte de ellos está a 180°, con la detección oficial y el
+ * clasificador de orientación del paquete. Para decidir si girarla antes de leerla: `estaDadaVuelta`.
+ * `null` si PP-OCR no está o falla: entonces no se sabe, y la página se lee como vino.
+ */
+export function orientacionDePagina(png: Buffer, parametros: Partial<OpcionesDeteccion> = {}): Promise<VotoDeRenglones | null> {
+  const esta = turno.then(async () => {
+    const motor = await getMotorOficial();
+    if (!motor) return null;
+    try {
+      return await motor.orientacion(png, { deteccion: parametros });
+    } catch (error) {
+      console.warn("[paddleOcr] la orientación falló:", error instanceof Error ? error.message : String(error));
+      return null;
+    }
+  });
+  turno = esta.catch(() => undefined);
+  return esta;
+}
+
 const VACIA: LecturaPaddle = { vacia: true };
 
-async function leerConPaddle(png: Buffer, scale: number): Promise<LecturaPaddle> {
+/** gutenye lee de un archivo; la oficial, del buffer. */
+async function detectarLineas(png: Buffer, opciones: OpcionesPaddle): Promise<unknown | null> {
+  if (deteccionElegida(opciones) === "oficial") {
+    const motor = await getMotorOficial();
+    return motor && motor.detect(png, { deteccion: opciones.parametros ?? {}, reconocimiento: opciones.reconocimiento ?? "oficial" });
+  }
   const engine = await getEngine();
-  if (!engine) return { fallo: "PP-OCR no está disponible en este proceso." };
-
+  if (!engine) return null;
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ap-paddle-"));
   const imgPath = path.join(dir, "in.png");
   try {
     await fs.writeFile(imgPath, png);
-    const detectado: unknown = await engine.detect(imgPath);
+    return await engine.detect(imgPath);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function leerConPaddle(png: Buffer, scale: number, opciones: OpcionesPaddle): Promise<LecturaPaddle> {
+  try {
+    const detectado = await detectarLineas(png, opciones);
+    if (detectado === null) return { fallo: "PP-OCR no está disponible en este proceso." };
     if (!Array.isArray(detectado)) {
       const motivo = "detect() no devolvió la lista de líneas: la versión de @gutenye/ocr-common no es la fijada";
       console.warn(`[paddleOcr] ${motivo}`);
@@ -178,7 +273,5 @@ async function leerConPaddle(png: Buffer, scale: number): Promise<LecturaPaddle>
     const motivo = error instanceof Error ? error.message : String(error);
     console.warn("[paddleOcr] falló:", motivo);
     return { fallo: motivo };
-  } finally {
-    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }
