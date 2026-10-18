@@ -637,7 +637,8 @@ Si trae datos, vienen en <code>datos</code>.</p>
 <tr><td><code>sentido</code></td><td><code>cronologico</code> o <code>inverso</code>: si el más nuevo está arriba</td></tr>
 <tr><td><code>saldoDeLaFila</code></td><td><code>despues</code> o <code>antes</code>: si el saldo impreso es el que queda después del movimiento o el que había antes, como el saldo de apertura del día</td></tr>
 <tr><td><code>renglonesConSaldo</code>, <code>renglonesQueEncadenan</code></td><td>Cuántos renglones tienen saldo y cuántos encadenan</td></tr>
-<tr><td><code>cierraConSusSaldos</code>, <code>cierraConProntoNet</code></td><td>Si los saldos cierran con los del archivo y con los que mandaron. <code>null</code> si no hay con qué comparar: no mandaron el período o alguno de los dos saldos, o el archivo no cubre el período. <code>cierraConSusSaldos</code> también es <code>null</code> cuando el saldo inicial y el final salen del mismo saldo de renglón y el archivo no imprime ninguno de los dos: la resta da cero por construcción, y no se controló nada. Con el aviso <code>lectura-parcial</code>, los dos son <code>null</code>, tanto si cerraban como si no</td></tr>
+<tr><td><code>cierraConSusSaldos</code></td><td>Si el saldo inicial más los renglones da el saldo final del archivo. <code>null</code> si falta el saldo inicial o el final con qué sumar, y también cuando los dos salen del mismo saldo de renglón y el archivo no imprime ninguno: la resta da cero por construcción, y no se controló nada. Con el aviso <code>lectura-parcial</code> es <code>null</code>, tanto si cerraba como si no</td></tr>
+<tr><td><code>cierraConProntoNet</code></td><td>Si los saldos cierran con los que mandaron. <code>null</code> si no hay con qué comparar: no mandaron el período o alguno de los dos saldos, o el archivo no cubre el período. Con el aviso <code>lectura-parcial</code> es <code>null</code>, tanto si cerraba como si no</td></tr>
 </tbody>
 </table></div>
 
