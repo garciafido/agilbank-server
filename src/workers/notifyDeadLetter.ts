@@ -54,7 +54,7 @@ export async function notifyDeadLetter(
       where: {
         tenant_id_: tenantId,
         active: true,
-        roles: { some: { name_es: "SysAdmin" } },
+        role: { id: "SysAdmin" },
       },
       select: { id: true, email: true },
     });

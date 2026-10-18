@@ -48,7 +48,7 @@ npm run db:seed:list           # List available modules
 |--------|-------------|--------------|
 | `users` | System users (SYSTEM, SYSADMIN) | None |
 | `permissions` | CRUD permissions for all entities | users |
-| `roles` | System roles (Admin, User, etc.) | users, permissions |
+| `roles` | System roles (Admin, User, etc.); assigns the `SysAdmin` role to `SYSADMIN` | users, permissions |
 | `customRoles` | Custom roles from config | users, permissions |
 
 ### Demo Seeds (Development/Staging Only)
@@ -135,6 +135,49 @@ Update only specific modules:
 ```bash
 SEED_ONLY=permissions,roles npm run db:seed
 ```
+
+### 6. Cuándo volver a correr el seed de roles
+
+Después de una regeneración que cambia los permisos que siembra el generador: un
+pipeline expuesto nuevo (trae su permiso `<pipeline>_run`) o un cambio en los
+permisos de `SysAdmin`, `UsersAdmin`, `SiteAdmin` o `SiteUser`. La base no se entera sola: hasta que el seed
+corre, el permiso nuevo no existe y no lo tiene nadie, ni SysAdmin, así que lo que
+lo exige queda cerrado para todos.
+
+Un usuario tiene un solo rol (`User.role`). El seed de `roles` le asigna
+`SysAdmin` a `SYSADMIN` con `role: { connect }`, que lo deja igual si ya lo tiene:
+correrlo de nuevo no suma roles ni toca el de ningún otro usuario. `SYSTEM` y los
+usuarios de servicio de las integraciones no tienen rol.
+
+Van los tres módulos juntos: `roles` conecta permisos que siembra
+`permissions`, y con `SEED_ONLY=roles` solo, `permissions` no corre y el
+seed falla con el primero que todavía no está en la tabla.
+
+```bash
+# Qué correría, sin escribir nada
+SEED_ONLY=permissions,roles,customRoles SEED_DRY_RUN=true npm run db:seed
+# La corrida
+SEED_ONLY=permissions,roles,customRoles npm run db:seed
+# En el contenedor (ver Docker Usage)
+docker compose exec -e SEED_ONLY=permissions,roles,customRoles server npm run db:seed
+```
+
+Qué pisa: en la actualización, `upsertOne` cambia el `connect` de los
+permisos por un `set`. Cada rol del sistema (los de `roleData` en
+`src/prisma/seed/roles.ts`) queda con exactamente los permisos del seed más los
+de `roleExtensions` en `src/prisma/seed/rolesCustom.ts`, y SysAdmin además con
+todos los de la tabla. Un permiso que se le dio a uno de esos roles desde la app y
+que no está en el seed ni en `rolesCustom.ts` se pierde; el nombre del rol
+también vuelve al del seed. Por eso, antes de correrlo en producción:
+
+1. Comparar la matriz rol → permiso de producción con la del seed (`roleData`
+   más `roleExtensions`). Lo que haya que conservar va a `rolesCustom.ts`
+   antes de correr el seed.
+2. Revisar que los permisos de cada rol que asigna un SiteAdmin estén
+   contenidos en los de SiteAdmin: la regla de no elevación
+   (`src/common/utils/roleAssignment.ts`) solo deja asignar o quitar un rol a
+   quien tiene todos sus permisos, y un rol con uno de más deja de poder
+   asignarse.
 
 ## 🏗️ Creating Custom Seeds
 

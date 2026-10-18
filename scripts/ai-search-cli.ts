@@ -89,14 +89,15 @@ interface TenantLlmConfigRow {
   provider_code: string;
 }
 
-interface UserWithRoles {
+interface UserWithRole {
   id: string;
   email: string;
   tenant_id_: string;
-  roles: Array<{
+  // One role at most (User.role)
+  role: {
     id: string;
     permissions: Array<{ id: string }>;
-  }>;
+  } | null;
 }
 
 async function main() {
@@ -117,14 +118,14 @@ async function main() {
     const user = await prisma.user.findFirst({
       where: userEmail ? { email: userEmail } : {},
       include: {
-        roles: {
+        role: {
           include: {
             permissions: true,
           },
         },
         tenant_: true,
       },
-    }) as unknown as (UserWithRoles & { tenant_: { id: string; name: string | null } }) | null;
+    }) as unknown as (UserWithRole & { tenant_: { id: string; name: string | null } }) | null;
 
     if (!user) {
       console.error(`❌ User not found${userEmail ? `: ${userEmail}` : ''}`);
@@ -133,18 +134,13 @@ async function main() {
 
     const tenant = user.tenant_;
 
-    // Extract permissions from roles
-    const permissions = new Set<string>();
-    for (const role of user.roles) {
-      for (const perm of role.permissions) {
-        permissions.add(perm.id);
-      }
-    }
+    // Permissions of the user's role: without a role, none
+    const permissions = new Set<string>((user.role?.permissions ?? []).map(p => p.id));
 
     console.log(`👤 User: ${user.email}`);
     console.log(`🏢 Tenant: ${tenant.name || tenant.id}`);
     if (verbose) {
-      console.log(`   Roles: ${user.roles.map(r => r.id).join(', ')}`);
+      console.log(`   Rol: ${user.role?.id ?? '(sin rol)'}`);
       console.log(`   Permissions: ${permissions.size} permisos`);
     }
 

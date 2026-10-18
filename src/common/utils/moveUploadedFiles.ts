@@ -1,7 +1,8 @@
 import { UploadedFile } from "../../graphql/types";
 import { getStorageProvider, keyGenerator } from "../storage";
-import { tempExtension, uploadTempDir } from "../constants";
 import { ValidationError } from "../errors";
+import { tempPathForTicket } from "./tempPath";
+import { storageKeyFor } from "./storageKey";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -20,7 +21,9 @@ async function moveUploaded(
   filename: string
 ) {
   const storage = getStorageProvider();
-  const source = path.join(uploadTempDir, `${ticket}.${tempExtension}`);
+  const source = tempPathForTicket(ticket);
+  // La clave valida el nombre y el uuid (storageKey.ts) antes de mirar el disco.
+  const destinationKey = storageKeyFor(baseName, uuid, filename);
 
   // El staging pudo expirar (temp sweep) o perderse: sin este check el upload
   // revienta con un ENOENT críptico. Error claro y accionable para el usuario.
@@ -30,8 +33,6 @@ async function moveUploaded(
       { code: "UPLOAD_TEMP_EXPIRED", field: baseName }
     );
   }
-
-  const destinationKey = path.join(baseName, uuid, filename);
 
   await storage.upload(source, destinationKey, {
     contentType: "application/octet-stream",
@@ -54,6 +55,11 @@ export const moveUploadedFiles = async (
 
 export const removeFile = async (fileData: any, id: string) => {
   const storage = getStorageProvider();
-  const key = path.join(fileData.baseName, fileData.uuid, fileData.filename);
+  // Una fila guardada antes con un nombre malo falla acá, cerrada, sin llegar al storage.
+  const key = storageKeyFor(
+    fileData.baseName,
+    fileData.uuid,
+    fileData.filename
+  );
   await storage.delete(key);
 };

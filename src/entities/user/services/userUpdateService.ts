@@ -39,6 +39,7 @@ import {
   getTokenExpiration,
 } from "../../../common/utils/passwordUtils";
 import { enqueueWelcomeEmail } from "../../../workers/queues/emailQueue";
+import { assertRolesAssignable } from "../../../common/utils/roleAssignment";
 import {
   fileServerDataSetter,
   fileClientDataSetter,
@@ -235,17 +236,62 @@ export class UserUpdateService {
           ? args.twoFaseAuth
           : undefined,
       profile: args.profile !== undefined ? args.profile : undefined,
-      roles:
-        args.rolesIds && args.rolesIds.set
-          ? {
-              set: args.rolesIds.set.map((x: any) => {
-                return { id: x };
-              }),
-            }
-          : undefined, // Setters de negocio, relaciones, workflows...
+      role: args.roleId
+        ? { connect: { id: args.roleId } }
+        : (args.roleId === null || args.roleId === "") &&
+          this.db.canSeeRelated("Role")
+        ? { disconnect: true }
+        : undefined, // Setters de negocio, relaciones, workflows...
     };
 
     // Hook para posible lógica adicional de relleno/modificación de 'data'
+    // El rol del usuario (User.role, uno como máximo), con dos reglas. La de no
+    // elevación (common/utils/roleAssignment): cambiar el rol exige tener todos
+    // los permisos del que se quita y del que se pone. Y un usuario activo tiene
+    // que tener un rol, mirado solo en las transiciones: cuando la edición lo
+    // activa (de inactivo a activo) o le cambia el rol (null incluido). El
+    // cliente manda el registro completo en cada guardado (active: true y
+    // roleId sin cambios): editar otros datos de un activo sin rol —los
+    // usuarios de servicio de las integraciones— sigue permitido.
+    //
+    // El rol y la actividad actuales se leen recién acá, después de oldEntity
+    // (cuyo select no los trae): la empresa y el permiso sobre el usuario ya se
+    // verificaron. Sin roleId ni active: true no se consulta nada; con el mismo
+    // rol no hay cambio que revisar. En modo sistema no aplica ninguna de las
+    // dos. ValidationError lo importa el template genérico.
+    if (
+      !this.context.isSystemMode &&
+      (args.roleId !== undefined || args.active === true)
+    ) {
+      const actual = await this.prisma.user.findUnique({
+        where: { id: args.id },
+        select: { role_id: true, active: true },
+      });
+      const rolAntes = actual?.role_id ?? null;
+      if (args.roleId !== undefined && args.roleId !== rolAntes) {
+        // El de antes y el nuevo, sin el vacío (null o ""): distintos, sin repetir.
+        const rolesDelta = [rolAntes, args.roleId].filter(
+          (id): id is string => !!id
+        );
+        await assertRolesAssignable(
+          this.context,
+          this.prisma,
+          this.schemaMetaStore,
+          rolesDelta
+        );
+      }
+      // El rol que queda: "" desconecta, como null (el setter de role).
+      const rol = args.roleId === undefined ? rolAntes : args.roleId || null;
+      const activacion = args.active === true && actual?.active === false;
+      const cambioDeRol = rol !== rolAntes;
+      const activo = args.active ?? actual?.active;
+      if ((activacion || cambioDeRol) && activo === true && !rol) {
+        throw new ValidationError("Un usuario activo tiene que tener un rol.", {
+          code: "ACTIVE_USER_NEEDS_ROLE",
+        });
+      }
+    }
+
     if (args.twoFaseAuth === false) {
       data.twoFaSecret = null;
       data.twoFaBackupCodes = null;

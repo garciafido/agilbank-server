@@ -8,10 +8,12 @@ import {
 } from "../prisma/generated-client/client";
 
 // Define aquí los tipos que serán compartidos
-export type RoleType = "SysAdmin" | "User";
+// El id de un rol: los roles son filas de Role, no una lista fija.
+export type RoleType = string;
 
-export type UserWithRolesAndPermissions = Prisma.UserGetPayload<{
-  include: { roles: { include: { permissions: true } } };
+// Un usuario tiene como máximo un rol (User.role), con sus permisos.
+export type UserWithRoleAndPermissions = Prisma.UserGetPayload<{
+  include: { role: { include: { permissions: true } } };
 }>;
 // Usar Prisma.UserGetPayload es más robusto que la intersección manual
 
@@ -20,7 +22,7 @@ export type ExtendedPrismaClient = PrismaClient; // O un tipo más específico s
 
 export type ServiceContext = {
   prisma: ExtendedPrismaClient;
-  currentUser: UserWithRolesAndPermissions | null;
+  currentUser: UserWithRoleAndPermissions | null;
   hasRole: (...roles: RoleType[]) => boolean;
   permissions: () => Set<string>;
   req: Request;
@@ -31,4 +33,7 @@ export type ServiceContext = {
 export interface Token {
   // Si también la necesitas en otros lados
   userId: string;
+  // Solo el access token abre sesión (createContext lo exige): el refresh token
+  // y los temporales de 2FA se firman con el mismo secreto, sin este tipo.
+  type: "access";
 }

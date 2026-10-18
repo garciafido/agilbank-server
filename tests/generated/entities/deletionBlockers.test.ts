@@ -24,8 +24,9 @@
  *    remove anidados y los pipelines). Sin permiso de lectura sobre la raíz:
  *    solo cantidades. Sin permiso de lectura sobre lo que el nombre de la raíz
  *    nombra: sin ese texto. Con alcance por dueño o por rol: solo los nombres
- *    que el usuario ya ve, y cuentas exactas. Con un rol que cruza empresas:
- *    cuentas que suman la verdad, sin contar dos veces.
+ *    que el usuario ya ve, y cuentas exactas; sin rol, de lo acotado por rol,
+ *    solo lo suyo. Con un rol que cruza empresas: cuentas que suman la verdad,
+ *    sin contar dos veces.
  * 4. El nombre de la entidad se valida contra la tabla, antes de cualquier
  *    consulta; los caminos y los nombres siguen solo relaciones hacia adelante
  *    de la metadata (SecurePrismaOps no filtra por empresa las inversas).
@@ -164,11 +165,6 @@ const NESTED_NAMES = NAMED_ROOTS.flatMap((root) =>
 const CROSS_ROLE: string | undefined = [...generatedSchemaMetadata.values()]
   .map((m: any) => m.crossTenantForRoles)
   .find((c: any) => c?.mode === "always")?.roles?.[0];
-/** El segundo rol del usuario con dos roles: el primero, distinto de User, con alcance por rol; si no hay, el que cruza empresas. */
-const OTHER_ROLE: string | undefined =
-  [...generatedSchemaMetadata.values()]
-    .flatMap((m: any) => m.userScopedForRoles ?? [])
-    .find((r: string) => r !== "User") ?? CROSS_ROLE;
 
 /**
  * Controles de la limpieza previa: filas cuyo id se parece al prefijo sin
@@ -222,7 +218,8 @@ type Ctx = {
   tenant: string | null;
   user: string | null;
   permissions: string[];
-  roles?: string[];
+  /** El rol del usuario (uno; null, ninguno). Por defecto, User. */
+  role?: string | null;
   /** Modo sistema: sin filtros de empresa, de dueño ni de permisos. */
   system?: boolean;
   /** El cliente de Prisma del contexto (por defecto, el de la app). */
@@ -230,7 +227,7 @@ type Ctx = {
 };
 const context = (c: Ctx): any => {
   const set = new Set(c.permissions);
-  const roles = c.roles ?? ["User"];
+  const role = c.role === undefined ? "User" : c.role;
   return {
     prisma: c.prisma ?? basePrisma,
     // Como el contexto real: el usuario trae su empresa (los borrados con archivos la usan).
@@ -239,11 +236,11 @@ const context = (c: Ctx): any => {
           id: c.user,
           tenant_id_: c.tenant,
           tenant_: { id: c.tenant },
-          roles: roles.map((id) => ({ id, permissions: [] })),
+          role: role === null ? null : { id: role, permissions: [] },
         }
       : null,
     permissions: () => set,
-    hasRole: (...r: string[]) => r.some((x) => roles.includes(x)),
+    hasRole: (...r: string[]) => role !== null && r.includes(role),
     isSystemMode: !!c.system,
     req: {},
   };
@@ -266,17 +263,14 @@ const without = (all: string[], removed: string[]) =>
   all.filter((p) => !removed.includes(p));
 
 /**
- * Un usuario de A con dos roles de la base, cada uno con una parte de los
- * permisos (uno, todo menos las lecturas; el otro, solo las lecturas), y su
- * contexto armado por createContext como en un pedido: lee el usuario con sus
- * roles y suma sus permisos. Los permisos que no estén en la base se crean (y se
- * borran al final, con lo sembrado); los que estén se usan sin tocarlos.
+ * Un usuario de A con un rol de la base que tiene todos los permisos, y su
+ * contexto armado por createContext como en un pedido: lee el usuario con su
+ * rol y saca de él los permisos. Los permisos que no estén en la base se crean
+ * (y se borran al final, con lo sembrado); los que estén se usan sin tocarlos.
  */
-let twoRoles: Promise<{ ctx: any; user: string; roles: string[] }> | null =
-  null;
-const twoRoleContext = () =>
-  (twoRoles ??= (async () => {
-    const reads = ALL.filter((p) => p.endsWith("_retrieve"));
+let roleFromDb: Promise<{ ctx: any; user: string; role: string }> | null = null;
+const roleFromDbContext = () =>
+  (roleFromDb ??= (async () => {
     const existing = new Set(
       (
         await basePrisma.permission.findMany({
@@ -289,25 +283,23 @@ const twoRoleContext = () =>
       if (!existing.has(id))
         await f.create("Permission", { tenant: null, user: ids.uA }, { id });
     const own = { tenant: ids.A, user: ids.uA };
-    const roles = [await f.create("Role", own), await f.create("Role", own)];
-    const granted = [without(ALL, reads), reads];
-    for (let i = 0; i < roles.length; i++)
-      await basePrisma.role.update({
-        where: { id: roles[i] },
-        data: { permissions: { connect: granted[i].map((id) => ({ id })) } },
-      });
+    const role = await f.create("Role", own);
+    await basePrisma.role.update({
+      where: { id: role },
+      data: { permissions: { connect: ALL.map((id) => ({ id })) } },
+    });
     const user = await f.create("User", own);
     await basePrisma.user.update({
       where: { id: user },
-      data: { roles: { connect: roles.map((id) => ({ id })) } },
+      data: { role: { connect: { id: role } } },
     });
-    const token = sign({ userId: user }, APP_SECRET);
+    const token = sign({ userId: user, type: "access" }, APP_SECRET);
     const ctx = await createContext({
       get: (name: string) =>
         name.toLowerCase() === "authorization" ? "Bearer " + token : undefined,
       headers: {},
     } as any);
-    return { ctx, user, roles };
+    return { ctx, user, role };
   })());
 
 /** El error, reducido a lo que ve el cliente. */
@@ -758,32 +750,34 @@ const key = (r: { kind: string; rootEntity: string }) =>
 const keyOf = (r: DeletionBlockerRelation) => r.kind + " ← " + r.rootEntity;
 
 /**
- * Si un usuario con esos roles ve la raíz en la app, según la metadata de su
- * modelo: empresa (o global, o un rol que cruza empresas), y alcance por dueño
- * o por rol (compara el creador de la raíz con el usuario).
+ * Si un usuario con ese rol (null: sin rol) ve la raíz en la app, según la
+ * metadata de su modelo: empresa (o global, o un rol que cruza empresas), y
+ * alcance por dueño o por rol (compara el creador de la raíz con el usuario).
  */
 function canSee(
   c: Chain,
   tenant: string,
   user: string,
-  roles: string[] = ["User"]
+  role: string | null = "User"
 ): boolean {
   const meta: any =
     generatedSchemaMetadata.get(c.relation.rootEntity as any) ?? {};
   const crosses =
     meta.crossTenantForRoles?.mode === "always" &&
-    roles.some((r) => meta.crossTenantForRoles.roles.includes(r));
-  // Como SecurePrismaOps: el alcance por rol corre si todos los roles del usuario lo tienen.
+    role !== null &&
+    meta.crossTenantForRoles.roles.includes(role);
+  // Como SecurePrismaOps: el alcance por rol corre si el rol del usuario lo
+  // tiene, o si no tiene rol.
   const scoped =
     !!meta.ownerScoped ||
-    (roles.length > 0 &&
-      roles.every((r) => (meta.userScopedForRoles ?? []).includes(r)));
+    ((meta.userScopedForRoles ?? []).length > 0 &&
+      (role === null || meta.userScopedForRoles.includes(role)));
   // Debajo de la raíz: cada nivel de algún camino es sin empresa, de la empresa
   // del usuario, o de un modelo que cruza empresas para su rol.
   const crossesAt = (model: string) => {
     const cross: any = metaOf(model)?.crossTenantForRoles;
     return (
-      cross?.mode === "always" && roles.some((r) => cross.roles.includes(r))
+      cross?.mode === "always" && role !== null && cross.roles.includes(role)
     );
   };
   const nested = c.paths.some((levels) =>
@@ -808,7 +802,7 @@ function expected(
   tenant: string,
   user: string,
   names = true,
-  roles: string[] = ["User"]
+  role: string | null = "User"
 ) {
   const roots = new Map<
     string,
@@ -817,7 +811,7 @@ function expected(
   for (const c of chains) {
     const k = keyOf(c.relation);
     const byRoot = roots.get(k) ?? new Map();
-    const seen = names && canSee(c, tenant, user, roles);
+    const seen = names && canSee(c, tenant, user, role);
     byRoot.set(c.rootId, {
       visible: (byRoot.get(c.rootId)?.visible ?? false) || seen,
       tenant: c.tenant,
@@ -1547,18 +1541,18 @@ describe.each(TARGETS)("%s", (target) => {
   );
 
   /**
-   * Las cuentas y los nombres de un contexto con esos roles, contra la verdad:
+   * Las cuentas y los nombres de un contexto con ese rol, contra la verdad:
    * cada raíz una sola vez (a la vista, oculta en la empresa o de otra), y cada
    * nombre de una raíz que ese contexto lee por SecurePrismaOps.
    */
   const expectTruthFor = async (
     ctx: any,
-    roles: string[],
+    role: string | null,
     user: string = ids.uA
   ) => {
     const all = await truth(relations, t.id);
     const result: any = await blockersOf(target, t.id, ctx);
-    check(result, expected(all, ids.A, user, true, roles), true);
+    check(result, expected(all, ids.A, user, true, role), true);
     for (const r of result.reasons) {
       const roots = new Set(
         all.filter((c) => keyOf(c.relation) === key(r)).map((c) => c.rootId)
@@ -1586,35 +1580,68 @@ describe.each(TARGETS)("%s", (target) => {
         CROSS_ROLE +
         "): las cuentas suman la verdad sin contar dos veces, y los nombres son de lo que ese rol ve",
       async () => {
-        const roles = [CROSS_ROLE];
+        const role = CROSS_ROLE;
         await expectTruthFor(
-          context({ tenant: ids.A, user: ids.uA, permissions: ALL, roles }),
-          roles
+          context({ tenant: ids.A, user: ids.uA, permissions: ALL, role }),
+          role
         );
       }
     );
 
-  if (OTHER_ROLE)
-    it(
-      "un usuario con dos roles con alcance distinto (User y " +
-        OTHER_ROLE +
-        "), con todos los permisos: cuentas y nombres como la verdad",
-      async () => {
-        // El alcance por rol corre solo si todos los roles del usuario lo tienen.
-        const roles = ["User", OTHER_ROLE];
-        await expectTruthFor(
-          context({ tenant: ids.A, user: ids.uA, permissions: ALL, roles }),
-          roles
-        );
-      }
-    );
-
-  it("un usuario con dos roles de la base, cada uno con una parte de los permisos: createContext los suma, como en un pedido; cuentas y nombres como la verdad", async () => {
-    const { ctx, user, roles } = await twoRoleContext();
-    // Sumados, todos: con uno solo de los dos no habría borrado o no habría lectura.
+  it("un usuario con su rol de la base: createContext lee el rol con sus permisos, como en un pedido; cuentas y nombres como la verdad", async () => {
+    const { ctx, user, role } = await roleFromDbContext();
+    expect(ctx.currentUser?.role?.id).toBe(role);
     expect([...ctx.permissions()].sort()).toEqual([...ALL].sort());
-    await expectTruthFor(ctx, roles, user);
+    await expectTruthFor(ctx, role, user);
   });
+
+  // Las relaciones cuya raíz se acota por rol (y no por dueño, que acota a todos):
+  // sin ninguna en esta entidad, no hay alcance por rol que probar. Tenant, como
+  // en el alcance por dueño, no se siembra para otro usuario.
+  const scopedByRole = relations.filter(
+    (r) =>
+      !metaOf(r.rootEntity)?.ownerScoped &&
+      (metaOf(r.rootEntity)?.userScopedForRoles ?? []).length > 0
+  );
+  if (target !== "Tenant" && scopedByRole.length > 0)
+    it("un usuario sin rol no ve lo acotado por rol", async () => {
+      // Lo que sembró otro usuario de la empresa en las raíces acotadas por rol.
+      let extra = 0;
+      for (const r of scopedByRole)
+        if (await seedChain(r, t.id, ids.A, ids.uA2)) extra++;
+      if (extra === 0) return; // nada sembrable: quedó en el informe
+      const others = (await truth(relations, t.id)).filter(
+        (c) =>
+          c.creator === ids.uA2 &&
+          scopedByRole.some((r) => keyOf(r) === keyOf(c.relation))
+      );
+      expect(others.length).toBeGreaterThan(0);
+      const scopedKeys = new Set(scopedByRole.map(keyOf));
+      /** Cuántas raíces acotadas por rol ve ese rol (con nombre o sin él). */
+      const visibleTo = async (role: string | null) => {
+        const ctx = context({
+          tenant: ids.A,
+          user: ids.uA,
+          permissions: ALL,
+          role,
+        });
+        // Cuentas exactas y nombres como la verdad, para ese rol.
+        await expectTruthFor(ctx, role);
+        const result: any = await blockersOf(target, t.id, ctx);
+        return result.reasons
+          .filter((r: any) => scopedKeys.has(key(r)))
+          .reduce((n: number, r: any) => n + r.visible.count, 0);
+      };
+      // Sin rol, SecurePrismaOps acota lo acotado por rol a lo que creó el
+      // usuario: lo del otro es una cantidad oculta. Con un rol que no está en la
+      // lista, el mismo usuario lo ve: lo que lo oculta es no tener rol.
+      const withoutRole = await visibleTo(null);
+      const withOtherRole = await visibleTo(PREFIX + "ROL_FUERA_DE_LA_LISTA");
+      expect(withOtherRole - withoutRole).toBeGreaterThanOrEqual(
+        new Set(others.map((c) => c.rootId)).size
+      );
+      chosen.push("sin rol, lo acotado por rol: " + target);
+    });
 
   it("un usuario sin empresa (en la app todo usuario tiene una): si la consulta responde, es la verdad; si no, falla cerrada, sin datos", async () => {
     const ctx = context({ tenant: null, user: ids.uA, permissions: ALL });
@@ -1873,7 +1900,7 @@ describe("una relación de auditoría sobre una raíz con alcance por rol", () =
     }
     let exercised = 0;
     for (const { target, relation } of shapes) {
-      const roles = [metaOf(relation.rootEntity).userScopedForRoles[0]];
+      const role: string = metaOf(relation.rootEntity).userScopedForRoles[0];
       const t = await seedTarget(target);
       if (!(await seedChain(relation, t.id, t.tenant ?? ids.A, ids.uA)))
         continue;
@@ -1894,17 +1921,17 @@ describe("una relación de auditoría sobre una raíz con alcance por rol", () =
       const result = await blockersOf(
         target,
         t.id,
-        context({ tenant: ids.A, user: ids.uA, permissions: ALL, roles })
+        context({ tenant: ids.A, user: ids.uA, permissions: ALL, role })
       );
       check(
         result,
-        expected(await truth(group, t.id), ids.A, ids.uA, true, roles),
+        expected(await truth(group, t.id), ids.A, ids.uA, true, role),
         true
       );
       exercised++;
       chosen.push(
         "auditoría con alcance por rol " +
-          roles[0] +
+          role +
           ": " +
           target +
           " ← " +

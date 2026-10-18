@@ -47,6 +47,17 @@ describe("los modelos de PP-OCR", () => {
     expect((await motorCon(dir)).detectionPath).toBe(path.join(dir, "det.onnx"));
   });
 
+  it("la detección v5 de la carpeta es de la oficial: gutenye sigue con la del paquete", async () => {
+    const dir = carpeta(["PP-OCRv5_mobile_det.onnx", "rec.onnx", "dict.txt"]);
+    expect((await motorCon(dir)).detectionPath).toBeUndefined();
+  });
+
+  it("la carpeta del motor trae la detección PP-OCRv5 mobile convertida, la del sha256 del LEEME", () => {
+    const archivo = path.join(__dirname, "..", "modelos", "paddle-latin-v5", "PP-OCRv5_mobile_det.onnx");
+    const sha = require("crypto").createHash("sha256").update(fs.readFileSync(archivo)).digest("hex");
+    expect(sha).toBe("d7fe3ea74652890722c0f4d02458b7261d9f5ae6c92904d05707c9eb155c7924");
+  });
+
   it("la carpeta del motor trae el reconocimiento latino y su diccionario", () => {
     const dir = path.join(__dirname, "..", "modelos", "paddle-latin-v5");
     expect(fs.existsSync(path.join(dir, "rec.onnx"))).toBe(true);

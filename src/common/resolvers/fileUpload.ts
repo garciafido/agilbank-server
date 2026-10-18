@@ -1,10 +1,11 @@
 import { Resolvers } from "../../graphql/types";
 import { GraphQLUpload } from "graphql-upload-minimal";
 import { finished } from "stream/promises";
-import * as path from "path";
 import * as fs from "fs";
 import { randomUUID } from "crypto";
-import { uploadTempDir, tempExtension } from "../constants";
+import { uploadTempDir } from "../constants";
+import { UnauthorizedError } from "../errors";
+import { tempPathForTicket } from "../utils/tempPath";
 
 export const fileUploadResolvers: Resolvers = {
   // This maps the `Upload` scalar to the implementation provided
@@ -12,7 +13,11 @@ export const fileUploadResolvers: Resolvers = {
   Upload: GraphQLUpload,
 
   Mutation: {
-    singleUpload: async (_parent, args, _context, _info) => {
+    singleUpload: async (_parent, args, context, _info) => {
+      if (!context.isSystemMode && !context.currentUser)
+        throw new UnauthorizedError(
+          "Usuario no autenticado para esta operación."
+        );
       const { createReadStream, filename, mimetype, encoding } =
         await args.file;
       const stream = createReadStream();
@@ -21,10 +26,7 @@ export const fileUploadResolvers: Resolvers = {
       if (!fs.existsSync(uploadTempDir)) {
         fs.mkdirSync(uploadTempDir, { recursive: true });
       }
-      const pathName = path.join(
-        uploadTempDir,
-        `${systemFilename}.${tempExtension}`
-      );
+      const pathName = tempPathForTicket(systemFilename);
       const out = fs.createWriteStream(pathName);
       stream.pipe(out);
       await finished(out);
@@ -38,11 +40,12 @@ export const fileUploadResolvers: Resolvers = {
       };
     },
 
-    deleteUploadedFile: async (_parent, args, _context, _info) => {
-      const pathName = path.join(
-        uploadTempDir,
-        `${args.ticket}.${tempExtension}`
-      );
+    deleteUploadedFile: async (_parent, args, context, _info) => {
+      if (!context.isSystemMode && !context.currentUser)
+        throw new UnauthorizedError(
+          "Usuario no autenticado para esta operación."
+        );
+      const pathName = tempPathForTicket(args.ticket);
       await fs.promises.unlink(pathName);
       return args.ticket;
     },

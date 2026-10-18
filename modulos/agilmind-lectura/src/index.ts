@@ -1,8 +1,10 @@
 /// <reference path="./gutenye-ocr-node.d.ts" />
 // Lo que el paquete publica. agilpost-motor lo reexporta en su propio índice con los mismos nombres.
 // La referencia lleva los tipos de @gutenye/ocr-node a quien compile el paquete desde afuera.
-export { runPaddleOcr, leerConPaddleDetallado, paddleDisponible } from "./paddleOcr";
-export type { LecturaPaddle } from "./paddleOcr";
+export { runPaddleOcr, leerConPaddleDetallado, paddleDisponible, orientacionDePagina } from "./paddleOcr";
+export { estaDadaVuelta, ORIENTACION } from "./orientacionDeLaPagina";
+export type { VotoDeRenglones, OpcionesOrientacion } from "./orientacionDeLaPagina";
+export type { LecturaPaddle, OpcionesPaddle, DeteccionPaddle } from "./paddleOcr";
 export { agruparEnOrdenDeLectura } from "./ordenDeLectura";
 export { herramientasDeLectura, programaDisponible } from "./herramientasDeLectura";
 export type { HerramientasDeLectura } from "./herramientasDeLectura";

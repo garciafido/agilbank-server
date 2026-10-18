@@ -10,7 +10,10 @@
     "src/pdfGeometry.ts",
     "src/ordenDeLectura.ts",
     "src/paginasDePdf.ts",
-    "src/paginasDelPdf.ts"
+    "src/paginasDelPdf.ts",
+    "src/deteccionDeTexto.ts",
+    "src/reconocimientoDeRenglones.ts",
+    "src/orientacionDeLaPagina.ts"
   ],
   "coverageAnalysis": "perTest",
   "reporters": ["clear-text", "progress"],

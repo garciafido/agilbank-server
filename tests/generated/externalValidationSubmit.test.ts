@@ -1436,11 +1436,7 @@ describe("después del commit", () => {
   it("un aviso guardado por administrador de sitio activo de la empresa, con el enlace al formulario del registro y la clave de texto", async () => {
     await submit({ firstName: "Ana", taxId: "   " });
     expect(mockUserFindMany).toHaveBeenCalledWith({
-      where: {
-        tenant_id_: "t1",
-        active: true,
-        roles: { some: { id: "SiteAdmin" } },
-      },
+      where: { tenant_id_: "t1", active: true, role: { id: "SiteAdmin" } },
       select: { id: true },
     });
     expect(mockNotify).toHaveBeenCalledTimes(1);
@@ -1466,27 +1462,20 @@ describe("después del commit", () => {
   });
 
   it("un administrador de sitio de otra empresa no recibe nada: la empresa sale de la verificación guardada, no del pedido", async () => {
-    // Los usuarios de dos empresas; la consulta se evalúa de verdad sobre ellos,
-    // y una clave que este test no conoce la hace fallar.
+    // Los usuarios de dos empresas, cada uno con su rol o sin ninguno; la consulta
+    // se evalúa de verdad sobre ellos, y una clave que este test no conoce la hace fallar.
     const users = [
-      { id: "a1", tenant_id_: "t1", active: true, roles: ["SiteAdmin"] },
-      {
-        id: "a2",
-        tenant_id_: "t1",
-        active: true,
-        roles: ["User", "SiteAdmin"],
-      },
-      { id: "inactivo", tenant_id_: "t1", active: false, roles: ["SiteAdmin"] },
-      { id: "usuario", tenant_id_: "t1", active: true, roles: ["User"] },
-      { id: "otra", tenant_id_: "t2", active: true, roles: ["SiteAdmin"] },
+      { id: "a1", tenant_id_: "t1", active: true, role: "SiteAdmin" },
+      { id: "a2", tenant_id_: "t1", active: true, role: "SiteAdmin" },
+      { id: "inactivo", tenant_id_: "t1", active: false, role: "SiteAdmin" },
+      { id: "usuario", tenant_id_: "t1", active: true, role: "User" },
+      { id: "sinRol", tenant_id_: "t1", active: true, role: null },
+      { id: "otra", tenant_id_: "t2", active: true, role: "SiteAdmin" },
     ];
     mockUserFindMany.mockImplementation(
       async (args: { where: Record<string, any> }) => {
-        const { tenant_id_, active, roles, ...rest } = args.where;
-        if (
-          Object.keys(rest).length > 0 ||
-          typeof roles?.some?.id !== "string"
-        ) {
+        const { tenant_id_, active, role, ...rest } = args.where;
+        if (Object.keys(rest).length > 0 || typeof role?.id !== "string") {
           throw new Error("una consulta de usuarios que este test no evalúa");
         }
         return users
@@ -1494,7 +1483,7 @@ describe("después del commit", () => {
             (u) =>
               u.tenant_id_ === tenant_id_ &&
               u.active === active &&
-              u.roles.includes(roles.some.id)
+              u.role === role.id
           )
           .map((u) => ({ id: u.id }));
       }

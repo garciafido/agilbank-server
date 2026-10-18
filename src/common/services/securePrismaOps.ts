@@ -59,6 +59,46 @@ const ALWAYS_REDACTED_FIELDS: readonly string[] = [
   "tokenHash",
 ];
 
+// Claves de un `data` que los recorridos de escritura no tratan como relaciones:
+// las estructurales (filtros, selección, operaciones sobre la propia relación) y
+// la empresa, que la capa inyecta y `_sanitizeTenantChange` protege. La comparten
+// la inyección de contexto en altas anidadas y la validación de referencias.
+const NON_DATA_KEYS: ReadonlySet<string> = new Set([
+  "where",
+  "select",
+  "include",
+  "orderBy",
+  "connect",
+  "disconnect",
+  "set",
+  "skip",
+  "take",
+  "cursor",
+  "_count",
+  "tenant_",
+  "tenant_id_",
+]);
+
+/** Las referencias de una escritura a filas de un modelo con empresa, agrupadas
+ *  por modelo: lo que `_assertReferencesAccessible` comprueba. */
+type ReferenciasPorModelo = Map<
+  PrismaModelName,
+  {
+    /** Selectores `{ id }`: se comprueban todos con un solo count. */
+    ids: Set<string>;
+    /** Cualquier otro selector único (otra columna única, clave compuesta): la
+     *  fila tiene que existir y ser alcanzable. */
+    selectores: any[];
+    /** Llaves que pueden no existir —entonces Prisma crea—: si existen, tienen
+     *  que ser alcanzables. */
+    llavesDeConnectOrCreate: any[];
+  }
+>;
+
+/** Un valor de operación anidada de Prisma (objeto o lista) como lista. */
+const asList = (x: any): any[] =>
+  x === undefined || x === null ? [] : Array.isArray(x) ? x : [x];
+
 // --- SecurePrismaOps Class ---
 
 // NOTE: This class is NOT managed by DI (@injectable) itself.
@@ -83,9 +123,8 @@ export class SecurePrismaOps<M extends PrismaModelName> {
   private hasCrossTenantRole(meta: ModelMetadata | undefined): boolean {
     const ct = meta?.crossTenantForRoles;
     if (!ct) return false;
-    const userRoles =
-      this.context.currentUser?.roles?.map((r: any) => r.id) ?? [];
-    return userRoles.some((r: string) => ct.roles.includes(r));
+    const rol = this.context.currentUser?.role?.id;
+    return !!rol && ct.roles.includes(rol);
   }
 
   /**
@@ -151,9 +190,8 @@ export class SecurePrismaOps<M extends PrismaModelName> {
         `Escribir en otra empresa no está habilitado para ${this.modelNamePascal}`
       );
     }
-    const rolesDelUsuario =
-      this.context.currentUser?.roles?.map((r: any) => r.id) ?? [];
-    if (!rolesDelUsuario.some((r: string) => habilitados.includes(r))) {
+    const rol = this.context.currentUser?.role?.id;
+    if (!rol || !habilitados.includes(rol)) {
       throw new UnauthorizedError(
         `Escribir en otra empresa requiere un rol autorizado (${habilitados.join(
           ", "
@@ -379,27 +417,10 @@ export class SecurePrismaOps<M extends PrismaModelName> {
     // No injection needed in system mode.
     if (this.context.isSystemMode) return;
 
-    // Keys to completely ignore during traversal for injection purposes (structural or non-data)
-    const nonDataKeys = new Set([
-      "where",
-      "select",
-      "include",
-      "orderBy",
-      "connect",
-      "disconnect",
-      "set",
-      "skip",
-      "take",
-      "cursor",
-      "_count",
-      "tenant_",
-      "tenant_id_",
-    ]);
-
     for (const key in data) {
       if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
       const value = data[key];
-      if (nonDataKeys.has(key)) continue;
+      if (NON_DATA_KEYS.has(key)) continue;
 
       // Is the current key ('key') a known relation field of the 'parentMeta' model?
       const relationMeta = parentMeta.relations.get(key);
@@ -596,15 +617,11 @@ export class SecurePrismaOps<M extends PrismaModelName> {
       const userScopedRoles = targetMeta?.userScopedForRoles || [];
       if (userScopedRoles.length > 0) {
         const currentUserId = this.context.currentUser?.id;
-        const currentUserRoles =
-          this.context.currentUser?.roles?.map((r) => r.id) || [];
+        const rolDelUsuario = this.context.currentUser?.role?.id;
 
-        // Si TODOS los roles del usuario están en userScopedForRoles, aplicar filtro
-        const allRolesAreScoped =
-          currentUserRoles.length > 0 &&
-          currentUserRoles.every((role) => userScopedRoles.includes(role));
-
-        if (allRolesAreScoped) {
+        // Si el rol del usuario está en userScopedForRoles, aplicar filtro. Sin
+        // rol también: falla cerrado, ve solo lo que creó.
+        if (!rolDelUsuario || userScopedRoles.includes(rolDelUsuario)) {
           if (!currentUserId) {
             throw new Error(
               `[SecurePrismaOps] User ID missing for user-scoped filter on ${modelName}.`
@@ -740,82 +757,327 @@ export class SecurePrismaOps<M extends PrismaModelName> {
     }
   }
 
-  /** Validates that records specified in 'connect' operations within 'data' are accessible by the current tenant. */
+  /**
+   * Las filas a las que una escritura apunta tienen que ser alcanzables desde la
+   * empresa en la que escribe, a CUALQUIER profundidad del `data`.
+   *
+   * Antes miraba solo `data.<relación>.connect` del primer nivel, y solo por
+   * `id`. Todo lo demás enlazaba sin preguntar de qué empresa era la fila:
+   * `set` y la clave escalar (por `roleId: "SysAdmin"` un SiteAdmin de otra empresa
+   * se daba el rol de administrador del sistema), `connectOrCreate`, los
+   * `connect` dentro de una alta o una edición anidada, y los selectores por
+   * otra clave única (`{ tenant_id__iswc: { tenant_id_: <ajena>, iswc } }`).
+   *
+   * Además acota a la empresa los `updateMany`/`deleteMany` anidados: su filtro
+   * alcanza a las filas enlazadas, y un enlace entre empresas que se haya colado
+   * antes los dejaría tocar lo ajeno. Muta `data`, que es el clon propio de la
+   * operación. En modo sistema no se valida ni se acota nada.
+   */
   private async validateTenantRelations(data: any): Promise<void> {
     if (this.context.isSystemMode || !data || typeof data !== "object") return;
-    const currentModelRelations = this.modelMeta?.relations;
-    if (!currentModelRelations || currentModelRelations.size === 0) return;
+    const acc: ReferenciasPorModelo = new Map();
+    this._scopeNestedManyWheres(data, this.modelMeta);
+    this._collectReferences(data, this.modelMeta, acc);
+    await this._assertReferencesAccessible(acc);
+  }
 
-    const idsToValidateByModel = new Map<PrismaModelName, Set<string>>();
+  /**
+   * Los bloques de datos anidados bajo una relación, que se recorren con la
+   * metadata del modelo relacionado: `create` (objeto o lista),
+   * `connectOrCreate[].create`, `upsert[].create` y `upsert[].update`, y
+   * `update` —a-muchos, `update[].data`; a-uno, el propio `update`, o su
+   * `data` cuando viene con la forma `{ where?, data }`—.
+   */
+  private _nestedDataBlocks(
+    value: any,
+    relation: { isList: boolean },
+    related: ModelMetadata | undefined
+  ): any[] {
+    const blocks: any[] = [...asList(value.create)];
+    for (const coc of asList(value.connectOrCreate))
+      blocks.push(...asList(coc?.create));
+    for (const up of asList(value.upsert)) {
+      blocks.push(...asList(up?.create));
+      if (up?.update) blocks.push(up.update);
+    }
+    if (relation.isList) {
+      for (const up of asList(value.update)) if (up?.data) blocks.push(up.data);
+    } else if (value.update && typeof value.update === "object") {
+      // `{ where?, data }` o los datos directos. Un campo propio llamado `data`
+      // (un Json) desempata a favor de los datos directos.
+      const conWhere = "data" in value.update && !related?.fields?.has("data");
+      blocks.push(conWhere ? value.update.data : value.update);
+    }
+    return blocks.filter((b) => b && typeof b === "object");
+  }
 
-    // Phase 1: Collect IDs from 'connect' operations in the provided 'data'
-    // This simple traversal looks for { relationField: { connect: { id: '...' } } }
-    for (const fieldName in data) {
-      if (!Object.prototype.hasOwnProperty.call(data, fieldName)) continue;
-      const relationMeta = currentModelRelations.get(fieldName);
-      const connectData = data[fieldName]?.connect;
+  /**
+   * Junta en `acc` las referencias del `data` de `meta` a filas de modelos con
+   * empresa, y baja a los bloques anidados (`_nestedDataBlocks`). Las formas de
+   * Prisma que nombran una fila existente:
+   *
+   * - `connect` (objeto o lista) y `set`;
+   * - en las relaciones a-muchos, `delete`, `update[].where` (objeto o lista);
+   * - `connectOrCreate[].where` y, a-muchos, `upsert[].where`: llaves que
+   *   pueden no existir —entonces Prisma crea— y van aparte.
+   *
+   * `disconnect` no enlaza nada y no se mira. En una relación a-uno, `delete`,
+   * `update.where` y `upsert.where` filtran la fila ya enlazada: tampoco.
+   */
+  private _collectReferences(
+    data: any,
+    meta: ModelMetadata | undefined,
+    acc: ReferenciasPorModelo
+  ): void {
+    if (!data || typeof data !== "object") return;
+    if (Array.isArray(data)) {
+      for (const item of data) this._collectReferences(item, meta, acc);
+      return;
+    }
+    if (!meta?.relations || meta.relations.size === 0) return;
 
-      if (relationMeta && connectData && typeof connectData === "object") {
-        const relatedModelName = relationMeta.relatedModelName;
-        const relatedMetaFromStore = this.allSchemaMeta.get(relatedModelName);
-        if (
-          relatedMetaFromStore?.tenantIdField ||
-          relatedMetaFromStore?.hybridTenantFlagField
-        ) {
-          const connections = Array.isArray(connectData)
-            ? connectData
-            : [connectData];
-          for (const conn of connections) {
-            const idToCheck = conn?.id;
-            if (idToCheck && typeof idToCheck === "string") {
-              if (!idsToValidateByModel.has(relatedModelName))
-                idsToValidateByModel.set(relatedModelName, new Set<string>());
-              idsToValidateByModel.get(relatedModelName)!.add(idToCheck);
-            }
-          }
+    for (const key in data) {
+      if (
+        !Object.prototype.hasOwnProperty.call(data, key) ||
+        NON_DATA_KEYS.has(key)
+      )
+        continue;
+      const relation = meta.relations.get(key);
+      const value = data[key];
+      if (!relation || !value || typeof value !== "object") continue;
+      const relatedName = relation.relatedModelName;
+      const related = this.allSchemaMeta.get(relatedName);
+
+      if (related?.tenantIdField || related?.hybridTenantFlagField) {
+        let refs = acc.get(relatedName);
+        if (!refs) {
+          refs = {
+            ids: new Set<string>(),
+            selectores: [],
+            llavesDeConnectOrCreate: [],
+          };
+          acc.set(relatedName, refs);
         }
+        const r = refs;
+        const selector = (sel: any) => {
+          if (!sel || typeof sel !== "object" || Array.isArray(sel)) return;
+          const keys = Object.keys(sel);
+          if (
+            keys.length === 1 &&
+            keys[0] === "id" &&
+            typeof sel.id === "string"
+          )
+            r.ids.add(sel.id);
+          else r.selectores.push(sel);
+        };
+        const llave = (sel: any) => {
+          if (sel && typeof sel === "object" && !Array.isArray(sel))
+            r.llavesDeConnectOrCreate.push(sel);
+        };
+        asList(value.connect).forEach(selector);
+        asList(value.set).forEach(selector);
+        for (const coc of asList(value.connectOrCreate)) llave(coc?.where);
+        if (relation.isList) {
+          asList(value.delete).forEach(selector);
+          for (const up of asList(value.update)) selector(up?.where);
+          for (const up of asList(value.upsert)) llave(up?.where);
+        }
+      }
+
+      for (const block of this._nestedDataBlocks(value, relation, related)) {
+        this._collectReferences(block, related, acc);
       }
     }
+  }
 
-    // Phase 2: Perform batched validation checks if any IDs were collected
-    if (idsToValidateByModel.size === 0) return;
-
-    const validationPromises = Array.from(idsToValidateByModel.entries()).map(
-      async ([modelToValidate, ids]) => {
-        if (ids.size === 0) return;
-        const targetDelegate =
-          this.prisma[
-            this.pascalToCamelCase(modelToValidate) as keyof PrismaClient
-          ];
-        if (!targetDelegate) {
-          console.warn(
-            `[Validation] Delegate not found for model ${modelToValidate}, skipping relation validation.`
-          );
-          return;
-        }
-        const idArray = Array.from(ids);
-        const whereClause = this.buildTenantFilterForRelatedModel(
-          modelToValidate,
-          { id: { in: idArray } }
+  /**
+   * Comprueba que cada referencia juntada por `_collectReferences` sea alcanzable
+   * con el filtro de lectura del modelo (`buildTenantFilterForRelatedModel`:
+   * empresa, híbridos, crossTenantForRoles, userScoped, ownerScoped). Una que no
+   * existe y una que es de otra empresa dan el mismo error, a propósito.
+   */
+  private async _assertReferencesAccessible(
+    acc: ReferenciasPorModelo
+  ): Promise<void> {
+    const checks = Array.from(acc.entries()).map(async ([model, refs]) => {
+      if (
+        refs.ids.size === 0 &&
+        refs.selectores.length === 0 &&
+        refs.llavesDeConnectOrCreate.length === 0
+      )
+        return;
+      const delegate: any =
+        this.prisma[this.pascalToCamelCase(model) as keyof PrismaClient];
+      if (!delegate) {
+        console.warn(
+          `[Validation] Delegate not found for model ${model}, skipping relation validation.`
         );
-        const count = await (targetDelegate as any).count({
-          where: whereClause,
+        return;
+      }
+      const meta = this.allSchemaMeta.get(model);
+      const inaccessible = (detail: string) => {
+        console.error(
+          `[Validation] ${detail} for tenant ${this.tenantEfectivo}`
+        );
+        return new ValidationError(
+          `One or more references to ${model} are invalid or inaccessible by the current tenant.`
+        );
+      };
+
+      // Un selector por clave única compuesta (`{ tenant_id__iswc: { tenant_id_, iswc } }`)
+      // no vale en el `where` de un findFirst: se lo reemplaza por sus columnas. Es
+      // compuesto si su única clave no es un campo ni una relación del modelo y su
+      // valor es un objeto de columnas: campos de la metadata, la empresa, el flag
+      // híbrido, `id`, o las que forman su nombre (el que Prisma le da por defecto,
+      // las columnas unidas con "_": así entran las que la metadata no lista).
+      const comoFiltro = (sel: any): any => {
+        const keys = Object.keys(sel);
+        if (keys.length !== 1) return sel;
+        const [name] = keys;
+        const inner = sel[name];
+        if (
+          !isPlainObject(inner) ||
+          meta?.fields?.has(name) ||
+          meta?.relations?.has(name)
+        )
+          return sel;
+        const columns = Object.keys(inner);
+        const isColumn = (c: string) =>
+          c === "id" ||
+          c === meta?.tenantIdField ||
+          c === meta?.hybridTenantFlagField ||
+          !!meta?.fields?.has(c);
+        return columns.length > 0 &&
+          (columns.every(isColumn) || columns.join("_") === name)
+          ? inner
+          : sel;
+      };
+      // Con AND y no mezclado: mezclar pisaría la empresa que trae el selector
+      // (`{ tenant_id_: <ajena>, iswc }` pasaría a buscar en la propia y
+      // validaría otra fila que la que Prisma va a enlazar).
+      const accessible = (sel: any) => ({
+        AND: [
+          comoFiltro(sel),
+          this.buildTenantFilterForRelatedModel(model, {}),
+        ],
+      });
+
+      if (refs.ids.size > 0) {
+        const idArray = Array.from(refs.ids);
+        const count = await delegate.count({
+          where: this.buildTenantFilterForRelatedModel(model, {
+            id: { in: idArray },
+          }),
         });
-        if (count !== ids.size) {
-          console.error(
-            `[Validation] Found ${count} accessible records for ${modelToValidate}, expected ${
-              ids.size
-            }. IDs: ${idArray.join(", ")} for tenant ${
-              this.context.currentUser?.tenant_id_
-            }`
-          );
-          throw new ValidationError(
-            `One or more references to ${modelToValidate} are invalid or inaccessible by the current tenant.`
+        if (count !== refs.ids.size) {
+          throw inaccessible(
+            `Found ${count} accessible records for ${model}, expected ${
+              refs.ids.size
+            }. IDs: ${idArray.join(", ")}`
           );
         }
       }
-    );
-    await Promise.all(validationPromises);
+      for (const sel of refs.selectores) {
+        if (
+          !(await delegate.findFirst({
+            where: accessible(sel),
+            select: { id: true },
+          }))
+        ) {
+          throw inaccessible(
+            `No accessible ${model} matches ${JSON.stringify(sel)}`
+          );
+        }
+      }
+      for (const sel of refs.llavesDeConnectOrCreate) {
+        // Si la llave está libre, Prisma crea (y la creación anidada nace en la
+        // empresa de quien escribe). Si está tomada, tiene que ser alcanzable: si
+        // no, Prisma enlazaría la fila ajena.
+        if (
+          !(await delegate.findFirst({
+            where: comoFiltro(sel),
+            select: { id: true },
+          }))
+        )
+          continue;
+        if (
+          !(await delegate.findFirst({
+            where: accessible(sel),
+            select: { id: true },
+          }))
+        ) {
+          throw inaccessible(
+            `The key ${JSON.stringify(
+              sel
+            )} of ${model} is taken by an inaccessible record`
+          );
+        }
+      }
+    });
+    await Promise.all(checks);
+  }
+
+  /**
+   * Acota a la empresa los `updateMany` y `deleteMany` de las relaciones
+   * a-muchos, a cualquier profundidad: `updateMany` (objeto o lista) pasa a
+   * `{ where: { AND: [where, filtroDeEmpresa] }, data }`; `deleteMany`, que no
+   * lleva `where` porque cada elemento ES el filtro, a `{ AND: [filtro,
+   * filtroDeEmpresa] }`. El filtro de empresa es el de lectura del modelo
+   * (`buildTenantFilterForRelatedModel`), solo de columnas, como pide el filtro
+   * escalar de Prisma. Muta `data`.
+   */
+  private _scopeNestedManyWheres(
+    data: any,
+    meta: ModelMetadata | undefined
+  ): void {
+    if (!data || typeof data !== "object") return;
+    if (Array.isArray(data)) {
+      for (const item of data) this._scopeNestedManyWheres(item, meta);
+      return;
+    }
+    if (!meta?.relations || meta.relations.size === 0) return;
+
+    for (const key in data) {
+      if (
+        !Object.prototype.hasOwnProperty.call(data, key) ||
+        NON_DATA_KEYS.has(key)
+      )
+        continue;
+      const relation = meta.relations.get(key);
+      const value = data[key];
+      if (!relation || !value || typeof value !== "object") continue;
+      const relatedName = relation.relatedModelName;
+      const related = this.allSchemaMeta.get(relatedName);
+
+      if (relation.isList) {
+        // Solo un filtro que es un objeto: uno ausente o nulo es un input que
+        // Prisma rechaza, y acotarlo lo volvería válido —y sobre todas las filas—.
+        const isFilter = (w: any) =>
+          !!w && typeof w === "object" && !Array.isArray(w);
+        const scoped = (where: any) =>
+          isFilter(where)
+            ? {
+                AND: [
+                  where,
+                  this.buildTenantFilterForRelatedModel(relatedName, {}),
+                ],
+              }
+            : where;
+        for (const um of asList(value.updateMany)) {
+          if (um && typeof um === "object" && isFilter(um.where))
+            um.where = scoped(um.where);
+        }
+        if (value.deleteMany !== undefined) {
+          value.deleteMany = Array.isArray(value.deleteMany)
+            ? value.deleteMany.map(scoped)
+            : scoped(value.deleteMany);
+        }
+      }
+
+      for (const block of this._nestedDataBlocks(value, relation, related)) {
+        this._scopeNestedManyWheres(block, related);
+      }
+    }
   }
 
   private _sanitizeTenantChange(

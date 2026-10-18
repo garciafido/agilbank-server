@@ -59,10 +59,8 @@ export class AbStatementReadPipelineService {
       if (!ownerRow) {
         const meta = generatedSchemaMetadata.get("AbStatement" as any);
         const ct = (meta as any)?.crossTenantForRoles;
-        const userRoles =
-          apolloContext.currentUser?.roles?.map((r: any) => r.id) ?? [];
-        const allowed =
-          !!ct && userRoles.some((r: string) => ct.roles.includes(r));
+        const rol = apolloContext.currentUser?.role?.id;
+        const allowed = !!ct && !!rol && ct.roles.includes(rol);
         if (!allowed) {
           throw new NotFoundError("AbStatement " + ownerId + " no encontrada");
         }

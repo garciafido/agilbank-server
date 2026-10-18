@@ -3,7 +3,7 @@ export type { ServiceContext } from "./types/context.types";
 import type {
   ServiceContext,
   RoleType,
-  UserWithRolesAndPermissions,
+  UserWithRoleAndPermissions,
   Token,
 } from "./types/context.types";
 import { GraphQLError } from "graphql";
@@ -22,7 +22,6 @@ import {
 } from "./prisma/generated-client/client";
 import { Request } from "express";
 import { basePrisma } from "./prisma/client";
-import { intersection, flatten } from "lodash";
 import { randomUUID } from "crypto";
 
 // --- Configuration ---
@@ -50,7 +49,7 @@ export const APP_SECRET = (() => {
 
 /**
  * Creates the service context for a given request.
- * Handles authentication (JWT), fetches the user with roles/permissions,
+ * Handles authentication (JWT), fetches the user with its role and permissions,
  * calculates permission helpers, and provides the base Prisma client instance.
  * Middleware logic is NOT applied here anymore.
  *
@@ -62,7 +61,7 @@ export async function createContext(
   req: Request,
   isSystemMode = false
 ): Promise<ServiceContext> {
-  let currentUser: UserWithRolesAndPermissions | null = null; // Initialize tenantId if multitenant
+  let currentUser: UserWithRoleAndPermissions | null = null; // Initialize tenantId if multitenant
   const authHeader = req.get("Authorization");
 
   // Generate or extract traceId for request tracing
@@ -110,15 +109,31 @@ export async function createContext(
       }
     }
 
+    // Solo el token de acceso abre sesión. El refresh token y los temporales de
+    // 2FA se firman con el mismo secreto y también traen userId: sin este
+    // chequeo, el tempToken que el login entrega con solo la contraseña valía
+    // como sesión y salteaba el segundo factor. El rechazo es el mismo que el de
+    // una firma inválida, y llega antes de tocar la base.
+    if (verifiedToken?.type !== "access") {
+      console.warn("Context Error: Invalid token: not an access token");
+      throw new GraphQLError("Invalid token. Please log in again.", {
+        extensions: {
+          code: "UNAUTHENTICATED",
+          originalError: "INVALID_TOKEN",
+          http: { status: 401 },
+        },
+      });
+    }
+
     // 2. Fetch User from DB (using BASE Prisma client to bypass potential middleware)
     if (verifiedToken?.userId) {
       try {
-        // Fetch user including roles and permissions needed for context helpers
+        // Fetch user including its role (one at most) and the role's permissions
         const user = await basePrisma.user.findUnique({
           where: { id: String(verifiedToken.userId) },
-          // IMPORTANT: Ensure this include matches the UserWithRolesAndPermissions type
+          // IMPORTANT: Ensure this include matches the UserWithRoleAndPermissions type
           include: {
-            roles: {
+            role: {
               include: {
                 permissions: true,
               },
@@ -135,7 +150,7 @@ export async function createContext(
         });
 
         // Assign user (cast needed if include structure matches the type)
-        currentUser = (user as UserWithRolesAndPermissions) ?? null;
+        currentUser = (user as UserWithRoleAndPermissions) ?? null;
 
         if (!currentUser) {
           // Valid token but user deleted or not found
@@ -174,24 +189,21 @@ export async function createContext(
   } // End if (authHeader)
 
   // 3. Define Role and Permission Helper Functions
-  const userRoles =
-    currentUser?.roles?.map((role) => role.id as RoleType) ?? [];
-  // Checks if the user has at least one of the specified roles
-  const hasRole = (...rolesToCheck: RoleType[]): boolean => {
-    if (!currentUser) return false;
-    // Efficient check using intersection
-    return intersection(userRoles, rolesToCheck).length > 0;
-  };
+  // A user has one role at most (User.role). Without a role, hasRole is false
+  // for every role and permissions() is empty: it fails closed.
+  const rolDelUsuario = currentUser?.role?.id;
+  // Checks if the user's role is one of the specified roles
+  const hasRole = (...rolesToCheck: RoleType[]): boolean =>
+    !!rolDelUsuario && rolesToCheck.includes(rolDelUsuario);
 
-  // Calculates and returns a Set of unique permission IDs for the user (memoized per request)
+  // Calculates and returns the Set of permission IDs of the user's role (memoized per request)
   let _permissionsCache: Set<string> | null = null;
   const permissions = (): Set<string> => {
     if (!currentUser) return new Set<string>();
     if (_permissionsCache) return _permissionsCache;
-    const permissionsPerRole = currentUser.roles.map((role) =>
-      role.permissions.map((p) => p.id)
+    _permissionsCache = new Set<string>(
+      (currentUser.role?.permissions ?? []).map((p) => p.id)
     );
-    _permissionsCache = new Set<string>(flatten(permissionsPerRole));
     return _permissionsCache;
   };
 

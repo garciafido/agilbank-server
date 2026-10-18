@@ -308,7 +308,12 @@ export const userResolvers: {
           user.twoFaVerifiedAt &&
           (await twoFaService.isTrustedDevice(deviceToken, user.id));
         if (!trusted) {
-          const tempToken = twoFaService.createTempToken(user.id);
+          // El tipo del token temporal sigue al estado del 2FA: el de configurar no
+          // verifica y el de verificar no configura (con él no se rota el secreto).
+          const tempToken = twoFaService.createTempToken(
+            user.id,
+            user.twoFaVerifiedAt ? "verify" : "setup"
+          );
           if (!user.twoFaVerifiedAt) {
             return {
               twoFaRequired: true,
@@ -553,13 +558,13 @@ export const userResolvers: {
     setupTwoFa: async (_parent, args, context, _info): Promise<any> => {
       const twoFaService =
         context.container.resolve<TwoFaService>("TwoFaService");
-      const { userId } = twoFaService.verifyTempToken(args.tempToken);
+      const { userId } = twoFaService.verifyTempToken(args.tempToken, "setup");
       return twoFaService.generateSetup(userId);
     },
     confirmTwoFaSetup: async (_parent, args, context, _info): Promise<any> => {
       const twoFaService =
         context.container.resolve<TwoFaService>("TwoFaService");
-      const { userId } = twoFaService.verifyTempToken(args.tempToken);
+      const { userId } = twoFaService.verifyTempToken(args.tempToken, "setup");
 
       const valid = await twoFaService.verifyCode(userId, args.code);
       if (!valid) {
@@ -608,7 +613,7 @@ export const userResolvers: {
     verifyTwoFa: async (_parent, args, context, _info): Promise<any> => {
       const twoFaService =
         context.container.resolve<TwoFaService>("TwoFaService");
-      const { userId } = twoFaService.verifyTempToken(args.tempToken);
+      const { userId } = twoFaService.verifyTempToken(args.tempToken, "verify");
 
       const valid = await twoFaService.verifyCode(userId, args.code);
       if (!valid) {
@@ -660,7 +665,7 @@ export const userResolvers: {
     ): Promise<any> => {
       const twoFaService =
         context.container.resolve<TwoFaService>("TwoFaService");
-      const { userId } = twoFaService.verifyTempToken(args.tempToken);
+      const { userId } = twoFaService.verifyTempToken(args.tempToken, "verify");
 
       const valid = await twoFaService.verifyBackupCode(userId, args.code);
       if (!valid) {

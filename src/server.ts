@@ -408,8 +408,11 @@ const apiLimiter = rateLimit({
  * `Bearer` para que el limiter estricto de anónimos se salteara, el camino
  * barato terminaba siendo MÁS permisivo que no autenticarse.
  *
- * Devuelve null ante cualquier duda: token ausente, mal formado, vencido o
- * firmado con otra clave. Quien no puede probar quién es, se limita por IP.
+ * Devuelve null ante cualquier duda: token ausente, mal formado, vencido,
+ * firmado con otra clave o que no es de acceso. Quien no puede probar quién es,
+ * se limita por IP. El refresh token y los temporales de 2FA se firman con el
+ * mismo secreto y traen userId, pero no abren sesión (createContext): tampoco
+ * dan el balde de usuario.
  */
 const userIdVerificado = (req: express.Request): string | null => {
   const header = req.get("Authorization");
@@ -417,8 +420,9 @@ const userIdVerificado = (req: express.Request): string | null => {
   try {
     const payload = jwtVerify(header.slice(7), APP_SECRET) as {
       userId?: string;
+      type?: string;
     };
-    return payload?.userId ?? null;
+    return payload?.type === "access" ? payload.userId ?? null : null;
   } catch {
     return null;
   }

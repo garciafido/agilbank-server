@@ -440,7 +440,7 @@ class Worker {
 
         const workerEvent = await prisma.workerEvent.findUnique({
           where: { id: payload.workerEventId },
-          include: { triggerUserId: { include: { roles: { include: { permissions: true } }, tenant_: true } } }
+          include: { triggerUserId: { include: { role: { include: { permissions: true } }, tenant_: true } } }
         });
 
         if (!workerEvent || !workerEvent.triggerUserId) {
@@ -450,18 +450,16 @@ class Worker {
         const requestContainer = container.createChildContainer();
 
         const user = workerEvent.triggerUserId;
+        const rolDelUsuario = user?.role?.id;
 
         apolloContext = {
           currentUser: user as any,
           isSystemMode: false,
-          hasRole: (role: string) => user?.roles?.some((r: any) => r.name === role) || false,
-          permissions: () => {
-            if (!user || !user.roles) return new Set<string>();
-            const allPermissions = user.roles.flatMap((role: any) =>
-              (role.permissions || []).map((p: any) => p.id)
-            );
-            return new Set<string>(allPermissions);
-          },
+          // Un usuario tiene un rol o ninguno (User.role): se compara su id, y sin
+          // rol no hay rol que coincida ni permisos.
+          hasRole: (role: string) => !!rolDelUsuario && rolDelUsuario === role,
+          permissions: () =>
+            new Set<string>((user.role?.permissions ?? []).map((p: { id: string }) => p.id)),
           prisma: prisma,
           container: requestContainer,
         };

@@ -91,8 +91,10 @@ export class RefreshTokenService {
       },
     });
 
-    // Crear access token JWT
-    const accessToken = jwt.sign({ userId }, APP_SECRET, {
+    // Crear access token JWT. El tipo "access" es lo único que createContext acepta
+    // como sesión: el refresh token y los temporales de 2FA se firman con el mismo
+    // secreto y también traen userId, pero no valen como Bearer.
+    const accessToken = jwt.sign({ userId, type: "access" }, APP_SECRET, {
       expiresIn: ACCESS_TOKEN_EXPIRY,
     });
 
@@ -188,7 +190,7 @@ export class RefreshTokenService {
             "Refresh race tolerado (gracia de reuso)"
           );
           const graceAccessToken = jwt.sign(
-            { userId: current.userId },
+            { userId: current.userId, type: "access" },
             APP_SECRET,
             { expiresIn: ACCESS_TOKEN_EXPIRY }
           );
@@ -260,9 +262,11 @@ export class RefreshTokenService {
     });
 
     // Generar nuevos tokens
-    const accessToken = jwt.sign({ userId: tokenRecord.userId }, APP_SECRET, {
-      expiresIn: ACCESS_TOKEN_EXPIRY,
-    });
+    const accessToken = jwt.sign(
+      { userId: tokenRecord.userId, type: "access" },
+      APP_SECRET,
+      { expiresIn: ACCESS_TOKEN_EXPIRY }
+    );
 
     const newRefreshTokenPayload: RefreshTokenPayload = {
       tokenId: newTokenRecord.id,

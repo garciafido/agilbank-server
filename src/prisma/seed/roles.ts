@@ -16,6 +16,8 @@ const roleData: Prisma.RoleCreateInput[] = [
         { id: "user_retrieve" },
         { id: "user_create" },
         { id: "user_update" },
+        { id: "role_retrieve" },
+        { id: "permission_retrieve" },
       ],
     },
   },
@@ -91,6 +93,7 @@ const roleData: Prisma.RoleCreateInput[] = [
         { id: "emailVerification_delete" },
         { id: "simulation_run" },
         { id: "abStatementRead_retry" },
+        { id: "abStatementRead_run" },
       ],
     },
   },
@@ -110,6 +113,7 @@ const roleData: Prisma.RoleCreateInput[] = [
         { id: "user_delete" },
         { id: "role_retrieve" },
         { id: "permission_retrieve" },
+        { id: "abStatementRead_run" },
       ],
     },
   },
@@ -159,12 +163,27 @@ export const seedRoles = async (prisma: PrismaClient) => {
     }
   }
 
-  // Assign SysAdmin role to SYSADMIN user
+  // SysAdmin tiene TODOS los permisos que haya en la tabla, no solo los que le
+  // conecta roleData: también los que el proyecto agregó por su cuenta. La regla
+  // de no elevación (common/utils/roleAssignment) solo deja asignar o quitar un
+  // rol a quien tiene todos sus permisos, y SysAdmin tiene que poder con
+  // cualquiera.
+  const allPermissions = await prisma.permission.findMany({
+    select: { id: true },
+  });
+  await prisma.role.update({
+    where: { id: "SysAdmin" },
+    data: { permissions: { connect: allPermissions } },
+  });
+  console.log(
+    `  ✅ Role SysAdmin: los ${allPermissions.length} permisos de la tabla`
+  );
+
+  // SYSADMIN tiene el rol SysAdmin. Un usuario tiene un solo rol (User.role):
+  // volver a conectarlo en cada seed lo deja igual.
   await prisma.user.update({
     where: { id: "SYSADMIN" },
-    data: {
-      roles: { connect: [{ id: "SysAdmin" }] },
-    },
+    data: { role: { connect: { id: "SysAdmin" } } },
   });
   console.log("  ✅ Assigned SysAdmin role to SYSADMIN user");
 };

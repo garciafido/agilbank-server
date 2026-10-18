@@ -1,14 +1,14 @@
 import * as fs from "fs";
-import * as path from "path";
-import { createHash } from "crypto";
-import { uploadTempDir, tempExtension } from "../constants";
+import { tempPathForTicket } from "./tempPath";
 
 /**
  * Calcula el CRC32 de un archivo subido usando su ticket.
  * Lee el archivo temporal desde uploadTempDir y retorna el hash CRC32 como hex string.
+ * El ticket llega del cliente: tempPathForTicket lo valida (un UUID, con la ruta
+ * dentro del directorio temporal; si no, INVALID_UPLOAD_TICKET) antes de leer nada.
  */
 export async function calculateUploadedFileCrc(ticket: string): Promise<string> {
-  const filePath = path.join(uploadTempDir, `${ticket}.${tempExtension}`);
+  const filePath = tempPathForTicket(ticket);
   const buffer = await fs.promises.readFile(filePath);
   return crc32Hex(buffer);
 }

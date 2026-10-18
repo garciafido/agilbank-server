@@ -26,7 +26,7 @@ type User {
   cellphone: String
   twoFaseAuth: Boolean
   profile: Json
-  roles: [Role!]
+  role: Role
   company: Company
 }
 
@@ -40,7 +40,7 @@ extend type Mutation {
     avatar: UploadedFile
     cellphone: String
     twoFaseAuth: Boolean
-    rolesIds: [String!]
+    roleId: String
     idempotencyKey_: String
   ): User!
   userUpdate(
@@ -54,7 +54,7 @@ extend type Mutation {
     cellphone: String
     twoFaseAuth: Boolean
     profile: Json
-    rolesIds: InputMultipleRef
+    roleId: String
     idempotencyKey_: String
   ): User!
   userDelete(id: String!): User!
@@ -121,7 +121,7 @@ input User_Filter {
   cellphone: FilterString
   twoFaseAuth: FilterBoolean
   profile: FilterJson
-  roles: User_roles_Filter
+  role: Role_Filter
   AND: [User_Filter!]
   OR: [User_Filter!]
   NOT: [User_Filter!]
@@ -144,7 +144,7 @@ input User_OrderBy {
   cellphone: SortOrder
   twoFaseAuth: SortOrder
   profile: SortOrder
-  roles: OrderByMultiple
+  role: Role_OrderBy
 }
 
 input User_OrderByCursor {
@@ -162,7 +162,7 @@ input User_CreateInput {
   avatar: UploadedFile
   cellphone: String
   twoFaseAuth: Boolean
-  rolesIds: [String!]
+  roleId: String
 }
 
 input User_UpdateInput {
@@ -176,11 +176,5 @@ input User_UpdateInput {
   cellphone: String
   twoFaseAuth: Boolean
   profile: Json
-  rolesIds: InputMultipleRef
-}
-
-input User_roles_Filter {
-  every: Role_Filter
-  some: Role_Filter
-  none: Role_Filter
+  roleId: String
 }

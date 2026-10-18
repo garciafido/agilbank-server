@@ -54,7 +54,7 @@ const opsCon = (entidad: string, permisos: string[], reg: { args?: any }) =>
         id: "READSEC_USER",
         tenant_id_: TENANT,
         active: true,
-        roles: [],
+        role: null,
       },
       permissions: () => new Set<string>(permisos),
     } as any,

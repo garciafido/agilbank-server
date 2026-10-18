@@ -53,7 +53,7 @@ const opsCon = (entidad: string, permisos: string[], record: any) =>
         id: "REDACT_USER",
         tenant_id_: TENANT,
         active: true,
-        roles: [],
+        role: null,
       },
       permissions: () => new Set<string>(permisos),
     } as any,

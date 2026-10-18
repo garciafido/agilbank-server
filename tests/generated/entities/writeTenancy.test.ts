@@ -23,10 +23,14 @@ interface Call {
  * la primera llamada dejaría el `update` real sin ejecutar, que es justo lo
  * que hay que observar.
  */
+/** Cuántas filas conectadas devuelve el count: un número para todos los modelos,
+ * o uno por modelo (el delegate), para que falle solo la referencia bajo prueba. */
+type ConnectedCount = number | ((model: string) => number);
+
 const prismaSpy = (
   calls: Call[],
   previousRead: any = { id: "x", tenant_id_: TENANT },
-  connectedCount = 1
+  connectedCount: ConnectedCount = 1
 ): any =>
   new Proxy(
     {},
@@ -49,7 +53,13 @@ const prismaSpy = (
               // devolver null es lo que permite probar el guard.
               // count es lo que decide validateTenantRelations: cuántas de las
               // filas conectadas son alcanzables desde esta empresa.
-              if (method === "count") return Promise.resolve(connectedCount);
+              if (method === "count") {
+                return Promise.resolve(
+                  typeof connectedCount === "function"
+                    ? connectedCount(String(model))
+                    : connectedCount
+                );
+              }
               if (method === "findFirst" || method === "findUnique") {
                 // `ajena`: la fila EXISTE pero es de otra empresa. La lectura
                 // filtrada no la encuentra; una sin filtrar, sí. Es el escenario
@@ -77,7 +87,7 @@ const context = (permissions: string[]): any => ({
     id: "WRITE_USER",
     tenant_id_: TENANT,
     active: true,
-    roles: [],
+    role: null,
   },
   permissions: () => new Set<string>(permissions),
 });
@@ -171,7 +181,7 @@ const ops = (
   permissions: string[],
   calls: Call[],
   previousRead?: any,
-  connectedCount = 1
+  connectedCount: ConnectedCount = 1
 ) =>
   new SecurePrismaOps(
     context(permissions),
@@ -203,21 +213,38 @@ describe("las relaciones que se conectan", () => {
         : [];
     });
 
-  const createConnecting = (testCase: any, count: number) => {
+  /**
+   * Corre una escritura contra el espía: las llamadas que hizo y el error, si
+   * hubo. El console.error con que la capa acompaña un rechazo no se muestra: lo
+   * que se afirma es el error.
+   */
+  const run = async (write: (calls: Call[]) => Promise<unknown>) => {
     const calls: Call[] = [];
-    return ops(
-      testCase.entity,
-      [`${testCase.basePermission}_create`],
-      calls,
-      undefined,
-      count
-    )
-      .create({
+    const quiet = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    try {
+      await write(calls);
+      return { calls, error: undefined as any };
+    } catch (error: any) {
+      return { calls, error };
+    } finally {
+      quiet.mockRestore();
+    }
+  };
+
+  const createConnecting = (testCase: any, count: number) =>
+    run((calls) =>
+      ops(
+        testCase.entity,
+        [`${testCase.basePermission}_create`],
+        calls,
+        undefined,
+        count
+      ).create({
         data: { [testCase.relation]: { connect: { id: "ajeno" } } },
       } as any)
-      .then(() => ({ calls, error: undefined as any }))
-      .catch((error: any) => ({ calls, error }));
-  };
+    );
 
   it("hay entidades con referencias con tenencia que probar", () => {
     expect(withRefs().length).toBeGreaterThan(0);
@@ -253,6 +280,468 @@ describe("las relaciones que se conectan", () => {
       expect(counted).toBeDefined();
       expect(tenantFilterOf(counted!.args?.where)).toBe(TENANT);
     }
+  });
+
+  // connect por id en el primer nivel era lo ÚNICO que se validaba. Prisma
+  // enlaza filas por muchos otros caminos, y por cada uno se enlazaba lo ajeno
+  // sin un solo error: por `role: { connect: { id: "SysAdmin" } }` un SiteAdmin de otra
+  // empresa se daba SysAdmin.
+
+  /** Entidades con una relación a-muchos hacia un modelo con tenencia. */
+  const withListRefs = () =>
+    ENTITIES.filter((e: any) => !e.shared).flatMap((e: any) => {
+      const meta: any = store.get(e.entity);
+      const rel = [...(meta?.relations?.values() ?? [])].find(
+        (r: any) => r.isList && store.get(r.relatedModelName)?.tenantIdField
+      );
+      return rel
+        ? [{ ...e, relation: rel.fieldName, target: rel.relatedModelName }]
+        : [];
+    });
+
+  /** Entidades con un hijo (relación a-muchos) que referencia, a-uno, un modelo
+   * con tenencia: la referencia queda dos niveles adentro. */
+  const withNestedRefs = () =>
+    ENTITIES.filter((e: any) => !e.shared).flatMap((e: any) => {
+      const meta: any = store.get(e.entity);
+      for (const child of meta?.relations?.values() ?? []) {
+        if (!child.isList) continue;
+        const ref = [
+          ...(store.get(child.relatedModelName)?.relations?.values() ?? []),
+        ].find(
+          (r: any) =>
+            !r.isList &&
+            store.get(r.relatedModelName)?.tenantIdField &&
+            r.fieldName !== "tenant_"
+        );
+        if (ref)
+          return [
+            {
+              ...e,
+              relation: child.fieldName,
+              nested: ref.fieldName,
+              target: ref.relatedModelName,
+            },
+          ];
+      }
+      return [];
+    });
+
+  /** Entidades con una relación a-uno hacia un modelo que referencia, a-uno, uno
+   * con tenencia: la edición a-uno (`update` sin lista), dos niveles adentro.
+   * `childHasData`: el modelo del medio tiene un campo propio `data`, y entonces
+   * `update: { data }` son sus datos directos, no la forma `{ where, data }`. */
+  const withToOneNestedRefs = () =>
+    ENTITIES.filter((e: any) => !e.shared).flatMap((e: any) => {
+      const meta: any = store.get(e.entity);
+      for (const child of meta?.relations?.values() ?? []) {
+        if (child.isList || child.fieldName === "tenant_") continue;
+        const childMeta = store.get(child.relatedModelName);
+        const ref = [...(childMeta?.relations?.values() ?? [])].find(
+          (r: any) =>
+            !r.isList &&
+            store.get(r.relatedModelName)?.tenantIdField &&
+            r.fieldName !== "tenant_"
+        );
+        if (ref) {
+          return [
+            {
+              ...e,
+              relation: child.fieldName,
+              nested: ref.fieldName,
+              target: ref.relatedModelName,
+              childHasData: Boolean(childMeta?.fields?.has("data")),
+            },
+          ];
+        }
+      }
+      return [];
+    });
+
+  /** El delegate de Prisma de un modelo: el nombre con que el espía anota la llamada. */
+  const delegateOf = (model: string) =>
+    `${model.charAt(0).toLowerCase()}${model.slice(1)}`;
+
+  /** Una instancia en modo sistema, con el count del espía en 0: si validara, rechazaría. */
+  const systemOps = (entity: string, calls: Call[]) =>
+    new SecurePrismaOps(
+      { ...context([]), isSystemMode: true },
+      prismaSpy(calls, undefined, 0),
+      store,
+      entity as any,
+      {} as any
+    );
+
+  /** El count del espía: ninguna fila alcanzable de `model`, todas las demás sí. Así
+   * la única referencia que puede fallar es la que se prueba. */
+  const onlyUnreachable = (model: string) => (counted: string) =>
+    counted === delegateOf(model) ? 0 : 1;
+
+  /** El rechazo es el de la validación y nombra al modelo de la referencia ajena. */
+  const rejectedFor = (error: any, model: string) =>
+    error instanceof ValidationError &&
+    String(error.message).includes(`references to ${model} `);
+
+  /**
+   * Edita la raíz de cada caso con el `data` de `payload`, con la referencia a
+   * `target` como única inalcanzable. Devuelve los casos que no se rechazaron
+   * por esa referencia.
+   */
+  const editPassedThrough = async (
+    testCases: any[],
+    payload: (testCase: any) => any
+  ) => {
+    const passedThrough: string[] = [];
+    for (const testCase of testCases) {
+      const { error } = await run((calls) =>
+        ops(
+          testCase.entity,
+          [
+            `${testCase.basePermission}_update`,
+            `${testCase.basePermission}_retrieve`,
+          ],
+          calls,
+          undefined,
+          onlyUnreachable(testCase.target)
+        ).update({ where: { id: "x" }, data: payload(testCase) } as any)
+      );
+      if (!rejectedFor(error, testCase.target)) {
+        passedThrough.push(
+          `${testCase.entity}.${testCase.relation}${
+            testCase.nested ? "." + testCase.nested : ""
+          }`
+        );
+      }
+    }
+    return passedThrough;
+  };
+
+  it("hay entidades con referencias a-muchos que probar", () => {
+    expect(withListRefs().length).toBeGreaterThan(0);
+  });
+
+  it("ningún hijo referencia una entidad con tenencia: las formas de dos niveles no tienen qué probar", () => {
+    // No es que la validación funcione: es que este proyecto no tiene el caso.
+    // Los tests que lo ejercitan quedan en skip, a la vista.
+    expect(withNestedRefs()).toHaveLength(0);
+  });
+
+  it("hay entidades con referencias a-uno de dos niveles que probar", () => {
+    expect(withToOneNestedRefs().length).toBeGreaterThan(0);
+  });
+
+  it("set con algo de otra empresa se rechaza", async () => {
+    // set reemplaza lo enlazado por lo que nombra: enlaza igual que connect.
+    const passedThrough: string[] = [];
+    for (const testCase of withListRefs()) {
+      const { error } = await run((calls) =>
+        ops(
+          testCase.entity,
+          [
+            `${testCase.basePermission}_update`,
+            `${testCase.basePermission}_retrieve`,
+          ],
+          calls,
+          undefined,
+          0
+        ).update({
+          where: { id: "x" },
+          data: { [testCase.relation]: { set: [{ id: "ajeno" }] } },
+        } as any)
+      );
+      if (!(error instanceof ValidationError))
+        passedThrough.push(`${testCase.entity}.${testCase.relation}`);
+    }
+    expect(passedThrough).toEqual([]);
+  });
+
+  it("connectOrCreate con una llave que es de otra empresa se rechaza", async () => {
+    // `ajena`: la lectura sin filtro encuentra la llave y la filtrada no. Prisma
+    // la encontraría igual y enlazaría la fila ajena en vez de crear.
+    const passedThrough: string[] = [];
+    const testCases = [
+      ...withRefs().map((c: any) => ({
+        ...c,
+        payload: { connectOrCreate: { where: { id: "ajeno" }, create: {} } },
+      })),
+      ...withListRefs().map((c: any) => ({
+        ...c,
+        payload: { connectOrCreate: [{ where: { id: "ajeno" }, create: {} }] },
+      })),
+    ];
+    for (const testCase of testCases) {
+      const { error } = await run((calls) =>
+        ops(
+          testCase.entity,
+          [`${testCase.basePermission}_create`],
+          calls,
+          "ajena"
+        ).create({ data: { [testCase.relation]: testCase.payload } } as any)
+      );
+      if (!(error instanceof ValidationError))
+        passedThrough.push(`${testCase.entity}.${testCase.relation}`);
+    }
+    expect(passedThrough).toEqual([]);
+  });
+
+  it("connectOrCreate con la llave libre no se rechaza", async () => {
+    // El contrapunto: si no existe en ninguna empresa, Prisma crea, y el alta
+    // anidada nace en la empresa de quien escribe.
+    const rejected: string[] = [];
+    for (const testCase of withListRefs()) {
+      const { calls, error } = await run((calls) =>
+        ops(
+          testCase.entity,
+          [`${testCase.basePermission}_create`],
+          calls,
+          null
+        ).create({
+          data: {
+            [testCase.relation]: {
+              connectOrCreate: [{ where: { id: "libre" }, create: {} }],
+            },
+          },
+        } as any)
+      );
+      if (error instanceof ValidationError || !last(calls, "create"))
+        rejected.push(`${testCase.entity}.${testCase.relation}`);
+    }
+    expect(rejected).toEqual([]);
+  });
+
+  it.skip("un connect ajeno dentro de un create anidado se rechaza", async () => {
+    // Dos niveles: el hijo nace con la referencia. Se exige además que la
+    // comprobación que faltó sea la del modelo referenciado.
+    const passedThrough: string[] = [];
+    for (const testCase of withNestedRefs()) {
+      const { calls, error } = await run((calls) =>
+        ops(
+          testCase.entity,
+          [`${testCase.basePermission}_create`],
+          calls,
+          undefined,
+          0
+        ).create({
+          data: {
+            [testCase.relation]: {
+              create: [{ [testCase.nested]: { connect: { id: "ajeno" } } }],
+            },
+          },
+        } as any)
+      );
+      if (
+        !(error instanceof ValidationError) ||
+        last(calls, "count")?.model !== delegateOf(testCase.target)
+      ) {
+        passedThrough.push(
+          `${testCase.entity}.${testCase.relation}.${testCase.nested}`
+        );
+      }
+    }
+    expect(passedThrough).toEqual([]);
+  });
+
+  // La edición: el vector anidado más alcanzable desde la API. Cambiar el autor
+  // de una subentidad llega como `authors: { update: [{ where, data: { author:
+  // { connect } } }] }`, no como un alta.
+
+  /** Las formas de una edición a-muchos que nombran una fila del modelo relacionado. */
+  const LIST_EDIT_SHAPES: { name: string; payload: (t: any) => any }[] = [
+    {
+      name: "update[].where",
+      payload: (t) => ({
+        [t.relation]: { update: [{ where: { id: "ajeno" }, data: {} }] },
+      }),
+    },
+    {
+      name: "delete[]",
+      payload: (t) => ({ [t.relation]: { delete: [{ id: "ajeno" }] } }),
+    },
+  ];
+
+  /** Las formas de una edición a-muchos que llevan datos del hijo, con la referencia ajena adentro. */
+  const NESTED_EDIT_SHAPES: { name: string; payload: (t: any) => any }[] = [
+    {
+      name: "update[].data",
+      payload: (t) => ({
+        [t.relation]: {
+          update: [
+            {
+              where: { id: "x" },
+              data: { [t.nested]: { connect: { id: "ajeno" } } },
+            },
+          ],
+        },
+      }),
+    },
+    {
+      name: "upsert[].create",
+      payload: (t) => ({
+        [t.relation]: {
+          upsert: [
+            {
+              where: { id: "nuevo" },
+              create: { [t.nested]: { connect: { id: "ajeno" } } },
+              update: {},
+            },
+          ],
+        },
+      }),
+    },
+    {
+      name: "upsert[].update",
+      payload: (t) => ({
+        [t.relation]: {
+          upsert: [
+            {
+              where: { id: "x" },
+              create: {},
+              update: { [t.nested]: { connect: { id: "ajeno" } } },
+            },
+          ],
+        },
+      }),
+    },
+    {
+      name: "connectOrCreate[].create",
+      payload: (t) => ({
+        [t.relation]: {
+          connectOrCreate: [
+            {
+              where: { id: "nuevo" },
+              create: { [t.nested]: { connect: { id: "ajeno" } } },
+            },
+          ],
+        },
+      }),
+    },
+  ];
+
+  /** Las dos formas de la edición a-uno: los datos directos, o `{ where, data }`. */
+  const TO_ONE_EDIT_SHAPES: {
+    name: string;
+    cases: () => any[];
+    payload: (t: any) => any;
+  }[] = [
+    {
+      name: "update a-uno con los datos directos",
+      cases: () => withToOneNestedRefs(),
+      payload: (t) => ({
+        [t.relation]: { update: { [t.nested]: { connect: { id: "ajeno" } } } },
+      }),
+    },
+    {
+      name: "update a-uno con { where, data }",
+      cases: () => withToOneNestedRefs().filter((t: any) => !t.childHasData),
+      payload: (t) => ({
+        [t.relation]: {
+          update: {
+            where: {},
+            data: { [t.nested]: { connect: { id: "ajeno" } } },
+          },
+        },
+      }),
+    },
+  ];
+
+  it.each(LIST_EDIT_SHAPES)(
+    "en una edición, una referencia ajena por $name se rechaza",
+    async ({ payload }) => {
+      expect(await editPassedThrough(withListRefs(), payload)).toEqual([]);
+    }
+  );
+
+  it.skip.each(NESTED_EDIT_SHAPES)(
+    "en una edición, una referencia ajena dos niveles adentro por $name se rechaza",
+    async ({ payload }) => {
+      expect(await editPassedThrough(withNestedRefs(), payload)).toEqual([]);
+    }
+  );
+
+  it.each(TO_ONE_EDIT_SHAPES)(
+    "en una edición, una referencia ajena por $name se rechaza",
+    async ({ cases, payload }) => {
+      expect(await editPassedThrough(cases(), payload)).toEqual([]);
+    }
+  );
+
+  it("un selector que no es el id se comprueba filtrando por empresa", async () => {
+    // Por otra clave única no hay ids que contar: se busca la fila, con el
+    // selector Y el filtro de empresa. Sin el filtro, encontraría la ajena.
+    const passedThrough: string[] = [];
+    for (const testCase of withRefs()) {
+      const { calls } = await run((calls) =>
+        ops(
+          testCase.entity,
+          [`${testCase.basePermission}_create`],
+          calls
+        ).create({
+          data: { [testCase.relation]: { connect: { email: "x" } } },
+        } as any)
+      );
+      const checked = calls.find(
+        (c) =>
+          c.method === "findFirst" &&
+          c.model === delegateOf(testCase.target) &&
+          Array.isArray(c.args?.where?.AND) &&
+          c.args.where.AND.some((w: any) => w?.email === "x")
+      );
+      if (!checked || tenantFilterOf(checked.args.where) !== TENANT) {
+        passedThrough.push(`${testCase.entity}.${testCase.relation}`);
+      }
+    }
+    expect(passedThrough).toEqual([]);
+  });
+
+  it("set vacío no consulta nada", async () => {
+    // Desenlazar todo no nombra ninguna fila: no hay nada que comprobar.
+    const queried: string[] = [];
+    for (const testCase of withListRefs()) {
+      const { calls } = await run((calls) =>
+        ops(
+          testCase.entity,
+          [
+            `${testCase.basePermission}_update`,
+            `${testCase.basePermission}_retrieve`,
+          ],
+          calls,
+          undefined,
+          0
+        ).update({
+          where: { id: "x" },
+          data: { [testCase.relation]: { set: [] } },
+        } as any)
+      );
+      if (!last(calls, "update") || last(calls, "count"))
+        queried.push(`${testCase.entity}.${testCase.relation}`);
+    }
+    expect(queried).toEqual([]);
+  });
+
+  it("en modo sistema no se valida", async () => {
+    // Seeds, migraciones y procesos internos escriben para la empresa que
+    // corresponda: el modo sistema no tiene una empresa contra la cual validar.
+    const queried: string[] = [];
+    for (const testCase of withRefs()) {
+      const { calls, error } = await run((calls) =>
+        systemOps(testCase.entity, calls).create({
+          data: { [testCase.relation]: { connect: { id: "ajeno" } } },
+        } as any)
+      );
+      if (error || !last(calls, "create") || last(calls, "count"))
+        queried.push(`${testCase.entity}.${testCase.relation}`);
+    }
+    for (const testCase of withListRefs()) {
+      const { calls, error } = await run((calls) =>
+        systemOps(testCase.entity, calls).update({
+          where: { id: "x" },
+          data: { [testCase.relation]: { set: [{ id: "ajeno" }] } },
+        } as any)
+      );
+      if (error || !last(calls, "update") || last(calls, "count"))
+        queried.push(`${testCase.entity}.${testCase.relation}`);
+    }
+    expect(queried).toEqual([]);
   });
 });
 
@@ -386,7 +875,7 @@ describe("forTenant: escribir en otra empresa, pidiéndolo", () => {
           id: "u",
           tenant_id_: TENANT,
           active: true,
-          roles: [{ id: "SysAdmin" }],
+          role: { id: "SysAdmin", permissions: [] },
         },
         permissions: () => new Set<string>(),
       } as any,
@@ -425,27 +914,29 @@ describe("forTenant: escribir en otra empresa, pidiéndolo", () => {
     expect(readOnlyOnes.length).toBeGreaterThan(0);
     for (const e of readOnlyOnes) {
       const meta: any = store.get(e.entity);
-      const roles = meta.crossTenantForRoles.roles.map((id: string) => ({
-        id,
-      }));
-      const ctx: any = {
-        isSystemMode: false,
-        currentUser: {
-          id: "WRITE_USER",
-          tenant_id_: TENANT,
-          active: true,
-          roles,
-        },
-        permissions: () => new Set<string>([`${e.basePermission}_create`]),
-      };
-      const base = new SecurePrismaOps(
-        ctx,
-        prismaSpy([]),
-        store,
-        e.entity as any,
-        {} as any
-      );
-      expect(() => (base as any).forTenant(FOREIGN)).toThrow(UnauthorizedError);
+      // Cada rol que lee todas las empresas, de a uno: un usuario tiene un solo rol.
+      for (const id of meta.crossTenantForRoles.roles) {
+        const ctx: any = {
+          isSystemMode: false,
+          currentUser: {
+            id: "WRITE_USER",
+            tenant_id_: TENANT,
+            active: true,
+            role: { id, permissions: [] },
+          },
+          permissions: () => new Set<string>([`${e.basePermission}_create`]),
+        };
+        const base = new SecurePrismaOps(
+          ctx,
+          prismaSpy([]),
+          store,
+          e.entity as any,
+          {} as any
+        );
+        expect(() => (base as any).forTenant(FOREIGN)).toThrow(
+          UnauthorizedError
+        );
+      }
     }
   });
 
@@ -455,36 +946,38 @@ describe("forTenant: escribir en otra empresa, pidiéndolo", () => {
 
     for (const e of testCases) {
       const meta: any = store.get(e.entity);
-      const roles = meta.tenantSelectableBy.map((id: string) => ({ id }));
-      const calls: Call[] = [];
-      const ctx: any = {
-        isSystemMode: false,
-        currentUser: {
-          id: "WRITE_USER",
-          tenant_id_: TENANT,
-          active: true,
-          roles,
-        },
-        permissions: () => new Set<string>([`${e.basePermission}_create`]),
-      };
-      const base = new SecurePrismaOps(
-        ctx,
-        prismaSpy(calls),
-        store,
-        e.entity as any,
-        {} as any
-      );
+      // Cada rol que puede elegir la empresa, de a uno: un usuario tiene un solo rol.
+      for (const id of meta.tenantSelectableBy) {
+        const calls: Call[] = [];
+        const ctx: any = {
+          isSystemMode: false,
+          currentUser: {
+            id: "WRITE_USER",
+            tenant_id_: TENANT,
+            active: true,
+            role: { id, permissions: [] },
+          },
+          permissions: () => new Set<string>([`${e.basePermission}_create`]),
+        };
+        const base = new SecurePrismaOps(
+          ctx,
+          prismaSpy(calls),
+          store,
+          e.entity as any,
+          {} as any
+        );
 
-      await (base as any)
-        .forTenant(FOREIGN)
-        .create({ data: {} })
-        .catch(() => undefined);
+        await (base as any)
+          .forTenant(FOREIGN)
+          .create({ data: {} })
+          .catch(() => undefined);
 
-      const created = last(calls, "create");
-      expect(created).toBeDefined();
-      // La empresa pedida, no la del operador: si acá saliera TENANT, el
-      // privilegio sería decorativo.
-      expect(tenantInData(created!.args?.data)).toBe(FOREIGN);
+        const created = last(calls, "create");
+        expect(created).toBeDefined();
+        // La empresa pedida, no la del operador: si acá saliera TENANT, el
+        // privilegio sería decorativo.
+        expect(tenantInData(created!.args?.data)).toBe(FOREIGN);
+      }
     }
   });
 });
@@ -520,13 +1013,18 @@ describe("el filtro de lectura, rama por rama", () => {
     entity: string,
     basePermission: string,
     extra: any,
-    roles: any[] = [],
+    role: string | null = null,
     ctxExtra: any = {}
   ) => {
     const calls: Call[] = [];
     const ctx: any = {
       isSystemMode: false,
-      currentUser: { id: USER, tenant_id_: TENANT, active: true, roles },
+      currentUser: {
+        id: USER,
+        tenant_id_: TENANT,
+        active: true,
+        role: role === null ? null : { id: role, permissions: [] },
+      },
       permissions: () => new Set<string>([`${basePermission}_retrieve`]),
       ...ctxExtra,
     };
@@ -550,7 +1048,7 @@ describe("el filtro de lectura, rama por rama", () => {
       {
         crossTenantForRoles: { roles: ["ADMIN"], mode: "always" },
       },
-      [{ id: "OTRO_ROL" }]
+      "OTRO_ROL"
     );
     expect(w?.[meta.tenantIdField]).toBe(TENANT);
   });
@@ -564,7 +1062,7 @@ describe("el filtro de lectura, rama por rama", () => {
       {
         crossTenantForRoles: { roles: ["ADMIN"], mode: "always" },
       },
-      [{ id: "ADMIN" }]
+      "ADMIN"
     );
     expect(w?.[meta.tenantIdField]).toBeUndefined();
   });
@@ -578,37 +1076,48 @@ describe("el filtro de lectura, rama por rama", () => {
       {
         crossTenantForRoles: { roles: ["ADMIN"], mode: "onRequest" },
       },
-      [{ id: "ADMIN" }]
+      "ADMIN"
     );
     expect(w?.[meta.tenantIdField]).toBe(TENANT);
   });
 
   it("ownerScoped filtra por quien creó, siempre", async () => {
     const e: any = withTenancy()[0];
-    const w = await whereOf(e.entity, e.basePermission, { ownerScoped: true }, [
-      { id: "CUALQUIERA" },
-    ]);
+    const w = await whereOf(
+      e.entity,
+      e.basePermission,
+      { ownerScoped: true },
+      "CUALQUIERA"
+    );
     expect(w?.createdBy_id_).toBe(USER);
   });
 
-  it("userScopedForRoles filtra si TODOS los roles del usuario están alcanzados", async () => {
+  it("userScopedForRoles filtra si el rol del usuario está alcanzado, o si no tiene rol", async () => {
     const e: any = withTenancy()[0];
     const reached = await whereOf(
       e.entity,
       e.basePermission,
       { userScopedForRoles: ["JUNIOR"] },
-      [{ id: "JUNIOR" }]
+      "JUNIOR"
     );
     expect(reached?.createdBy_id_).toBe(USER);
     // Con un rol fuera de la lista, el usuario ve todo el tenant: el scoping es
-    // por rol, no por usuario, y un rol más amplio manda.
-    const mixed = await whereOf(
+    // por rol, no por usuario.
+    const other = await whereOf(
       e.entity,
       e.basePermission,
       { userScopedForRoles: ["JUNIOR"] },
-      [{ id: "JUNIOR" }, { id: "SENIOR" }]
+      "SENIOR"
     );
-    expect(mixed?.createdBy_id_).toBeUndefined();
+    expect(other?.createdBy_id_).toBeUndefined();
+    // Sin rol, falla cerrado: ve solo lo que creó.
+    const none = await whereOf(
+      e.entity,
+      e.basePermission,
+      { userScopedForRoles: ["JUNIOR"] },
+      null
+    );
+    expect(none?.createdBy_id_).toBe(USER);
   });
 
   it("con el flag híbrido, el filtro es lo compartido O lo propio, no todo", async () => {
@@ -618,7 +1127,7 @@ describe("el filtro de lectura, rama por rama", () => {
       e.entity,
       e.basePermission,
       { hybridTenantFlagField: "isGlobal" },
-      []
+      null
     );
     const cond = w?.AND?.[1];
     expect(cond?.OR).toEqual([
@@ -632,7 +1141,12 @@ describe("el filtro de lectura, rama por rama", () => {
     const calls: Call[] = [];
     const ctx: any = {
       isSystemMode: false,
-      currentUser: { id: USER, tenant_id_: undefined, active: true, roles: [] },
+      currentUser: {
+        id: USER,
+        tenant_id_: undefined,
+        active: true,
+        role: null,
+      },
       permissions: () => new Set<string>([`${e.basePermission}_retrieve`]),
     };
     const o: any = new SecurePrismaOps(

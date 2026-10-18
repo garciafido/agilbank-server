@@ -85,19 +85,19 @@ function hashParams(params: Record<string, unknown>): string {
  * cubre todos los scope segments del mismo widget+tenant.
  *
  * - 'tenant' → 'all'                — todos los users del tenant comparten
- * - 'tenant+role' → 'r:<sorted role ids joined>'
+ * - 'tenant+role' → 'role:<id del rol>' ('role:none' sin rol)
  * - 'tenant+user' → 'u:<userId>'
  */
 function computeScopeKey(
   scope: WidgetCacheScope,
-  user: { id?: string; roles?: { id: string }[] } | undefined | null
+  user: { id?: string; role?: { id: string } | null } | undefined | null
 ): string {
   if (scope === 'tenant+user') {
     return `u:${user?.id ?? 'anon'}`;
   }
   if (scope === 'tenant+role') {
-    const ids = (user?.roles ?? []).map((r) => r.id).sort();
-    return `r:${ids.join(',')}`;
+    // Un usuario tiene un rol o ninguno: los que no tienen comparten 'none'.
+    return `role:${user?.role?.id ?? "none"}`;
   }
   return 'all';
 }

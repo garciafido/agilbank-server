@@ -62,7 +62,7 @@ const contextoConPermisos = (permiso: string): any => ({
     id: "TENANCY_USER",
     tenant_id_: TENANT,
     active: true,
-    roles: [],
+    role: null,
   },
   permissions: () => new Set<string>([permiso]),
 });

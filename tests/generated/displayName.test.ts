@@ -139,7 +139,7 @@ const MODEL: Record<
     },
     relations: {
       targetTenant: { entity: "Tenant", multi: false, nullable: true },
-      roles: { entity: "Role", multi: true, nullable: true },
+      role: { entity: "Role", multi: false, nullable: true },
     },
   },
   Role: {
