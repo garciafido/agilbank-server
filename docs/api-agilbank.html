@@ -178,13 +178,45 @@ hr { border: none; border-top: 1px solid var(--linea); margin: 3rem 0 0; }
 <div class="hoja">
 
 <header class="portada">
-<p class="rotulo">Para el área de sistemas de BDL · 16-10-2026</p>
+<p class="rotulo">Para el área de sistemas de BDL · 19-10-2026</p>
 <h1>API de AgilBank</h1>
 <p class="bajada">Referencia para enviar extractos bancarios a AgilBank, consultar su lectura,
 enviar las correcciones de tipos, conciliar los renglones con los valores de ProntoNet, recibir las
 propuestas de débitos y créditos bancarios (DBG) e informar las decisiones del usuario. Describe cada
 ruta, cada campo y cada error.</p>
 </header>
+
+<h2><span class="nro">00</span> Para empezar</h2>
+
+<p>Esta sección trae los datos de la instalación de pruebas de BDL y el orden para empezar. El
+resto del documento vale para cualquier instalación.</p>
+
+<h4>Su instalación de pruebas</h4>
+
+<div class="desborde">
+<table>
+<thead><tr><th>Dato</th><th>Valor</th></tr></thead>
+<tbody>
+<tr><td>Empresa</td><td>Pruebas API. No hace falta nombrarla en ningún pedido: sale de la credencial (§01)</td></tr>
+<tr><td>URL base</td><td><code>https://api.agilbank.bdlconsultores.com.ar</code>, sin nada después. Las rutas empiezan con <code>/api/v1/</code>: por ejemplo, <code>POST https://api.agilbank.bdlconsultores.com.ar/api/v1/extractos</code></td></tr>
+<tr><td>Credencial</td><td>Una sola, «ProntoNet pruebas», con los cuatro ámbitos: <code>ab:leer</code>, <code>ab:corregir</code>, <code>ab:conciliar</code> y <code>ab:decidir</code>. Vence el 30-11-2026. El token se lo pasamos aparte, una sola vez. Si hay que cambiarla o darla de baja, lo hacemos nosotros (§02)</td></tr>
+<tr><td>Estado</td><td>Vacía: sin extractos, correcciones, conciliaciones ni decisiones. Lo que AgilBank aprende de esta empresa sale solo de lo que ustedes le informen (§14)</td></tr>
+<tr><td>Límite de llamadas</td><td>2.000 cada 15 minutos. Todo llega por su nginx con una sola dirección IP, así que el cupo es uno para todos sus servidores. Es aparte del de AgilPost. Si se agota, respondemos 429 con <code>Retry-After</code> hasta que la ventana se renueva (§16)</td></tr>
+<tr><td>Para saber si el servicio responde</td><td><code>GET https://api.agilbank.bdlconsultores.com.ar/health/live</code>. No lleva token y no cuenta contra el límite</td></tr>
+</tbody>
+</table>
+</div>
+
+<h4>El orden para probar</h4>
+
+<ol>
+<li><code>GET /health/live</code> tiene que responder 200.</li>
+<li>Envíen un extracto con <code>POST /api/v1/extractos</code> (§04) y guarden el <code>idExtracto</code>.</li>
+<li>Consúltenlo con <code>GET /api/v1/extractos/{idExtracto}</code> (§05) hasta que deje de estar <code>en-proceso</code>.</li>
+<li>Concilien sus renglones con los valores pendientes de ProntoNet (§08) y revisen la propuesta (§09).</li>
+<li>Informen lo que el usuario aceptó, corrigió o rechazó con <code>POST /api/v1/decisiones</code> (§14).</li>
+</ol>
+
 
 <h2><span class="nro">01</span> En pocas palabras</h2>
 
