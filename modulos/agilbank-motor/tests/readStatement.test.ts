@@ -5,7 +5,7 @@ import * as spreadsheet from "../src/sources/spreadsheet";
 import * as visual from "../src/sources/visual";
 import { provenanceOf, readStatement } from "../src/readStatement";
 import { assignIds } from "../src/identity";
-import type { KnownAccount } from "../src/types";
+import type { KnownAccount, StatementReading } from "../src/types";
 import { pdfCifrado, pdfConTexto, rightAt, sparseBook, statementPdf, tiffDePaginas, xlsx } from "./helpers";
 
 const CBU_CREDICOOP = "1910018600001234567891";
@@ -718,6 +718,46 @@ describe("readStatement", () => {
       expect(r.header).toMatchObject({ openingBalanceCents: 100000, closingBalanceCents: 109000 });
     });
 
+    describe("si cierra con sus saldos", () => {
+      const cierra = async (...filas: string[]) => (await readStatement(csv("Fecha;Concepto;Importe;Saldo", ...filas))).checks?.closesWithOwnBalances;
+
+      it("con un solo saldo de renglón y ninguno impreso, las dos puntas salen de él: no se controló nada", async () => {
+        const r = await readStatement(csv("Fecha;Concepto;Importe;Saldo", "01/07/2026;A;100,00;", "02/07/2026;B;-30,00;1.070,00", "03/07/2026;C;-20,00;"));
+        expect(r.header).toMatchObject({ openingBalanceCents: 100000, closingBalanceCents: 105000 });
+        expect(r.checks).toMatchObject({ linesWithBalance: 1, closesWithOwnBalances: null, printedBalances: { openingCents: null, closingCents: null } });
+        expect(r.warnings.map((w) => w.code)).not.toContain("no-cierra");
+      });
+
+      it("el veredicto de la lectura no cambia: lo decide el juez de saldos, no esta marca", async () => {
+        const r = await readStatement(csv("Fecha;Concepto;Importe;Saldo", "01/07/2026;A;100,00;", "02/07/2026;B;-30,00;1.070,00", "03/07/2026;C;-20,00;"));
+        expect(r.verdict).toBe("weak");
+        expect(r.warnings.map((w) => w.code)).toContain("sin-saldos");
+      });
+
+      it("con dos saldos de renglón, las puntas son distintas y la suma controla", async () => {
+        expect(await cierra("01/07/2026;A;100,00;", "02/07/2026;B;-30,00;1.070,00", "03/07/2026;C;-20,00;", "04/07/2026;D;10,00;1.060,00")).toBe(true);
+      });
+
+      it("con una punta impresa, la otra sale de su saldo de renglón y la suma controla", async () => {
+        const filas = ["01/07/2026;A;100,00;", "02/07/2026;B;-30,00;1.070,00", "03/07/2026;C;-20,00;"];
+        expect(await cierra("Saldo anterior;;;1.000,00", ...filas)).toBe(true);
+        expect(await cierra("Saldo anterior;;;1.000,00", ...filas, "Saldo final;;;1.000,00")).toBe(false);
+        expect(await cierra(...filas, "Saldo final;;;1.050,00")).toBe(true);
+        expect(await cierra(...filas, "Saldo final;;;1.000,00")).toBe(false);
+      });
+
+      it("con las dos puntas impresas y un solo saldo de renglón, la suma controla", async () => {
+        const filas = ["Saldo anterior;;;1.000,00", "01/07/2026;A;100,00;", "02/07/2026;B;-30,00;1.070,00", "03/07/2026;C;-20,00;"];
+        expect(await cierra(...filas, "Saldo final;;;1.050,00")).toBe(true);
+        expect(await cierra(...filas, "Saldo final;;;1.060,00")).toBe(false);
+      });
+
+      it("sin saldos de renglón y con los impresos, la suma controla", async () => {
+        const r = await readStatement(csv("Fecha;Concepto;Importe", "Saldo anterior;;1.000,00", "01/07/2026;A;100,00", "02/07/2026;B;-30,00", "Saldo final;;1.070,00"));
+        expect(r.checks?.closesWithOwnBalances).toBe(true);
+      });
+    });
+
     it("sin saldos de renglón, los de los renglones son null", async () => {
       const r = await readStatement(csv("Fecha;Concepto;Importe", "Saldo anterior;;1.000,00", "01/07/2026;Transf recibida;100,00", "02/07/2026;Comision;-10,00"));
       expect(r.checks?.printedBalances).toEqual({ openingCents: 100000, closingCents: null });
@@ -1286,6 +1326,17 @@ describe("un PDF con texto", () => {
       "Se leyeron 1 de 2 páginas: el archivo pasa el tope de 1 páginas. Para leer el resto, manden el extracto partido en archivos más chicos. Los renglones de las otras páginas no están en esta lectura.",
     );
     expect(r.verdict).toBe("weak");
+  });
+
+  it("con la lectura parcial no avisa no-cierra: los renglones que faltan pueden ser la diferencia, y es weak por el aviso de la lectura parcial", async () => {
+    // Los saldos de ProntoNet no son los de este extracto; el corte cae en los últimos cinco días del período.
+    const account = { openingBalance: 1000, closingBalance: 1050, periodFrom: "2026-07-01", periodTo: "2026-07-04" };
+    const entera = await readStatement(statementPdf(), { account });
+    const cierre = (r: StatementReading) => r.warnings.map((w) => w.code).filter((c) => c === "no-cierra" || c === "lectura-parcial");
+    expect(cierre(entera)).toEqual(["no-cierra"]);
+    const parcial = await readStatement(statementPdf(), { account, visual: { maxPages: 1 } });
+    expect(cierre(parcial)).toEqual(["lectura-parcial"]);
+    expect(parcial.verdict).toBe("weak");
   });
 
   describe("el aviso de la lectura parcial dice la causa del corte", () => {

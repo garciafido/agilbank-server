@@ -15,6 +15,15 @@ describe("el paquete de lectura", () => {
     expect(typeof (lectura as Record<string, unknown>)[nombre]).toBe("function");
   });
 
+  it.each(["coordinar", "controlDeSuma", "controlesDeCompletitud", "masDebil", "acotar", "indice"])("publica el juez común: %s", (nombre) => {
+    expect(typeof (lectura as Record<string, unknown>)[nombre]).toBe("function");
+  });
+
+  it("publica las constantes del juez común", () => {
+    expect(typeof lectura.VERSION_DEL_MODULO).toBe("string");
+    expect(lectura.TOPE_POR_DEFECTO).toEqual(expect.objectContaining({ candidatosPorCampo: expect.any(Number) }));
+  });
+
   it("fija el PP-OCR en 1.4.8 exacto", () => {
     expect(paquete.dependencies["@gutenye/ocr-common"]).toBe("1.4.8");
     expect(paquete.dependencies["@gutenye/ocr-node"]).toBe("1.4.8");

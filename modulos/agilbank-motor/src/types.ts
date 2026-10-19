@@ -1,3 +1,4 @@
+import type { DictamenResumido } from "@agilmind/lectura";
 import type { Verdict } from "./verdict";
 
 /** Una celda como sale de la fuente. Las fechas de una planilla ya vienen como "AAAA-MM-DD". */
@@ -116,6 +117,7 @@ export interface ReadingChecks {
   balanceIs: "after" | "before" | null;
   linesWithBalance: number;
   linesThatChain: number;
+  /** `null` si no hay dos puntas o si salen del mismo saldo de renglón: no se controló nada. */
   closesWithOwnBalances: boolean | null;
   closesWithProntoNet: boolean | null;
   /** Los saldos inicial y final impresos en el archivo. El encabezado lleva estos y, si faltan, los de los renglones. */
@@ -133,6 +135,12 @@ export interface StatementReading {
   warnings: Warning[];
   checks: ReadingChecks | null;
 }
+
+/**
+ * La lectura como se guarda: con su dictamen resumido al lado, que no se publica. Si el dictamen no se pudo
+ * armar, es null y `dictamenFallo` dice por qué. Una fila anterior al dictamen no tiene la clave.
+ */
+export type LecturaGuardada = StatementReading & { dictamen?: DictamenResumido | null; dictamenFallo?: string };
 
 /** Lo que un usuario de la empresa marcó para un concepto. Vale solo para su empresa. */
 export interface Correction {

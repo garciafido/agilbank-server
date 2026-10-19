@@ -11,6 +11,11 @@
     "src/ordenDeLectura.ts",
     "src/paginasDePdf.ts",
     "src/paginasDelPdf.ts",
+    "src/juez/firmeza.ts",
+    "src/juez/indice.ts",
+    "src/juez/coordinar.ts",
+    "src/juez/ayudas.ts",
+    "src/juez/resumen.ts",
     "src/deteccionDeTexto.ts",
     "src/reconocimientoDeRenglones.ts",
     "src/orientacionDeLaPagina.ts"

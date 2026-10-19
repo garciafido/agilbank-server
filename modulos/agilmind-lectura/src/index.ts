@@ -22,3 +22,4 @@ export { tamanoDelPng } from "./paginasDelPdf";
 export { prepararFoto, girarPng, pixelesGrises, paginasDeImagen } from "./foto";
 export type { PaginaConPalabras, PalabraDelPdf } from "./paginasDelPdf";
 export type { ApBoundingBox, PageSize, OcrWord } from "./tipos";
+export * from "./juez";

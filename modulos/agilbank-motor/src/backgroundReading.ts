@@ -1,8 +1,11 @@
 import { randomUUID } from "crypto";
 import type { Db } from "./api/http";
+import { resumirDictamen } from "@agilmind/lectura";
 import { conceptKeyOf } from "./dbg/conceptKey";
+import { dictaminarExtracto } from "./juez/juecesDelExtracto";
+import { balanceUnseen, unseenEnd } from "./partialReading";
 import { readStatement } from "./readStatement";
-import type { Correction, KnownAccount } from "./types";
+import type { Correction, KnownAccount, LecturaGuardada, StatementReading } from "./types";
 
 export interface BackgroundStorage {
   downloadBuffer(key: string): Promise<Buffer>;
@@ -47,6 +50,17 @@ const touched = (): { lastUpdatedAt_: Date; version_: string } => ({ lastUpdated
 const pesos = (cents: number | null | undefined): string | null => (cents === null || cents === undefined ? null : (cents / 100).toFixed(2));
 const day = (iso: string | null | undefined): Date | null => (iso ? new Date(`${iso}T00:00:00.000Z`) : null);
 
+/** El dictamen es un agregado: si no se puede armar, la lectura no pierde nada por eso, y queda el porqué. */
+function conDictamen(reading: StatementReading): LecturaGuardada {
+  try {
+    return { ...reading, dictamen: resumirDictamen(dictaminarExtracto(reading)) };
+  } catch (e) {
+    const motivo = e instanceof Error ? e.message : String(e);
+    console.warn("[juez] el dictamen del extracto no se pudo armar:", motivo);
+    return { ...reading, dictamen: null, dictamenFallo: motivo };
+  }
+}
+
 /**
  * El paso `read` del pipeline AbStatementRead (`.implementedBy`). Escribe con `context.prisma` y no con la
  * transacción del paso: si escribiera adentro, el rollback al relanzar se llevaría el estado y la causa.
@@ -89,13 +103,13 @@ export const readStatementStage = async (context: StageContextLike, statementId:
       data: {
         status: "read",
         verdict: reading.verdict,
-        reading: JSON.parse(JSON.stringify(reading)),
+        reading: JSON.parse(JSON.stringify(conDictamen(reading))),
         bankCode: header?.bankCode ?? null,
         cbu: header?.cbu ?? null,
-        periodFrom: day(header?.periodFrom),
-        periodTo: day(header?.periodTo),
-        openingBalance: pesos(header?.openingBalanceCents),
-        closingBalance: pesos(header?.closingBalanceCents),
+        periodFrom: unseenEnd(reading) === "opening" ? null : day(header?.periodFrom),
+        periodTo: unseenEnd(reading) === "closing" ? null : day(header?.periodTo),
+        openingBalance: balanceUnseen(reading, "opening") ? null : pesos(header?.openingBalanceCents),
+        closingBalance: balanceUnseen(reading, "closing") ? null : pesos(header?.closingBalanceCents),
         lineCount: reading.lines.length,
         error: null,
         processedAt: new Date(),
