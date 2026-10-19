@@ -1,5 +1,7 @@
+import { dictaminarExtracto } from "../src/juez/juecesDelExtracto";
 import { toPublicReading } from "../src/publicReading";
-import type { StatementLine, StatementReading } from "../src/types";
+import type { LecturaGuardada, StatementLine, StatementReading } from "../src/types";
+import { resumirDictamen } from "@agilmind/lectura";
 
 const line: StatementLine = {
   id: "r-1",
@@ -28,7 +30,7 @@ const reading: StatementReading = {
   warnings: [{ code: "sin-saldos", detail: "x", blocksProposals: false }],
   checks: {
     direction: "reverse", balanceIs: "after", linesWithBalance: 1, linesThatChain: 1, closesWithOwnBalances: true, closesWithProntoNet: null,
-    printedBalances: { openingCents: null, closingCents: null }, lineBalances: { openingCents: 52944560, closingCents: 151234560 },
+    printedBalances: { openingCents: 52944560, closingCents: 151234560 }, lineBalances: { openingCents: 52944560, closingCents: 151234560 },
   },
 };
 
@@ -112,6 +114,141 @@ describe("toPublicReading", () => {
     });
     expect(p.encabezado).toMatchObject({ saldoInicial: null, saldoFinal: 0 });
     expect(p.renglones[0]).toMatchObject({ saldo: null, importe: 0 });
+  });
+
+  describe("la lectura parcial", () => {
+    const parcial: StatementReading = {
+      ...reading,
+      verdict: "weak",
+      warnings: [{ code: "lectura-parcial", detail: "Se leyeron 1 de 2 páginas.", blocksProposals: true, data: { paginas: 2, paginasLeidas: 1, causa: "paginas" } }],
+      checks: { ...reading.checks!, direction: "chronological" },
+    };
+
+    it("no publica el fin del período: es la fecha del último renglón leído, no la del extracto", () => {
+      expect(toPublicReading(parcial).encabezado).toEqual({ ...toPublicReading(reading).encabezado, periodoHasta: null });
+    });
+
+    it("nada más cambia: el inicio del período, los saldos, los renglones, los avisos y los controles salen igual", () => {
+      const completa = toPublicReading({ ...parcial, warnings: [] });
+      const p = toPublicReading(parcial);
+      expect(p.encabezado).toEqual({ ...completa.encabezado, periodoHasta: null });
+      expect(p.encabezado!.periodoDesde).toBe("2026-07-01");
+      expect(p.encabezado!.saldoInicial).toBe(529445.6);
+      expect(p.renglones).toEqual(completa.renglones);
+      expect(p.controles).toEqual({ ...completa.controles, cierraConSusSaldos: null, cierraConProntoNet: null });
+      expect(p.avisos.map((a) => a.codigo)).toEqual(["lectura-parcial"]);
+    });
+
+    it("tampoco publica si cierra con sus saldos, ni cuando no cierra: la punta que no se vio no se afirma", () => {
+      expect(toPublicReading(parcial).controles!.cierraConSusSaldos).toBeNull();
+      expect(toPublicReading({ ...parcial, checks: { ...parcial.checks!, closesWithOwnBalances: false } }).controles!.cierraConSusSaldos).toBeNull();
+      expect(toPublicReading({ ...parcial, checks: { ...parcial.checks!, closesWithOwnBalances: false } }).controles).toMatchObject({ cierraConProntoNet: null, renglonesConSaldo: 1 });
+    });
+
+    it("tampoco publica si cierra con ProntoNet: el juez deja esos saldos sin juzgar", () => {
+      for (const cierra of [true, false]) {
+        expect(toPublicReading({ ...parcial, checks: { ...parcial.checks!, closesWithProntoNet: cierra } }).controles!.cierraConProntoNet).toBeNull();
+        expect(toPublicReading({ ...reading, checks: { ...reading.checks!, closesWithProntoNet: cierra } }).controles!.cierraConProntoNet).toBe(cierra);
+      }
+    });
+
+    describe("el saldo final", () => {
+      const conImpresos = (printed: { openingCents: number | null; closingCents: number | null }, over: Partial<StatementReading> = {}): StatementReading => ({
+        ...parcial, ...over, checks: { ...parcial.checks!, printedBalances: printed },
+      });
+
+      it("si sale de un saldo de renglón, que es el último leído y no el del extracto, no se publica", () => {
+        expect(toPublicReading(conImpresos({ openingCents: null, closingCents: null })).encabezado!.saldoFinal).toBeNull();
+        expect(toPublicReading(conImpresos({ openingCents: 52944560, closingCents: null })).encabezado!.saldoFinal).toBeNull();
+      });
+
+      it("si es un saldo final impreso y leído, con su rótulo, se conserva", () => {
+        expect(toPublicReading(conImpresos({ openingCents: null, closingCents: 151234560 })).encabezado!.saldoFinal).toBe(1512345.6);
+      });
+
+      it("el cero impreso también se conserva", () => {
+        const r = conImpresos({ openingCents: null, closingCents: 0 }, { header: { ...reading.header!, closingBalanceCents: 0 } });
+        expect(toPublicReading(r).encabezado!.saldoFinal).toBe(0);
+      });
+
+      it("el saldo inicial no cambia, salga de donde salga", () => {
+        expect(toPublicReading(conImpresos({ openingCents: null, closingCents: null })).encabezado!.saldoInicial).toBe(529445.6);
+      });
+
+      it("sin el aviso, un saldo final que sale de un saldo de renglón se publica", () => {
+        const r = { ...reading, checks: { ...reading.checks!, printedBalances: { openingCents: null, closingCents: null } } };
+        expect(toPublicReading(r).encabezado!.saldoFinal).toBe(1512345.6);
+      });
+
+      it("sin los controles no se sabe de dónde sale: no se publica", () => {
+        expect(toPublicReading({ ...parcial, checks: null }).encabezado!.saldoFinal).toBeNull();
+        expect(toPublicReading({ ...reading, checks: null }).encabezado!.saldoFinal).toBe(1512345.6);
+      });
+
+      it("un saldo final que ya era null sigue null", () => {
+        const r = conImpresos({ openingCents: null, closingCents: null }, { header: { ...reading.header!, closingBalanceCents: null } });
+        expect(toPublicReading(r).encabezado!.saldoFinal).toBeNull();
+      });
+    });
+
+    it("sin el aviso, cierraConSusSaldos se publica", () => {
+      expect(toPublicReading(reading).controles!.cierraConSusSaldos).toBe(true);
+      expect(toPublicReading({ ...reading, checks: { ...reading.checks!, closesWithOwnBalances: false } }).controles!.cierraConSusSaldos).toBe(false);
+    });
+
+    it("el encabezado interno no se toca: la conciliación y la comparación con ProntoNet usan el fin del período", () => {
+      toPublicReading(parcial);
+      expect(parcial.header!.periodTo).toBe("2026-07-31");
+    });
+
+    it("con otros avisos y sin el de lectura parcial, el fin del período se publica", () => {
+      expect(toPublicReading(reading).encabezado!.periodoHasta).toBe("2026-07-31");
+      expect(toPublicReading({ ...reading, warnings: [{ code: "no-cierra", detail: "x", blocksProposals: true }] }).encabezado!.periodoHasta).toBe("2026-07-31");
+    });
+
+    it("con el aviso entre otros, también", () => {
+      const avisos = [{ code: "sin-saldos" as const, detail: "x", blocksProposals: false }, ...parcial.warnings];
+      expect(toPublicReading({ ...parcial, warnings: avisos }).encabezado!.periodoHasta).toBeNull();
+    });
+  });
+
+  describe("la lectura parcial de un extracto inverso", () => {
+    // Lo más nuevo va arriba y el PDF se lee desde la página 1: las páginas que faltan son las más viejas.
+    const renglon = (order: number, amountCents: number, balanceCents: number, date: string): StatementLine => ({ ...line, id: `L${order}`, order, date, amountCents, balanceCents });
+    const inverso: StatementReading = {
+      ...reading,
+      verdict: "weak",
+      header: { ...reading.header!, periodFrom: "2026-07-20", periodTo: "2026-07-31", openingBalanceCents: 280000, closingBalanceCents: 300000 },
+      lines: [renglon(1, 10000, 300000, "2026-07-31"), renglon(2, 10000, 290000, "2026-07-20")],
+      warnings: [{ code: "lectura-parcial", detail: "corte", blocksProposals: true, data: { paginas: 70, paginasLeidas: 60, causa: "paginas" } }],
+      checks: {
+        ...reading.checks!, direction: "reverse", linesWithBalance: 2,
+        printedBalances: { openingCents: null, closingCents: null }, lineBalances: { openingCents: 280000, closingCents: 300000 },
+      },
+    };
+    const conImpresos = (printed: { openingCents: number | null; closingCents: number | null }): StatementReading => ({ ...inverso, checks: { ...inverso.checks!, printedBalances: printed } });
+
+    it("no publica el inicio del período ni un saldo inicial sacado de un renglón: son los del renglón más viejo leído", () => {
+      expect(toPublicReading(inverso).encabezado).toMatchObject({ periodoDesde: null, saldoInicial: null });
+    });
+
+    it("el fin del período y el saldo final están arriba, en lo que se leyó: se publican", () => {
+      expect(toPublicReading(inverso).encabezado).toMatchObject({ periodoHasta: "2026-07-31", saldoFinal: 3000 });
+    });
+
+    it("un saldo inicial impreso y leído se conserva, aunque sea cero", () => {
+      expect(toPublicReading(conImpresos({ openingCents: 280000, closingCents: null })).encabezado!.saldoInicial).toBe(2800);
+      const cero = { ...conImpresos({ openingCents: 0, closingCents: null }), header: { ...inverso.header!, openingBalanceCents: 0 } };
+      expect(toPublicReading(cero).encabezado!.saldoInicial).toBe(0);
+    });
+
+    it("los cierres se callan igual que en el cronológico", () => {
+      expect(toPublicReading({ ...inverso, checks: { ...inverso.checks!, closesWithProntoNet: true } }).controles).toMatchObject({ sentido: "inverso", cierraConSusSaldos: null, cierraConProntoNet: null });
+    });
+
+    it("sin el aviso, se publican las dos puntas", () => {
+      expect(toPublicReading({ ...inverso, warnings: [] }).encabezado).toMatchObject({ periodoDesde: "2026-07-20", periodoHasta: "2026-07-31", saldoInicial: 2800, saldoFinal: 3000 });
+    });
   });
 
   describe("sin lectura y no disponible", () => {
@@ -240,6 +377,21 @@ describe("toPublicReading", () => {
         "sentido", "saldoDeLaFila", "renglonesConSaldo", "renglonesQueEncadenan", "cierraConSusSaldos", "cierraConProntoNet",
       ]);
       expect(JSON.stringify(p)).not.toMatch(/interno|secreto/);
+    });
+
+    it("el dictamen guardado junto a la lectura no se publica", () => {
+      const dictamen = dictaminarExtracto(reading);
+      expect(toPublicReading({ ...reading, dictamen } as never)).toEqual(toPublicReading(reading));
+      expect(JSON.stringify(toPublicReading({ ...reading, dictamen } as never))).not.toMatch(/dictamen|sospechosos|parteMasDebil/);
+    });
+
+    it("la lectura como se guarda, con el dictamen resumido o con su falla, publica lo mismo que la lectura", () => {
+      const conResumen: LecturaGuardada = { ...reading, dictamen: resumirDictamen(dictaminarExtracto(reading)) };
+      const conFalla: LecturaGuardada = { ...reading, dictamen: null, dictamenFallo: "juez roto" };
+      for (const guardada of [conResumen, conFalla]) {
+        expect(toPublicReading(guardada)).toEqual(toPublicReading(reading));
+        expect(JSON.stringify(toPublicReading(guardada))).not.toMatch(/dictamen|cierran|juez roto/);
+      }
     });
 
     it("el JSON de una lectura no tiene claves undefined ni nombres del motor", () => {

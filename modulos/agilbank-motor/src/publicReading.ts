@@ -1,3 +1,4 @@
+import { balanceUnseen, isPartialReading, unseenEnd } from "./partialReading";
 import type { StatementReading, TypeSource } from "./types";
 
 // Los identificadores del motor van en inglés; el contrato con BDL, en castellano. La traducción vive
@@ -69,6 +70,10 @@ export const toPublicReading = (r: StatementReading): LecturaPublica => {
   // Sin lectura y no disponible no traen encabezado, renglones ni controles, traiga lo que traiga la lectura.
   const read = r.verdict === "verified" || r.verdict === "weak";
   const { header, checks } = r;
+  // Con la lectura cortada, el renglón leído más cercano a la punta que no se vio no es esa punta del extracto: su fecha,
+  // su saldo y el cierre de los saldos afirmarían lo que no se vio. Solo un saldo impreso, con su rótulo en una página leída, se conserva.
+  const partial = isPartialReading(r);
+  const unseen = unseenEnd(r);
   return {
     huella: r.fingerprint,
     veredicto: VEREDICTOS[r.verdict],
@@ -80,10 +85,10 @@ export const toPublicReading = (r: StatementReading): LecturaPublica => {
             cuenta: header.account,
             cbu: header.cbu,
             moneda: header.currency,
-            periodoDesde: header.periodFrom,
-            periodoHasta: header.periodTo,
-            saldoInicial: pesos(header.openingBalanceCents),
-            saldoFinal: pesos(header.closingBalanceCents),
+            periodoDesde: unseen === "opening" ? null : header.periodFrom,
+            periodoHasta: unseen === "closing" ? null : header.periodTo,
+            saldoInicial: balanceUnseen(r, "opening") ? null : pesos(header.openingBalanceCents),
+            saldoFinal: balanceUnseen(r, "closing") ? null : pesos(header.closingBalanceCents),
           }
         : null,
     renglones: read
@@ -128,8 +133,8 @@ export const toPublicReading = (r: StatementReading): LecturaPublica => {
             saldoDeLaFila: checks.balanceIs === null || checks.linesWithBalance === 0 ? null : checks.balanceIs === "after" ? "despues" : "antes",
             renglonesConSaldo: checks.linesWithBalance,
             renglonesQueEncadenan: checks.linesThatChain,
-            cierraConSusSaldos: checks.closesWithOwnBalances,
-            cierraConProntoNet: checks.closesWithProntoNet,
+            cierraConSusSaldos: partial ? null : checks.closesWithOwnBalances,
+            cierraConProntoNet: partial ? null : checks.closesWithProntoNet,
           }
         : null,
   };

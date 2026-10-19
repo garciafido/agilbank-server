@@ -43,6 +43,11 @@ export interface CheckInput {
   accounts: string[];
   /** La tabla tiene una columna rotulada como saldo que el juez no usó: ver `hasLabeledBalanceColumn`. */
   hasLabeledBalanceColumn: boolean;
+  /**
+   * La lectura se cortó: los renglones que faltan pueden ser la diferencia, así que no hay con qué afirmar que
+   * no cierra, y el detalle imprimiría un saldo que la lectura pública oculta. lectura-parcial ya frena las propuestas.
+   */
+  partial: boolean;
 }
 
 export interface CheckOutput {
@@ -54,6 +59,9 @@ export interface CheckOutput {
 export const buildWarnings = (input: CheckInput): CheckOutput => {
   const { judgement: j, lines, header, account } = input;
   const warnings: Warning[] = [];
+  const doesNotClose = (detail: string) => {
+    if (!input.partial) warnings.push({ code: "no-cierra", detail, blocksProposals: true });
+  };
   const total = lines.reduce((s, l) => s + l.amountCents, 0);
   const o = header.openingBalanceCents;
   const c = header.closingBalanceCents;
@@ -75,16 +83,12 @@ export const buildWarnings = (input: CheckInput): CheckOutput => {
     });
   }
 
+  // Con las dos puntas sacadas del único saldo de renglón, la resta es una identidad: no se controló nada.
+  const bothFromOneRowBalance = j.openingCents === null && j.closingCents === null && lines.filter((l) => l.balanceCents !== null).length === 1;
   let own: boolean | null = null;
-  if (o !== null && c !== null) {
+  if (o !== null && c !== null && !bothFromOneRowBalance) {
     own = o + total === c;
-    if (!own) {
-      warnings.push({
-        code: "no-cierra",
-        detail: `El saldo inicial más los renglones da ${pesos(o + total)}, y el saldo final es ${pesos(c)}: hay una diferencia de ${pesos(c - (o + total))}.`,
-        blocksProposals: true,
-      });
-    }
+    if (!own) doesNotClose(`El saldo inicial más los renglones da ${pesos(o + total)}, y el saldo final es ${pesos(c)}: hay una diferencia de ${pesos(c - (o + total))}.`);
   }
 
   // Sin el período no se sabe de qué resumen son los saldos de ProntoNet: un extracto diario mandado
@@ -96,22 +100,11 @@ export const buildWarnings = (input: CheckInput): CheckOutput => {
     const covers = coversPeriod(lines, account.periodFrom, account.periodTo);
     if (o !== null && c !== null) {
       pn = o === ko && c === kc;
-      if (!pn && covers) {
-        warnings.push({
-          code: "no-cierra",
-          detail: `Los saldos del archivo (${pesos(o)} y ${pesos(c)}) no son los del resumen de ProntoNet (${pesos(ko)} y ${pesos(kc)}).`,
-          blocksProposals: true,
-        });
-      } else if (!pn) pn = null;
+      if (!pn && covers) doesNotClose(`Los saldos del archivo (${pesos(o)} y ${pesos(c)}) no son los del resumen de ProntoNet (${pesos(ko)} y ${pesos(kc)}).`);
+      else if (!pn) pn = null;
     } else if (covers) {
       pn = ko + total === kc;
-      if (!pn) {
-        warnings.push({
-          code: "no-cierra",
-          detail: `Partiendo del saldo inicial de ProntoNet y sumando los renglones se llega a ${pesos(ko + total)}, no a ${pesos(kc)}: hay una diferencia de ${pesos(kc - (ko + total))}.`,
-          blocksProposals: true,
-        });
-      }
+      if (!pn) doesNotClose(`Partiendo del saldo inicial de ProntoNet y sumando los renglones se llega a ${pesos(ko + total)}, no a ${pesos(kc)}: hay una diferencia de ${pesos(kc - (ko + total))}.`);
     }
   }
 

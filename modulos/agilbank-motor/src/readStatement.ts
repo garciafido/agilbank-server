@@ -226,6 +226,7 @@ export const readStatement = async (file: Buffer, options: ReadOptions = {}): Pr
     fileCbus,
     accounts,
     hasLabeledBalanceColumn: hasLabeledBalanceColumn(grid, table),
+    partial: partial !== null,
   });
   const warnings = partial === null ? out.warnings : [...out.warnings, partialWarning(partial)];
 

@@ -1,5 +1,10 @@
 import { configureBackgroundReading, latestCorrections, MAX_READ_STARTS, markStatementFailed, readStatementStage } from "../src/backgroundReading";
+import { readStatement } from "../src/readStatement";
+import * as lector from "../src/readStatement";
+import * as jueces from "../src/juez/juecesDelExtracto";
 import { fakeDb } from "./api/fakeDb";
+import { resumirDictamen } from "@agilmind/lectura";
+import type { LecturaGuardada } from "../src/types";
 
 const CSV = Buffer.from(
   "Fecha;Concepto;Importe;Saldo\n01/07/2026;Saldo anterior;;1.000,00\n02/07/2026;COMISION MANTENIMIENTO;-10,00;990,00\n03/07/2026;Transf recibida;100,00;1.090,00\n",
@@ -31,6 +36,39 @@ describe("readStatementStage", () => {
     expect(b.wheres.every((w) => w.tenant_id_ === "T1")).toBe(true);
   });
 
+  it("guarda el dictamen del extracto resumido junto a la lectura, y el resto de la lectura queda como se guardaba", async () => {
+    configureBackgroundReading({ storage: storage({ [KEY]: CSV }).storage });
+    const b = fakeDb({ abStatement: [statement()] });
+    await readStatementStage({ prisma: b.db, currentUser: { tenant_id_: "T1" } }, "s1", "w1");
+    const guardada: LecturaGuardada = b.rows.abStatement[0].reading;
+    const { dictamen, ...lectura } = guardada;
+    const leida = await readStatement(CSV, { fileName: "julio.csv", corrections: [] });
+    expect(dictamen).toEqual(JSON.parse(JSON.stringify(resumirDictamen(jueces.dictaminarExtracto(leida)))));
+    expect(dictamen!.cierran).toEqual(expect.objectContaining({ "cadena-de-saldos": 2 }));
+    expect(dictamen!.controles.every((c) => c.estado !== "cierra")).toBe(true);
+    expect("dictamenFallo" in guardada).toBe(false);
+    expect(lectura).toEqual(JSON.parse(JSON.stringify(leida)));
+  });
+
+  it("si el dictamen no se puede armar, la lectura se guarda igual con dictamen null y el motivo queda en el registro", async () => {
+    const avisos = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const roto = jest.spyOn(jueces, "dictaminarExtracto").mockImplementation(() => { throw new Error("juez roto"); });
+    try {
+      configureBackgroundReading({ storage: storage({ [KEY]: CSV }).storage });
+      const b = fakeDb({ abStatement: [statement()] });
+      await expect(readStatementStage({ prisma: b.db, currentUser: { tenant_id_: "T1" } }, "s1", "w1")).resolves.toEqual({ status: "read" });
+      const row = b.rows.abStatement[0];
+      expect(row.status).toBe("read");
+      expect(row.reading.dictamen).toBeNull();
+      expect(row.reading.dictamenFallo).toBe("juez roto");
+      expect(row.reading.lines.length).toBeGreaterThan(0);
+      expect(avisos).toHaveBeenCalledWith("[juez] el dictamen del extracto no se pudo armar:", "juez roto");
+    } finally {
+      roto.mockRestore();
+      avisos.mockRestore();
+    }
+  });
+
   it("guarda el encabezado en columnas: banco, CBU, período y saldos en pesos con dos decimales", async () => {
     configureBackgroundReading({ storage: storage({ [KEY]: CSV }).storage });
     const b = fakeDb({ abStatement: [statement({ declaredAccount: { cbu: "1910001800005555555555" } })] });
@@ -46,6 +84,95 @@ describe("readStatementStage", () => {
       lineCount: row.reading.lines.length,
     });
     expect(row.lineCount).toBeGreaterThan(0);
+  });
+
+  it("con una lectura parcial, la columna del fin del período queda en null: el último renglón leído no es el fin del extracto", async () => {
+    const entera = await readStatement(CSV, { fileName: "julio.csv", corrections: [] });
+    const parcial = { ...entera, warnings: [...entera.warnings, { code: "lectura-parcial" as const, detail: "x", blocksProposals: true }] };
+    const lee = jest.spyOn(lector, "readStatement").mockResolvedValue(parcial);
+    try {
+      configureBackgroundReading({ storage: storage({ [KEY]: CSV }).storage });
+      const b = fakeDb({ abStatement: [statement()] });
+      await readStatementStage({ prisma: b.db, currentUser: { tenant_id_: "T1" } }, "s1");
+      const row = b.rows.abStatement[0];
+      expect(row.periodTo).toBeNull();
+      expect(row.periodFrom).toEqual(new Date("2026-07-02T00:00:00.000Z"));
+      expect(row.reading.header.periodTo).toBe("2026-07-03");
+    } finally {
+      lee.mockRestore();
+    }
+  });
+
+  describe("con una lectura parcial, la columna del saldo final", () => {
+    const guardarParcial = async (over: (r: LecturaGuardada) => Partial<LecturaGuardada> = () => ({})) => {
+      const entera = await readStatement(CSV, { fileName: "julio.csv", corrections: [] });
+      const parcial = { ...entera, warnings: [...entera.warnings, { code: "lectura-parcial" as const, detail: "x", blocksProposals: true }] };
+      const lee = jest.spyOn(lector, "readStatement").mockResolvedValue({ ...parcial, ...over(parcial) });
+      try {
+        configureBackgroundReading({ storage: storage({ [KEY]: CSV }).storage });
+        const b = fakeDb({ abStatement: [statement()] });
+        await readStatementStage({ prisma: b.db, currentUser: { tenant_id_: "T1" } }, "s1");
+        return b.rows.abStatement[0];
+      } finally {
+        lee.mockRestore();
+      }
+    };
+
+    it("queda en null si sale de un saldo de renglón: es el del último renglón leído, no el del extracto", async () => {
+      const row = await guardarParcial();
+      expect(row.reading.checks.printedBalances.closingCents).toBeNull();
+      expect(row.closingBalance).toBeNull();
+      expect(row.openingBalance).toBe("1000.00");
+      expect(row.reading.header.closingBalanceCents).toBe(109000);
+    });
+
+    it("se conserva si es un saldo final impreso y leído, con su rótulo", async () => {
+      const row = await guardarParcial((r) => ({ checks: { ...r.checks!, printedBalances: { ...r.checks!.printedBalances, closingCents: 109000 } } }));
+      expect(row.closingBalance).toBe("1090.00");
+    });
+
+    it("sin los controles no se sabe de dónde sale: queda en null", async () => {
+      expect((await guardarParcial(() => ({ checks: null }))).closingBalance).toBeNull();
+    });
+  });
+
+  describe("con una lectura parcial de un extracto inverso, lo que no se vio es el principio", () => {
+    const guardarInversa = async (printed: { openingCents: number | null; closingCents: number | null }) => {
+      const entera = await readStatement(CSV, { fileName: "julio.csv", corrections: [] });
+      const parcial = {
+        ...entera,
+        warnings: [...entera.warnings, { code: "lectura-parcial" as const, detail: "x", blocksProposals: true }],
+        checks: { ...entera.checks!, direction: "reverse" as const, printedBalances: printed },
+      };
+      const lee = jest.spyOn(lector, "readStatement").mockResolvedValue(parcial);
+      try {
+        configureBackgroundReading({ storage: storage({ [KEY]: CSV }).storage });
+        const b = fakeDb({ abStatement: [statement()] });
+        await readStatementStage({ prisma: b.db, currentUser: { tenant_id_: "T1" } }, "s1");
+        return b.rows.abStatement[0];
+      } finally {
+        lee.mockRestore();
+      }
+    };
+
+    it("el inicio del período y un saldo inicial sacado de un renglón quedan en null; el fin y el saldo final se guardan", async () => {
+      const row = await guardarInversa({ openingCents: null, closingCents: null });
+      expect(row).toMatchObject({ periodFrom: null, openingBalance: null, periodTo: new Date("2026-07-03T00:00:00.000Z"), closingBalance: "1090.00" });
+      expect(row.reading.header.periodFrom).toBe("2026-07-02");
+    });
+
+    it("un saldo inicial impreso y leído se conserva", async () => {
+      expect((await guardarInversa({ openingCents: 100000, closingCents: null })).openingBalance).toBe("1000.00");
+    });
+  });
+
+  it("sin la lectura parcial, un saldo final que sale de un saldo de renglón se guarda", async () => {
+    configureBackgroundReading({ storage: storage({ [KEY]: CSV }).storage });
+    const b = fakeDb({ abStatement: [statement()] });
+    await readStatementStage({ prisma: b.db, currentUser: { tenant_id_: "T1" } }, "s1");
+    const row = b.rows.abStatement[0];
+    expect(row.reading.checks.printedBalances.closingCents).toBeNull();
+    expect(row.closingBalance).toBe("1090.00");
   });
 
   it("un archivo que no es un extracto se guarda leído, sin encabezado: todas las columnas del encabezado en null", async () => {
