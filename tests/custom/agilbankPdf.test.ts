@@ -142,14 +142,16 @@ afterAll(async () => {
 const workerContext = async (workerEventId: string): Promise<MyApolloContext> => {
   const workerEvent = await basePrisma.workerEvent.findUnique({
     where: { id: workerEventId },
-    include: { triggerUserId: { include: { roles: { include: { permissions: true } }, tenant_: true } } },
+    include: { triggerUserId: { include: { role: { include: { permissions: true } }, tenant_: true } } },
   });
   const user = workerEvent!.triggerUserId;
+  // Un usuario tiene un rol o ninguno (User.role), como arma el contexto el worker.
+  const rolDelUsuario = user?.role?.id;
   return {
     currentUser: user as any,
     isSystemMode: false,
-    hasRole: (role: string) => user?.roles?.some((r: any) => r.name === role) || false,
-    permissions: () => new Set<string>(user.roles.flatMap((role: any) => (role.permissions || []).map((p: any) => p.id))),
+    hasRole: (role: string) => !!rolDelUsuario && rolDelUsuario === role,
+    permissions: () => new Set<string>((user.role?.permissions ?? []).map((p: { id: string }) => p.id)),
     prisma: basePrisma,
     container: container.createChildContainer(),
   } as unknown as MyApolloContext;
